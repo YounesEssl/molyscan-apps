@@ -4,8 +4,10 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Text } from '@/components/ui';
+import { Toggle } from '@/components/ui/Toggle';
 import { ScanHistoryItem } from '@/components/history/ScanHistoryItem';
 import { ScanHistoryFilter } from '@/components/history/ScanHistoryFilter';
+import { ScanMap } from '@/components/history/ScanMap';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '@/constants/theme';
 import { MOCK_SCANS } from '@/mocks/scans.mock';
 import type { ScanStatus } from '@/types/scan';
@@ -15,6 +17,7 @@ export default function HistoryScreen(): React.JSX.Element {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<ScanStatus | 'all'>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
   const filteredScans = useMemo(() => {
     let result: ScanRecord[] = MOCK_SCANS;
@@ -64,29 +67,47 @@ export default function HistoryScreen(): React.JSX.Element {
         </View>
       </View>
 
-      {/* Filters */}
-      <View style={styles.filterContainer}>
-        <ScanHistoryFilter activeFilter={filter} onFilterChange={setFilter} />
+      {/* View mode toggle */}
+      <View style={styles.toggleContainer}>
+        <Toggle
+          options={[
+            { label: 'Liste', value: 'list' },
+            { label: 'Carte', value: 'map' },
+          ]}
+          value={viewMode}
+          onChange={(v) => setViewMode(v as 'list' | 'map')}
+        />
       </View>
 
-      {/* List */}
-      <FlatList
-        data={filteredScans}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="file-tray-outline" size={40} color={COLORS.textMuted} />
-            </View>
-            <Text variant="body" color={COLORS.textSecondary}>
-              Aucun scan pour le moment
-            </Text>
+      {viewMode === 'list' ? (
+        <>
+          {/* Filters */}
+          <View style={styles.filterContainer}>
+            <ScanHistoryFilter activeFilter={filter} onFilterChange={setFilter} />
           </View>
-        }
-      />
+
+          {/* List */}
+          <FlatList
+            data={filteredScans}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            contentContainerStyle={styles.listContent}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="file-tray-outline" size={40} color={COLORS.textMuted} />
+                </View>
+                <Text variant="body" color={COLORS.textSecondary}>
+                  Aucun scan pour le moment
+                </Text>
+              </View>
+            }
+          />
+        </>
+      ) : (
+        <ScanMap scans={filteredScans} />
+      )}
     </ScreenWrapper>
   );
 }
@@ -98,6 +119,10 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md,
   },
   searchContainer: {
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
+  },
+  toggleContainer: {
     paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
   },

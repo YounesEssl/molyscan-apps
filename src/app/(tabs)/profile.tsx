@@ -7,9 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Text, Avatar, Card } from '@/components/ui';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
+import { SyncQueue } from '@/components/layout/SyncQueue';
 import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth.store';
 import { useOfflineStore } from '@/stores/offline.store';
+import { useSync } from '@/hooks/useSync';
 import { MOCK_USER } from '@/mocks/user.mock';
 import { MOCK_SCANS } from '@/mocks/scans.mock';
 import { hasPermission } from '@/utils/permissions';
@@ -21,6 +23,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const role = (user.role ?? 'commercial') as UserRole;
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const { isOffline, setManualOffline } = useOfflineStore();
+  const { syncNow } = useSync();
 
   const handleLogout = () => {
     router.replace('/(auth)/login');
@@ -120,6 +123,9 @@ export default function ProfileScreen(): React.JSX.Element {
               />
             </View>
           </Card>
+
+          {/* Sync queue */}
+          <SyncQueue onSyncNow={syncNow} />
 
           {/* RBAC shortcuts */}
           {hasPermission(role, 'canExportData') && (

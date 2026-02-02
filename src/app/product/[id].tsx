@@ -1,17 +1,26 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Button } from '@/components/ui';
 import { ProductMatch } from '@/components/product/ProductMatch';
+import { TechnicalSheet } from '@/components/product/TechnicalSheet';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { MOCK_SCANS } from '@/mocks/scans.mock';
 import { formatFullDate } from '@/utils/date';
 
+const SCAN_METHOD_LABELS: Record<string, string> = {
+  barcode: 'code-barres',
+  label: 'étiquette OCR',
+  voice: 'vocal',
+  camera: 'caméra',
+};
+
 export default function ProductDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const [showTechSheet, setShowTechSheet] = useState(false);
   const scan = MOCK_SCANS.find((s) => s.id === id);
 
   if (!scan) {
@@ -41,7 +50,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
             </Text>
           )}
           <Text variant="caption" color={COLORS.textMuted}>
-            Scanné via {scan.scanMethod === 'voice' ? 'vocal' : 'caméra'}
+            Scanné via {SCAN_METHOD_LABELS[scan.scanMethod] ?? scan.scanMethod}
           </Text>
         </View>
 
@@ -86,7 +95,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
               title="Fiche technique"
               variant="outline"
               icon="document-text-outline"
-              onPress={() => {}}
+              onPress={() => setShowTechSheet(true)}
               style={styles.actionButton}
             />
             <Button
@@ -101,6 +110,18 @@ export default function ProductDetailScreen(): React.JSX.Element {
       </View>
 
       <View style={styles.bottomSpacer} />
+
+      {/* Technical sheet modal */}
+      {scan.molydalMatch && (
+        <Modal visible={showTechSheet} animationType="slide" presentationStyle="pageSheet">
+          <ScreenWrapper padded={false}>
+            <Header title="Fiche technique" showBack onBack={() => setShowTechSheet(false)} />
+            <View style={styles.techSheetContent}>
+              <TechnicalSheet match={scan.molydalMatch} />
+            </View>
+          </ScreenWrapper>
+        </Modal>
+      )}
     </ScreenWrapper>
   );
 }
@@ -136,5 +157,9 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: SPACING.xxl,
+  },
+  techSheetContent: {
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
   },
 });

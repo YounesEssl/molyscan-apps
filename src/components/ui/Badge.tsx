@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, RADIUS, SPACING, FONT_SIZE } from '@/constants/theme';
 
 interface BadgeProps {
   label: string;
   variant?: 'success' | 'warning' | 'danger' | 'neutral' | 'primary';
+  onPress?: () => void;
 }
 
 const BADGE_COLORS = {
@@ -18,14 +19,24 @@ const BADGE_COLORS = {
 export const Badge: React.FC<BadgeProps> = ({
   label,
   variant = 'neutral',
+  onPress,
 }) => {
   const colors = BADGE_COLORS[variant];
-
-  return (
+  const content = (
     <View style={[styles.badge, { backgroundColor: colors.bg }]}>
       <Text style={[styles.text, { color: colors.text }]}>{label}</Text>
     </View>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return content;
 };
 
 const styles = StyleSheet.create({

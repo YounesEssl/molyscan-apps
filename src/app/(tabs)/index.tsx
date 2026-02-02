@@ -9,6 +9,8 @@ import { Text, Card } from '@/components/ui';
 import { NotificationBell } from '@/components/dashboard/NotificationBell';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RecentScans } from '@/components/dashboard/RecentScans';
+import { CompetitorChart } from '@/components/dashboard/CompetitorChart';
+import { ScanFrequencyChart } from '@/components/dashboard/ScanFrequencyChart';
 import { PriceRequestCard } from '@/components/workflow/PriceRequestCard';
 import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth.store';
@@ -119,6 +121,17 @@ export default function DashboardScreen(): React.JSX.Element {
 
         {/* Recent scans */}
         <RecentScans />
+
+        {/* Intelligence concurrentielle — visible for Commercial and Admin */}
+        {(role === 'commercial' || role === 'admin') && (
+          <View style={styles.section}>
+            <Text variant="label" style={styles.sectionTitle}>
+              Intelligence concurrentielle
+            </Text>
+            <CompetitorChart />
+            <ScanFrequencyChart />
+          </View>
+        )}
 
         <View style={styles.bottomSpacer} />
       </View>

@@ -1,20 +1,25 @@
-import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, FlatList, StyleSheet, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
-import { Text, Card, Badge, EmptyState } from '@/components/ui';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { Text, Card, Badge, Button, EmptyState } from '@/components/ui';
+import { COLORS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
 import { voiceNoteService } from '@/services/voice-note.service';
 import type { VoiceNote } from '@/schemas/voice-note.schema';
 import { formatRelativeDate } from '@/utils/date';
 
 export default function VoiceNoteScreen(): React.JSX.Element {
+  const router = useRouter();
   const [notes, setNotes] = useState<VoiceNote[]>([]);
 
-  useEffect(() => {
-    voiceNoteService.getAll().then(setNotes);
-  }, []);
+  // Reload notes when screen is focused (after recording)
+  useFocusEffect(
+    useCallback(() => {
+      voiceNoteService.getAll().then(setNotes);
+    }, []),
+  );
 
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -25,6 +30,15 @@ export default function VoiceNoteScreen(): React.JSX.Element {
   return (
     <ScreenWrapper padded={false}>
       <Header title="Notes vocales CRM" showBack />
+      <View style={styles.recordButtonContainer}>
+        <Button
+          title="Nouvelle note vocale"
+          variant="accent"
+          icon="mic"
+          onPress={() => router.push('/voice-note/record')}
+          style={styles.recordButton}
+        />
+      </View>
       <FlatList
         data={notes}
         keyExtractor={(item) => item.id}
@@ -69,6 +83,13 @@ export default function VoiceNoteScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
+  recordButtonContainer: {
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  recordButton: {
+    width: '100%',
+  },
   list: {
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.xl,

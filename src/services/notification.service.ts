@@ -16,4 +16,10 @@ export const notificationService = {
   async markAllAsRead(): Promise<void> {
     await delay(100);
   },
+
+  async registerPushToken(token: string): Promise<void> {
+    // Mock — log token for now, will send to backend later
+    console.log('[NotificationService] Registering push token:', token);
+    await delay(100);
+  },
 };

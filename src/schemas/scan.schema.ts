@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ScanMethodSchema = z.enum(['camera', 'voice']);
+export const ScanMethodSchema = z.enum(['barcode', 'label', 'voice']);
 export type ScanMethod = z.infer<typeof ScanMethodSchema>;
 
 export const ScanLocationSchema = z.object({
@@ -39,7 +39,7 @@ export const ScanRecordSchema = z.object({
   molydalMatch: MolydalMatchSchema.nullable(),
   status: ScanStatusSchema,
   scannedAt: z.string().datetime(),
-  scanMethod: ScanMethodSchema.default('camera'),
+  scanMethod: ScanMethodSchema.default('barcode'),
   location: ScanLocationSchema.nullable().default(null),
   userId: z.string().optional(),
 });

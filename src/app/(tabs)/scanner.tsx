@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,15 +10,20 @@ import { ScanResult } from '@/components/scanner/ScanResult';
 import { PermissionGate } from '@/components/scanner/PermissionGate';
 import { ScanModeSwitch } from '@/components/scanner/ScanModeSwitch';
 import { VoiceInput } from '@/components/scanner/VoiceInput';
+import { LabelCaptureOverlay } from '@/components/scanner/LabelCaptureOverlay';
 import { useCameraPermission } from '@/hooks/useCameraPermission';
 import { useBarcodeScan } from '@/hooks/useBarcodeScan';
 import { useScannerStore } from '@/stores/scanner.store';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { MOCK_SCANNED_PRODUCTS } from '@/mocks/products.mock';
 
 export default function ScannerScreen(): React.JSX.Element {
+  const cameraRef = useRef<CameraView>(null);
   const { isLoading, isGranted, requestPermission } = useCameraPermission();
   const {
     handleBarcodeScanned,
+    captureLabel,
+    isAnalyzingLabel,
     lastScanRecord,
     isScanning,
     flashEnabled,
@@ -26,6 +31,8 @@ export default function ScannerScreen(): React.JSX.Element {
     resetScan,
   } = useBarcodeScan();
   const { scanMode, setScanMode } = useScannerStore();
+
+  const needsCamera = scanMode === 'barcode' || scanMode === 'label';
 
   if (isLoading) {
     return (
@@ -35,7 +42,7 @@ export default function ScannerScreen(): React.JSX.Element {
     );
   }
 
-  if (!isGranted && scanMode === 'camera') {
+  if (!isGranted && needsCamera) {
     return (
       <ScreenWrapper>
         <PermissionGate onRequestPermission={requestPermission} />
@@ -45,13 +52,14 @@ export default function ScannerScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      {scanMode === 'camera' ? (
+      {needsCamera ? (
         <>
           <CameraView
+            ref={cameraRef}
             style={StyleSheet.absoluteFill}
             facing="back"
             enableTorch={flashEnabled}
-            barcodeScannerSettings={{
+            barcodeScannerSettings={scanMode === 'barcode' ? {
               barcodeTypes: [
                 'ean13',
                 'ean8',
@@ -61,16 +69,25 @@ export default function ScannerScreen(): React.JSX.Element {
                 'code39',
                 'qr',
               ],
-            }}
-            onBarcodeScanned={isScanning ? handleBarcodeScanned : undefined}
+            } : undefined}
+            onBarcodeScanned={scanMode === 'barcode' && isScanning ? handleBarcodeScanned : undefined}
           />
-          {isScanning && <ScanOverlay />}
+          {scanMode === 'barcode' && isScanning && <ScanOverlay />}
+          {scanMode === 'label' && (
+            <LabelCaptureOverlay
+              onCapture={() => captureLabel(cameraRef)}
+              isAnalyzing={isAnalyzingLabel}
+            />
+          )}
         </>
       ) : (
         <VoiceInput
           onResult={(text) => {
-            // Simulate a voice scan result
-            handleBarcodeScanned({ type: 'qr', data: '3456789012345' } as any);
+            // Find a matching product by name
+            const matchBarcode = MOCK_SCANNED_PRODUCTS.find(
+              (p) => p.name.toLowerCase().includes(text.toLowerCase()),
+            )?.barcode ?? '3456789012345';
+            handleBarcodeScanned({ type: 'qr', data: matchBarcode } as never, 'voice');
           }}
         />
       )}
@@ -81,7 +98,7 @@ export default function ScannerScreen(): React.JSX.Element {
           <View style={styles.modeContainer}>
             <ScanModeSwitch mode={scanMode} onChange={setScanMode} />
           </View>
-          {scanMode === 'camera' && (
+          {needsCamera && (
             <TouchableOpacity
               style={styles.controlButton}
               onPress={toggleFlash}
@@ -97,8 +114,8 @@ export default function ScannerScreen(): React.JSX.Element {
         </View>
       </SafeAreaView>
 
-      {/* Instruction text when scanning */}
-      {isScanning && scanMode === 'camera' && (
+      {/* Instruction text when scanning barcode */}
+      {isScanning && scanMode === 'barcode' && (
         <View style={styles.instructionContainer}>
           <Text variant="body" color={COLORS.surface} style={styles.instruction}>
             Placez le code-barres dans le cadre
@@ -141,7 +158,6 @@ const styles = StyleSheet.create({
   },
   modeContainer: {
     flex: 1,
-    maxWidth: 200,
   },
   controlButton: {
     width: 48,

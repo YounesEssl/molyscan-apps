@@ -17,10 +17,10 @@ export const useScannerStore = create<ScannerState>((set) => ({
   lastScanRecord: null,
   isScanning: true,
   flashEnabled: false,
-  scanMode: 'camera',
+  scanMode: 'barcode',
   setLastScanRecord: (record) => set({ lastScanRecord: record }),
   setIsScanning: (scanning) => set({ isScanning: scanning }),
   toggleFlash: () => set((s) => ({ flashEnabled: !s.flashEnabled })),
   setScanMode: (mode) => set({ scanMode: mode }),
-  reset: () => set({ lastScanRecord: null, isScanning: true, flashEnabled: false, scanMode: 'camera' }),
+  reset: () => set({ lastScanRecord: null, isScanning: true, flashEnabled: false, scanMode: 'barcode' }),
 }));

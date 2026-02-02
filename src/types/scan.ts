@@ -17,7 +17,7 @@ export interface MolydalMatch {
   technicalSheetUrl?: string;
 }
 
-export type ScanStatus = 'matched' | 'pending' | 'no_match';
+export type ScanStatus = 'matched' | 'partial' | 'pending' | 'no_match';
 
 export interface ScanRecord {
   id: string;

@@ -8,6 +8,7 @@ import { COLORS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
 interface HeaderProps {
   title: string;
   showBack?: boolean;
+  onBack?: () => void;
   rightAction?: {
     icon: keyof typeof Ionicons.glyphMap;
     onPress: () => void;
@@ -17,6 +18,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   title,
   showBack = false,
+  onBack,
   rightAction,
 }) => {
   const router = useRouter();
@@ -25,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
     <View style={styles.container}>
       {showBack ? (
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={onBack ?? (() => router.back())}
           style={[styles.iconButton, SHADOW.sm as ViewStyle]}
           hitSlop={8}
         >

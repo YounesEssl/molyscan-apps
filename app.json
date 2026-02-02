@@ -46,7 +46,26 @@
           "cameraPermission": "Allow MolyScan to access your camera for barcode scanning."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MolyScan utilise votre position pour géolocaliser vos scans."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "MolyScan utilise le micro pour enregistrer des notes vocales CRM."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#E87722"
+        }
+      ]
     ]
   }
 }
