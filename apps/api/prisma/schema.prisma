@@ -1,0 +1,331 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ─── ENUMS ────────────────────────────────────────
+
+enum UserRole {
+  commercial
+  distributor
+  admin
+}
+
+enum ScanStatus {
+  matched
+  partial
+  no_match
+}
+
+enum ScanMethod {
+  barcode
+  label
+  voice
+}
+
+enum WorkflowStatus {
+  draft
+  submitted
+  under_review
+  approved
+  rejected
+}
+
+enum NotificationType {
+  scan_match
+  price_approved
+  price_rejected
+  ai_response
+  workflow_update
+  system
+}
+
+enum ExportFormat {
+  pdf
+  csv
+  xlsx
+}
+
+enum ExportStatus {
+  generating
+  ready
+  failed
+}
+
+enum PricingTier {
+  standard
+  premium
+  enterprise
+}
+
+// ─── MODELS ───────────────────────────────────────
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  role           UserRole
+  company        String?
+  phone          String?
+  organizationId String?
+  pushToken      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  scans          Scan[]
+  workflows      PriceWorkflow[]
+  conversations  AIConversation[]
+  notifications  Notification[]
+  voiceNotes     VoiceNote[]
+  exports        ExportRecord[]
+  refreshTokens  RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model CompetitorProduct {
+  id          String   @id @default(uuid())
+  barcode     String   @unique
+  name        String
+  brand       String
+  category    String
+  subcategory String?
+  description String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  equivalences ProductEquivalence[]
+  scans        Scan[]
+
+  @@map("competitor_products")
+}
+
+model MolydalProduct {
+  id                String      @id @default(uuid())
+  reference         String      @unique
+  name              String
+  category          String
+  description       String?
+  pricingTier       PricingTier @default(standard)
+  technicalSheetUrl String?
+  advantages        String[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  equivalences ProductEquivalence[]
+  workflows    PriceWorkflow[]
+
+  @@map("molydal_products")
+}
+
+model ProductEquivalence {
+  id                  String @id @default(uuid())
+  competitorProductId String
+  molydalProductId    String
+  confidenceScore     Int
+
+  competitorProduct CompetitorProduct @relation(fields: [competitorProductId], references: [id])
+  molydalProduct    MolydalProduct    @relation(fields: [molydalProductId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([competitorProductId, molydalProductId])
+  @@map("product_equivalences")
+}
+
+model Scan {
+  id                  String     @id @default(uuid())
+  barcode             String?
+  status              ScanStatus
+  scanMethod          ScanMethod @default(barcode)
+  locationLat         Float?
+  locationLng         Float?
+  locationLabel       String?
+  userId              String
+  competitorProductId String?
+  organizationId      String?
+
+  user              User               @relation(fields: [userId], references: [id])
+  competitorProduct CompetitorProduct?  @relation(fields: [competitorProductId], references: [id])
+
+  workflows     PriceWorkflow[]
+  conversations AIConversation[]
+  voiceNotes    VoiceNote[]
+
+  scannedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@map("scans")
+}
+
+model PriceWorkflow {
+  id               String         @id @default(uuid())
+  scanId           String
+  molydalProductId String
+  clientName       String
+  quantity         Float
+  unit             String         @default("L")
+  requestedPrice   Float?
+  approvedPrice    Float?
+  status           WorkflowStatus @default(draft)
+  userId           String
+  reviewedById     String?
+  reviewComment    String?
+  organizationId   String?
+
+  scan           Scan           @relation(fields: [scanId], references: [id])
+  molydalProduct MolydalProduct @relation(fields: [molydalProductId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+
+  steps WorkflowStep[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("price_workflows")
+}
+
+model WorkflowStep {
+  id         String         @id @default(uuid())
+  workflowId String
+  status     WorkflowStatus
+  actor      String
+  comment    String?
+  date       DateTime       @default(now())
+
+  workflow PriceWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_steps")
+}
+
+model AIConversation {
+  id               String @id @default(uuid())
+  scanId           String
+  scannedName      String
+  scannedBrand     String
+  molydalName      String
+  molydalReference String
+  userId           String
+
+  scan     Scan        @relation(fields: [scanId], references: [id])
+  user     User        @relation(fields: [userId], references: [id])
+  messages AIMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String   @id @default(uuid())
+  conversationId String
+  role           String
+  text           String
+  sources        String[]
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  timestamp DateTime @default(now())
+
+  @@map("ai_messages")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  body      String
+  read      Boolean          @default(false)
+  relatedId String?
+  userId    String
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model ExportRecord {
+  id          String       @id @default(uuid())
+  fileName    String
+  format      ExportFormat
+  status      ExportStatus @default(generating)
+  size        String?
+  fileKey     String?
+  filters     Json?
+  userId      String
+
+  user User @relation(fields: [userId], references: [id])
+
+  generatedAt DateTime @default(now())
+
+  @@map("export_records")
+}
+
+model VoiceNote {
+  id               String   @id @default(uuid())
+  duration         Int
+  audioKey         String?
+  transcription    String?
+  clientName       String?
+  contactName      String?
+  productMentioned String?
+  nextAction       String?
+  notes            String?
+  tags             String[]
+  syncStatus       String   @default("pending")
+  relatedScanId    String?
+  userId           String
+
+  scan Scan? @relation(fields: [relatedScanId], references: [id])
+  user User  @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("voice_notes")
+}
+
+model DocumentEmbedding {
+  id        String                       @id @default(uuid())
+  content   String
+  source    String
+  metadata  Json?
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime                     @default(now())
+
+  @@map("document_embeddings")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String
+  userId    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
