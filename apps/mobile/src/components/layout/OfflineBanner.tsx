@@ -6,17 +6,17 @@ import { COLORS, SPACING } from '@/constants/theme';
 import { useOfflineStore } from '@/stores/offline.store';
 
 export const OfflineBanner: React.FC = () => {
-  const { isOffline, pendingActions, isSyncing, syncProgress, lastSyncAt } = useOfflineStore();
+  const { manualOffline, pendingActions, isSyncing, syncProgress, lastSyncAt } = useOfflineStore();
   const [showSynced, setShowSynced] = useState(false);
 
   // Show "all synced" message briefly after sync completes
   useEffect(() => {
-    if (!isSyncing && lastSyncAt && !isOffline) {
+    if (!isSyncing && lastSyncAt && !manualOffline) {
       setShowSynced(true);
       const timer = setTimeout(() => setShowSynced(false), 3000);
       return () => clearTimeout(timer);
     }
-  }, [isSyncing, lastSyncAt, isOffline]);
+  }, [isSyncing, lastSyncAt, manualOffline]);
 
   if (isSyncing && syncProgress) {
     return (
@@ -48,7 +48,7 @@ export const OfflineBanner: React.FC = () => {
     );
   }
 
-  if (!isOffline) return null;
+  if (!manualOffline) return null;
 
   return (
     <View style={styles.banner}>

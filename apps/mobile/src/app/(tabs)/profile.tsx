@@ -23,7 +23,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
   const role = (user?.role ?? 'commercial') as UserRole;
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const { isOffline, setManualOffline } = useOfflineStore();
+  const { manualOffline, setManualOffline } = useOfflineStore();
   const { syncNow } = useSync();
   const { logout } = useAuth();
   const [scans, setScans] = useState<ScanRecord[]>([]);
@@ -127,10 +127,10 @@ export default function ProfileScreen(): React.JSX.Element {
                 <Text variant="body">Mode hors-ligne</Text>
               </View>
               <Switch
-                value={isOffline}
+                value={manualOffline}
                 onValueChange={setManualOffline}
                 trackColor={{ false: COLORS.border, true: COLORS.warning + '60' }}
-                thumbColor={isOffline ? COLORS.warning : '#f4f3f4'}
+                thumbColor={manualOffline ? COLORS.warning : '#f4f3f4'}
               />
             </View>
           </Card>
