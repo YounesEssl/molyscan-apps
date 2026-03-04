@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, GRADIENTS, SPACING, RADIUS } from '@/constants/theme';
 import type { ScanStatus } from '@/types/scan';
@@ -9,17 +10,18 @@ interface ScanHistoryFilterProps {
   onFilterChange: (filter: ScanStatus | 'all') => void;
 }
 
-const FILTERS: { key: ScanStatus | 'all'; label: string }[] = [
-  { key: 'all', label: 'Tous' },
-  { key: 'matched', label: 'Matchés' },
-  { key: 'pending', label: 'En cours' },
-  { key: 'no_match', label: 'Sans match' },
+const FILTERS: { key: ScanStatus | 'all'; labelKey: string }[] = [
+  { key: 'all', labelKey: 'history.filterAll' },
+  { key: 'matched', labelKey: 'history.filterMatched' },
+  { key: 'pending', labelKey: 'history.filterPending' },
+  { key: 'no_match', labelKey: 'history.filterNoMatch' },
 ];
 
 export const ScanHistoryFilter: React.FC<ScanHistoryFilterProps> = ({
   activeFilter,
   onFilterChange,
 }) => {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {FILTERS.map((filter) => {
@@ -37,7 +39,7 @@ export const ScanHistoryFilter: React.FC<ScanHistoryFilterProps> = ({
                 end={{ x: 1, y: 0 }}
                 style={styles.chipActive}
               >
-                <Text style={styles.chipTextActive}>{filter.label}</Text>
+                <Text style={styles.chipTextActive}>{t(filter.labelKey)}</Text>
               </LinearGradient>
             </TouchableOpacity>
           );
@@ -49,7 +51,7 @@ export const ScanHistoryFilter: React.FC<ScanHistoryFilterProps> = ({
             onPress={() => onFilterChange(filter.key)}
             activeOpacity={0.7}
           >
-            <Text style={styles.chipText}>{filter.label}</Text>
+            <Text style={styles.chipText}>{t(filter.labelKey)}</Text>
           </TouchableOpacity>
         );
       })}

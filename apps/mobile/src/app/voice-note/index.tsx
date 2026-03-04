@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, FlatList, StyleSheet, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Card, Badge, Button, EmptyState } from '@/components/ui';
@@ -12,6 +13,7 @@ import { formatRelativeDate } from '@/utils/date';
 
 export default function VoiceNoteScreen(): React.JSX.Element {
   const router = useRouter();
+  const { t } = useTranslation();
   const [notes, setNotes] = useState<VoiceNote[]>([]);
 
   // Reload notes when screen is focused (after recording)
@@ -29,10 +31,10 @@ export default function VoiceNoteScreen(): React.JSX.Element {
 
   return (
     <ScreenWrapper padded={false}>
-      <Header title="Notes vocales CRM" showBack />
+      <Header title={t('voiceNote.title')} showBack />
       <View style={styles.recordButtonContainer}>
         <Button
-          title="Nouvelle note vocale"
+          title={t('voiceNote.newNote')}
           variant="accent"
           icon="mic"
           onPress={() => router.push('/voice-note/record')}
@@ -75,7 +77,7 @@ export default function VoiceNoteScreen(): React.JSX.Element {
           </Card>
         )}
         ListEmptyComponent={
-          <EmptyState icon="mic-outline" title="Aucune note vocale" />
+          <EmptyState icon="mic-outline" title={t('voiceNote.emptyState')} />
         }
       />
     </ScreenWrapper>

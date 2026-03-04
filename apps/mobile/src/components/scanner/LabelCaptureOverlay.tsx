@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Animated, Dimensions, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -16,6 +17,7 @@ interface LabelCaptureOverlayProps {
 }
 
 export const LabelCaptureOverlay: React.FC<LabelCaptureOverlayProps> = ({ onCapture, isAnalyzing }) => {
+  const { t } = useTranslation();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export const LabelCaptureOverlay: React.FC<LabelCaptureOverlayProps> = ({ onCapt
       {/* Help text */}
       <View style={styles.helpContainer}>
         <Text variant="body" color={COLORS.surface} style={styles.helpText}>
-          {isAnalyzing ? 'Analyse de l\'étiquette en cours...' : 'Cadrez l\'étiquette du produit'}
+          {isAnalyzing ? t('scanner.analyzingLabel') : t('scanner.frameLabel')}
         </Text>
       </View>
 

@@ -1,17 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text, Card } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import i18n from '@/i18n';
 import { scanService } from '@/services/scan.service';
 import type { ScanRecord } from '@/schemas/scan.schema';
 
 function getWeekLabel(weeksAgo: number): string {
-  if (weeksAgo === 0) return 'Cette sem.';
-  if (weeksAgo === 1) return 'Sem. -1';
-  return `Sem. -${weeksAgo}`;
+  if (weeksAgo === 0) return i18n.t('scanFrequency.thisWeek');
+  return i18n.t('scanFrequency.weekAgo', { n: weeksAgo });
 }
 
 export const ScanFrequencyChart: React.FC = () => {
+  const { t } = useTranslation();
   const [scans, setScans] = useState<ScanRecord[]>([]);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export const ScanFrequencyChart: React.FC = () => {
 
   return (
     <Card style={styles.card}>
-      <Text variant="label" style={styles.title}>Fréquence des scans</Text>
+      <Text variant="label" style={styles.title}>{t('scanFrequency.title')}</Text>
       <View style={styles.chart}>
         {weekData.map((count, i) => (
           <View key={i} style={styles.column}>

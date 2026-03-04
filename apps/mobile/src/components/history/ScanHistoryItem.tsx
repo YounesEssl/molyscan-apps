@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
@@ -21,6 +22,7 @@ export const ScanHistoryItem: React.FC<ScanHistoryItemProps> = ({
   scan,
   onPress,
 }) => {
+  const { t } = useTranslation();
   const icon = STATUS_ICON[scan.status];
 
   return (
@@ -45,7 +47,7 @@ export const ScanHistoryItem: React.FC<ScanHistoryItemProps> = ({
           </Text>
         ) : (
           <Text variant="caption" color={COLORS.danger}>
-            Aucun équivalent
+            {t('history.noEquivalent')}
           </Text>
         )}
       </View>

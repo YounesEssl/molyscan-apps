@@ -17,6 +17,7 @@ import { scanService } from '@/services/scan.service';
 import { hasPermission } from '@/utils/permissions';
 import type { UserRole } from '@/schemas/auth.schema';
 import type { ScanRecord } from '@/schemas/scan.schema';
+import { useTranslation } from 'react-i18next';
 
 export default function ProfileScreen(): React.JSX.Element {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const { syncNow } = useSync();
   const { logout } = useAuth();
   const [scans, setScans] = useState<ScanRecord[]>([]);
+  const { t } = useTranslation();
 
   useEffect(() => {
     scanService.getHistory().then(setScans).catch(() => {});
@@ -35,12 +37,6 @@ export default function ProfileScreen(): React.JSX.Element {
   const handleLogout = async () => {
     await logout();
     router.replace('/(auth)/login');
-  };
-
-  const ROLE_LABELS: Record<string, string> = {
-    commercial: 'Commercial terrain',
-    distributor: 'Distributeur',
-    admin: 'Administrateur',
   };
 
   const matchedCount = scans.filter((s) => s.status === 'matched').length;
@@ -68,7 +64,7 @@ export default function ProfileScreen(): React.JSX.Element {
                 {user?.firstName} {user?.lastName}
               </Text>
               <Text variant="caption" color="rgba(255,255,255,0.7)">
-                {ROLE_LABELS[role] ?? role}
+                {t('roles.' + role, role)}
               </Text>
             </View>
           </SafeAreaView>
@@ -77,40 +73,40 @@ export default function ProfileScreen(): React.JSX.Element {
         <View style={styles.content}>
           {/* Stats */}
           <Card style={styles.section}>
-            <Text variant="label" style={styles.sectionTitle}>Statistiques</Text>
+            <Text variant="label" style={styles.sectionTitle}>{t('profile.statistics')}</Text>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text variant="heading" color={COLORS.primary}>{scans.length}</Text>
-                <Text variant="caption" color={COLORS.textMuted}>Scans</Text>
+                <Text variant="caption" color={COLORS.textMuted}>{t('profile.scans')}</Text>
               </View>
               <View style={styles.statItem}>
                 <Text variant="heading" color={COLORS.success}>{matchedCount}</Text>
-                <Text variant="caption" color={COLORS.textMuted}>Matchs</Text>
+                <Text variant="caption" color={COLORS.textMuted}>{t('profile.matches')}</Text>
               </View>
               <View style={styles.statItem}>
                 <Text variant="heading" color={COLORS.accent}>{matchRate}%</Text>
-                <Text variant="caption" color={COLORS.textMuted}>Taux</Text>
+                <Text variant="caption" color={COLORS.textMuted}>{t('profile.rate')}</Text>
               </View>
             </View>
           </Card>
 
           {/* Info section */}
           <Card style={styles.section}>
-            <Text variant="label" style={styles.sectionTitle}>Informations</Text>
-            <ProfileRow icon="mail-outline" label="Email" value={user?.email ?? ''} />
-            <ProfileRow icon="call-outline" label="Téléphone" value={user?.phone ?? ''} />
-            <ProfileRow icon="business-outline" label="Entreprise" value={user?.company ?? 'Molydal'} />
+            <Text variant="label" style={styles.sectionTitle}>{t('profile.information')}</Text>
+            <ProfileRow icon="mail-outline" label={t('profile.emailLabel')} value={user?.email ?? ''} />
+            <ProfileRow icon="call-outline" label={t('profile.phone')} value={user?.phone ?? ''} />
+            <ProfileRow icon="business-outline" label={t('profile.company')} value={user?.company ?? 'Molydal'} />
           </Card>
 
           {/* Preferences */}
           <Card style={styles.section}>
-            <Text variant="label" style={styles.sectionTitle}>Préférences</Text>
+            <Text variant="label" style={styles.sectionTitle}>{t('profile.preferences')}</Text>
             <View style={styles.row}>
               <View style={styles.rowLeft}>
                 <View style={styles.rowIconBox}>
                   <Ionicons name="notifications-outline" size={18} color={COLORS.accent} />
                 </View>
-                <Text variant="body">Notifications</Text>
+                <Text variant="body">{t('profile.notifications')}</Text>
               </View>
               <Switch
                 value={notificationsEnabled}
@@ -124,7 +120,7 @@ export default function ProfileScreen(): React.JSX.Element {
                 <View style={[styles.rowIconBox, { backgroundColor: COLORS.warning + '15' }]}>
                   <Ionicons name="cloud-offline-outline" size={18} color={COLORS.warning} />
                 </View>
-                <Text variant="body">Mode hors-ligne</Text>
+                <Text variant="body">{t('profile.offlineMode')}</Text>
               </View>
               <Switch
                 value={manualOffline}
@@ -142,30 +138,30 @@ export default function ProfileScreen(): React.JSX.Element {
           {hasPermission(role, 'canExportData') && (
             <TouchableOpacity style={[styles.shortcutRow, SHADOW.sm as ViewStyle]} onPress={() => router.push('/export')}>
               <Ionicons name="analytics-outline" size={20} color={COLORS.primary} />
-              <Text variant="body" style={styles.shortcutText}>Export & Intelligence</Text>
+              <Text variant="body" style={styles.shortcutText}>{t('profile.exportIntelligence')}</Text>
               <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
             </TouchableOpacity>
           )}
           {hasPermission(role, 'canUpdateCRM') && (
             <TouchableOpacity style={[styles.shortcutRow, SHADOW.sm as ViewStyle]} onPress={() => router.push('/voice-note')}>
               <Ionicons name="mic-outline" size={20} color={COLORS.primary} />
-              <Text variant="body" style={styles.shortcutText}>Notes vocales CRM</Text>
+              <Text variant="body" style={styles.shortcutText}>{t('profile.voiceNotesCRM')}</Text>
               <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
             </TouchableOpacity>
           )}
 
           {/* About */}
           <Card style={styles.section}>
-            <Text variant="label" style={styles.sectionTitle}>À propos</Text>
-            <ProfileRow icon="information-circle-outline" label="Version" value="1.0.0" />
-            <ProfileRow icon="shield-checkmark-outline" label="Mentions légales" value="" />
+            <Text variant="label" style={styles.sectionTitle}>{t('profile.about')}</Text>
+            <ProfileRow icon="information-circle-outline" label={t('profile.version')} value="1.0.0" />
+            <ProfileRow icon="shield-checkmark-outline" label={t('profile.legalNotice')} value="" />
           </Card>
 
           {/* Logout */}
           <TouchableOpacity style={[styles.logoutButton, SHADOW.sm as ViewStyle]} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
             <Text variant="body" color={COLORS.danger} style={styles.logoutText}>
-              Se déconnecter
+              {t('profile.logout')}
             </Text>
           </TouchableOpacity>
 

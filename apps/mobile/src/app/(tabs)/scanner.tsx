@@ -16,6 +16,7 @@ import { useBarcodeScan } from '@/hooks/useBarcodeScan';
 import { useScannerStore } from '@/stores/scanner.store';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { scanService } from '@/services/scan.service';
+import { useTranslation } from 'react-i18next';
 
 export default function ScannerScreen(): React.JSX.Element {
   const cameraRef = useRef<CameraView>(null);
@@ -31,13 +32,14 @@ export default function ScannerScreen(): React.JSX.Element {
     resetScan,
   } = useBarcodeScan();
   const { scanMode, setScanMode } = useScannerStore();
+  const { t } = useTranslation();
 
   const needsCamera = scanMode === 'barcode' || scanMode === 'label';
 
   if (isLoading) {
     return (
       <ScreenWrapper style={styles.centered}>
-        <Text variant="body">Chargement...</Text>
+        <Text variant="body">{t('common.loading')}</Text>
       </ScreenWrapper>
     );
   }
@@ -114,7 +116,7 @@ export default function ScannerScreen(): React.JSX.Element {
       {isScanning && scanMode === 'barcode' && (
         <View style={styles.instructionContainer}>
           <Text variant="body" color={COLORS.surface} style={styles.instruction}>
-            Placez le code-barres dans le cadre
+            {t('scanner.barcodeInstruction')}
           </Text>
         </View>
       )}

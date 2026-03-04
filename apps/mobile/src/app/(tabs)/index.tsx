@@ -9,8 +9,6 @@ import { Text, Card } from '@/components/ui';
 import { NotificationBell } from '@/components/dashboard/NotificationBell';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RecentScans } from '@/components/dashboard/RecentScans';
-import { CompetitorChart } from '@/components/dashboard/CompetitorChart';
-import { ScanFrequencyChart } from '@/components/dashboard/ScanFrequencyChart';
 import { PriceRequestCard } from '@/components/workflow/PriceRequestCard';
 import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth.store';
@@ -20,6 +18,7 @@ import { workflowService } from '@/services/workflow.service';
 import { hasPermission } from '@/utils/permissions';
 import type { UserRole } from '@/schemas/auth.schema';
 import type { ScanRecord } from '@/schemas/scan.schema';
+import { useTranslation } from 'react-i18next';
 
 export default function DashboardScreen(): React.JSX.Element {
   const router = useRouter();
@@ -30,6 +29,7 @@ export default function DashboardScreen(): React.JSX.Element {
   const pendingWorkflows = workflows.filter((w) => w.status === 'submitted' || w.status === 'under_review');
 
   const [scans, setScans] = useState<ScanRecord[]>([]);
+  const { t } = useTranslation();
 
   useEffect(() => {
     scanService.getHistory().then(setScans).catch(() => {});
@@ -53,13 +53,13 @@ export default function DashboardScreen(): React.JSX.Element {
             <View style={styles.heroTop}>
               <View>
                 <Text variant="body" color="rgba(255,255,255,0.7)">
-                  Bonjour,
+                  {t('dashboard.greeting')}
                 </Text>
                 <Text variant="heading" color={COLORS.surface}>
                   {user?.firstName} {user?.lastName}
                 </Text>
                 <Text variant="caption" color="rgba(255,255,255,0.6)">
-                  {role === 'admin' ? 'Administrateur' : role === 'distributor' ? 'Distributeur' : 'Commercial terrain'}
+                  {t('roles.' + role)}
                 </Text>
               </View>
               <NotificationBell onPress={() => router.push('/notifications')} />
@@ -75,9 +75,9 @@ export default function DashboardScreen(): React.JSX.Element {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.statsRow}
         >
-          <StatCard icon="scan" label="Scans" value={totalScans.toString()} />
-          <StatCard icon="checkmark-circle" label="Matchs" value={matchedCount.toString()} />
-          <StatCard icon="git-branch" label="Demandes" value={workflows.length.toString()} />
+          <StatCard icon="scan" label={t('dashboard.scans')} value={totalScans.toString()} />
+          <StatCard icon="checkmark-circle" label={t('dashboard.matches')} value={matchedCount.toString()} />
+          <StatCard icon="git-branch" label={t('dashboard.requests')} value={workflows.length.toString()} />
         </ScrollView>
 
         {/* Quick actions */}
@@ -94,7 +94,7 @@ export default function DashboardScreen(): React.JSX.Element {
           >
             <Ionicons name="scan" size={24} color={COLORS.surface} />
             <Text variant="body" color={COLORS.surface} style={styles.scanButtonText}>
-              Scanner un produit
+              {t('dashboard.scanProduct')}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -102,13 +102,13 @@ export default function DashboardScreen(): React.JSX.Element {
         {/* Role-based shortcuts */}
         <View style={styles.shortcuts}>
           {hasPermission(role, 'canExportData') && (
-            <ShortcutCard icon="analytics-outline" label="Export" onPress={() => router.push('/export')} />
+            <ShortcutCard icon="analytics-outline" label={t('dashboard.export')} onPress={() => router.push('/export')} />
           )}
           {hasPermission(role, 'canUpdateCRM') && (
-            <ShortcutCard icon="mic-outline" label="Notes CRM" onPress={() => router.push('/voice-note')} />
+            <ShortcutCard icon="mic-outline" label={t('dashboard.crmNotes')} onPress={() => router.push('/voice-note')} />
           )}
           {hasPermission(role, 'canAccessChat') && (
-            <ShortcutCard icon="sparkles-outline" label="Assistant IA" onPress={() => router.push('/(tabs)/chat')} />
+            <ShortcutCard icon="sparkles-outline" label={t('dashboard.aiAssistant')} onPress={() => router.push('/(tabs)/chat')} />
           )}
         </View>
 
@@ -116,7 +116,7 @@ export default function DashboardScreen(): React.JSX.Element {
         {pendingWorkflows.length > 0 && hasPermission(role, 'canRequestPrice') && (
           <View style={styles.section}>
             <Text variant="label" style={styles.sectionTitle}>
-              Demandes de prix en cours
+              {t('dashboard.pendingPriceRequests')}
             </Text>
             {pendingWorkflows.slice(0, 3).map((wf) => (
               <PriceRequestCard
@@ -131,16 +131,6 @@ export default function DashboardScreen(): React.JSX.Element {
         {/* Recent scans */}
         <RecentScans />
 
-        {/* Intelligence concurrentielle — visible for Commercial and Admin */}
-        {(role === 'commercial' || role === 'admin') && (
-          <View style={styles.section}>
-            <Text variant="label" style={styles.sectionTitle}>
-              Intelligence concurrentielle
-            </Text>
-            <CompetitorChart />
-            <ScanFrequencyChart />
-          </View>
-        )}
 
         <View style={styles.bottomSpacer} />
       </View>

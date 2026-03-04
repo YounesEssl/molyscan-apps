@@ -1,15 +1,18 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Text, Card } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { useOfflineStore } from '@/stores/offline.store';
+import i18n from '@/i18n';
 
 interface SyncQueueProps {
   onSyncNow?: () => void;
 }
 
 export const SyncQueue: React.FC<SyncQueueProps> = ({ onSyncNow }) => {
+  const { t } = useTranslation();
   const { pendingActions, isSyncing, syncProgress, lastSyncAt, isOffline } = useOfflineStore();
 
   if (pendingActions === 0 && !isSyncing) return null;
@@ -27,12 +30,12 @@ export const SyncQueue: React.FC<SyncQueueProps> = ({ onSyncNow }) => {
           </View>
           <View>
             <Text variant="body" style={styles.title}>
-              {isSyncing ? 'Synchronisation...' : 'Actions en attente'}
+              {isSyncing ? t('sync.syncingTitle') : t('sync.pendingActionsTitle')}
             </Text>
             <Text variant="caption" color={COLORS.textMuted}>
               {isSyncing && syncProgress
-                ? `${syncProgress.current}/${syncProgress.total} traité(s)`
-                : `${pendingActions} action(s) en file d'attente`}
+                ? t('sync.processed', { current: syncProgress.current, total: syncProgress.total })
+                : t('sync.queued', { count: pendingActions })}
             </Text>
           </View>
         </View>
@@ -40,7 +43,7 @@ export const SyncQueue: React.FC<SyncQueueProps> = ({ onSyncNow }) => {
           <TouchableOpacity style={styles.syncButton} onPress={onSyncNow}>
             <Ionicons name="refresh" size={16} color={COLORS.surface} />
             <Text variant="caption" color={COLORS.surface} style={styles.syncButtonText}>
-              Sync
+              {t('sync.syncButton')}
             </Text>
           </TouchableOpacity>
         )}
@@ -59,7 +62,7 @@ export const SyncQueue: React.FC<SyncQueueProps> = ({ onSyncNow }) => {
 
       {lastSyncAt && !isSyncing && (
         <Text variant="caption" color={COLORS.textMuted} style={styles.lastSync}>
-          Dernière sync : {new Date(lastSyncAt).toLocaleString('fr-FR')}
+          {t('sync.lastSync', { date: new Date(lastSyncAt).toLocaleString(i18n.language === 'en' ? 'en-US' : 'fr-FR') })}
         </Text>
       )}
     </Card>

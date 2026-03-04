@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react
 import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Button, Card } from '@/components/ui';
@@ -51,6 +52,7 @@ const MOCK_TRANSCRIPTIONS = [
 
 export default function VoiceNoteRecordScreen(): React.JSX.Element {
   const router = useRouter();
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<'idle' | 'recording' | 'transcribing' | 'review'>('idle');
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -126,7 +128,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       const formData = new FormData();
       formData.append('duration', String(duration));
       formData.append('transcription', transcription);
-      formData.append('clientName', crmFields.clientName || 'Client inconnu');
+      formData.append('clientName', crmFields.clientName || t('voiceNote.unknownClient'));
       crmFields.tags.forEach((tag) => formData.append('tags', tag));
       if (recorder.uri) {
         formData.append('audio', { uri: recorder.uri, type: 'audio/m4a', name: 'recording.m4a' } as any);
@@ -141,7 +143,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
   return (
     <ScreenWrapper scroll padded={false}>
-      <Header title="Nouvelle note vocale" showBack />
+      <Header title={t('voiceNote.newNoteTitle')} showBack />
 
       <View style={styles.content}>
         {/* Recording phase */}
@@ -158,8 +160,8 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
             <Text variant="body" color={COLORS.textSecondary} style={styles.hint}>
               {isRecording
-                ? 'Enregistrement en cours... Appuyez pour arrêter.'
-                : 'Appuyez sur le micro pour commencer l\'enregistrement.'}
+                ? t('voiceNote.recordingHint')
+                : t('voiceNote.idleHint')}
             </Text>
 
             <TouchableOpacity
@@ -197,10 +199,10 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
               <Ionicons name="document-text-outline" size={40} color={COLORS.primary} />
             </View>
             <Text variant="body" color={COLORS.textSecondary}>
-              Transcription en cours...
+              {t('voiceNote.transcribing')}
             </Text>
             <Text variant="caption" color={COLORS.textMuted}>
-              Analyse IA de l'enregistrement ({formatDuration(duration)})
+              {t('voiceNote.aiAnalysis', { duration: formatDuration(duration) })}
             </Text>
           </View>
         )}
@@ -210,7 +212,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Transcription */}
             <Card style={styles.reviewCard}>
-              <Text variant="label">Transcription</Text>
+              <Text variant="label">{t('voiceNote.transcription')}</Text>
               <TextInput
                 style={styles.transcriptionInput}
                 value={transcription}
@@ -222,48 +224,48 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
             {/* CRM Fields */}
             <Card style={styles.reviewCard}>
-              <Text variant="label">Champs CRM extraits</Text>
+              <Text variant="label">{t('voiceNote.crmFields')}</Text>
 
               <View style={styles.fieldRow}>
-                <Text variant="caption" style={styles.fieldLabel}>Client</Text>
+                <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.client')}</Text>
                 <TextInput
                   style={styles.fieldInput}
                   value={crmFields.clientName}
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, clientName: v }))}
-                  placeholder="Nom du client"
+                  placeholder={t('voiceNote.clientPlaceholder')}
                   placeholderTextColor={COLORS.textMuted}
                 />
               </View>
 
               <View style={styles.fieldRow}>
-                <Text variant="caption" style={styles.fieldLabel}>Contact</Text>
+                <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.contact')}</Text>
                 <TextInput
                   style={styles.fieldInput}
                   value={crmFields.contactName}
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, contactName: v }))}
-                  placeholder="Nom du contact"
+                  placeholder={t('voiceNote.contactPlaceholder')}
                   placeholderTextColor={COLORS.textMuted}
                 />
               </View>
 
               <View style={styles.fieldRow}>
-                <Text variant="caption" style={styles.fieldLabel}>Produit</Text>
+                <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.productField')}</Text>
                 <TextInput
                   style={styles.fieldInput}
                   value={crmFields.product}
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, product: v }))}
-                  placeholder="Produit identifié"
+                  placeholder={t('voiceNote.productPlaceholder')}
                   placeholderTextColor={COLORS.textMuted}
                 />
               </View>
 
               <View style={styles.fieldRow}>
-                <Text variant="caption" style={styles.fieldLabel}>Prochaine action</Text>
+                <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.nextAction')}</Text>
                 <TextInput
                   style={styles.fieldInput}
                   value={crmFields.nextAction}
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, nextAction: v }))}
-                  placeholder="Action à planifier"
+                  placeholder={t('voiceNote.nextActionPlaceholder')}
                   placeholderTextColor={COLORS.textMuted}
                 />
               </View>
@@ -271,7 +273,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
             {/* Tags */}
             <Card style={styles.reviewCard}>
-              <Text variant="label">Tags détectés</Text>
+              <Text variant="label">{t('voiceNote.detectedTags')}</Text>
               <View style={styles.tagsRow}>
                 {crmFields.tags.map((tag) => (
                   <View key={tag} style={styles.tag}>
@@ -281,7 +283,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                   </View>
                 ))}
                 {crmFields.tags.length === 0 && (
-                  <Text variant="caption" color={COLORS.textMuted}>Aucun tag détecté</Text>
+                  <Text variant="caption" color={COLORS.textMuted}>{t('voiceNote.noTags')}</Text>
                 )}
               </View>
             </Card>
@@ -289,7 +291,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
             {/* Actions */}
             <View style={styles.actions}>
               <Button
-                title="Enregistrer la note"
+                title={t('voiceNote.saveNote')}
                 variant="accent"
                 icon="save-outline"
                 loading={saving}
@@ -297,7 +299,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                 style={styles.actionButton}
               />
               <Button
-                title="Réenregistrer"
+                title={t('voiceNote.reRecord')}
                 variant="outline"
                 icon="mic-outline"
                 onPress={() => {

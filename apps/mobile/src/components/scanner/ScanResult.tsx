@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { Text, Button, Card, Badge } from '@/components/ui';
 import { ConfidenceIndicator } from '@/components/product/ConfidenceIndicator';
@@ -15,6 +16,7 @@ export const ScanResult: React.FC<ScanResultProps> = ({
   scan,
   onScanAgain,
 }) => {
+  const { t } = useTranslation();
   const router = useRouter();
   const { scannedProduct, molydalMatch } = scan;
 
@@ -22,7 +24,7 @@ export const ScanResult: React.FC<ScanResultProps> = ({
     <View style={styles.container}>
       <Card style={styles.card}>
         <View style={styles.header}>
-          <Text variant="label">Produit scanné</Text>
+          <Text variant="label">{t('scanner.scannedProduct')}</Text>
           <Badge
             label={scannedProduct.brand}
             variant="neutral"
@@ -34,7 +36,7 @@ export const ScanResult: React.FC<ScanResultProps> = ({
         {molydalMatch && (
           <>
             <View style={styles.divider} />
-            <Text variant="label">Équivalent Molydal</Text>
+            <Text variant="label">{t('scanner.molydalEquivalent')}</Text>
             <Text variant="subheading" color={COLORS.primary}>
               {molydalMatch.name}
             </Text>
@@ -47,7 +49,7 @@ export const ScanResult: React.FC<ScanResultProps> = ({
           <>
             <View style={styles.divider} />
             <Text variant="body" color={COLORS.danger}>
-              Aucun équivalent trouvé
+              {t('scanner.noEquivalentFound')}
             </Text>
           </>
         )}
@@ -56,7 +58,7 @@ export const ScanResult: React.FC<ScanResultProps> = ({
       <View style={styles.actions}>
         {molydalMatch && (
           <Button
-            title="Voir le détail"
+            title={t('scanner.viewDetail')}
             variant="accent"
             icon="arrow-forward"
             onPress={() => router.push(`/product/${scan.id}`)}
@@ -64,7 +66,7 @@ export const ScanResult: React.FC<ScanResultProps> = ({
           />
         )}
         <Button
-          title="Scanner un autre"
+          title={t('scanner.scanAnother')}
           variant={molydalMatch ? 'outline' : 'accent'}
           icon="scan-outline"
           onPress={onScanAgain}

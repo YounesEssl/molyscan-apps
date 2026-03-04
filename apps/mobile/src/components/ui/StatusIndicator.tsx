@@ -1,17 +1,18 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from './Text';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 
-const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  draft: { color: COLORS.textMuted, bg: COLORS.muted, label: 'Brouillon' },
-  submitted: { color: COLORS.accent, bg: COLORS.accent + '15', label: 'Soumis' },
-  under_review: { color: '#2196F3', bg: '#2196F315', label: 'En examen' },
-  approved: { color: COLORS.success, bg: COLORS.successLight, label: 'Approuvé' },
-  rejected: { color: COLORS.danger, bg: COLORS.dangerLight, label: 'Refusé' },
-  matched: { color: COLORS.success, bg: COLORS.successLight, label: 'Trouvé' },
-  partial: { color: COLORS.warning, bg: COLORS.warningLight, label: 'Partiel' },
-  no_match: { color: COLORS.danger, bg: COLORS.dangerLight, label: 'Aucun' },
+const STATUS_CONFIG: Record<string, { color: string; bg: string; labelKey: string }> = {
+  draft: { color: COLORS.textMuted, bg: COLORS.muted, labelKey: 'statusIndicator.draft' },
+  submitted: { color: COLORS.accent, bg: COLORS.accent + '15', labelKey: 'statusIndicator.submitted' },
+  under_review: { color: '#2196F3', bg: '#2196F315', labelKey: 'statusIndicator.underReview' },
+  approved: { color: COLORS.success, bg: COLORS.successLight, labelKey: 'statusIndicator.approved' },
+  rejected: { color: COLORS.danger, bg: COLORS.dangerLight, labelKey: 'statusIndicator.rejected' },
+  matched: { color: COLORS.success, bg: COLORS.successLight, labelKey: 'statusIndicator.matched' },
+  partial: { color: COLORS.warning, bg: COLORS.warningLight, labelKey: 'statusIndicator.partial' },
+  no_match: { color: COLORS.danger, bg: COLORS.dangerLight, labelKey: 'statusIndicator.noMatch' },
 };
 
 interface StatusIndicatorProps {
@@ -19,12 +20,13 @@ interface StatusIndicatorProps {
 }
 
 export const StatusIndicator: React.FC<StatusIndicatorProps> = ({ status }) => {
-  const config = STATUS_CONFIG[status] ?? { color: COLORS.textMuted, bg: COLORS.muted, label: status };
+  const { t } = useTranslation();
+  const config = STATUS_CONFIG[status] ?? { color: COLORS.textMuted, bg: COLORS.muted, labelKey: status };
   return (
     <View style={[styles.badge, { backgroundColor: config.bg }]}>
       <View style={[styles.dot, { backgroundColor: config.color }]} />
       <Text variant="caption" color={config.color} style={styles.label}>
-        {config.label}
+        {t(config.labelKey)}
       </Text>
     </View>
   );

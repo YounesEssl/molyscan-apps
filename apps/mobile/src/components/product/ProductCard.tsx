@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Card, Badge } from '@/components/ui';
 import { ConfidenceIndicator } from './ConfidenceIndicator';
@@ -14,9 +15,9 @@ interface ProductCardProps {
 }
 
 const STATUS_CONFIG = {
-  matched: { label: 'Match', variant: 'success' as const },
-  partial: { label: 'Partiel', variant: 'warning' as const },
-  no_match: { label: 'Aucun match', variant: 'danger' as const },
+  matched: { labelKey: 'product.statusMatch', variant: 'success' as const },
+  partial: { labelKey: 'product.statusPartial', variant: 'warning' as const },
+  no_match: { labelKey: 'product.statusNoMatch', variant: 'danger' as const },
 } as const;
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -24,6 +25,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onPress,
   style,
 }) => {
+  const { t } = useTranslation();
   const status = STATUS_CONFIG[scan.status];
 
   return (
@@ -34,7 +36,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <Text variant="subheading" numberOfLines={1} style={styles.name}>
               {scan.scannedProduct.name}
             </Text>
-            <Badge label={status.label} variant={status.variant} />
+            <Badge label={t(status.labelKey)} variant={status.variant} />
           </View>
           <Text variant="caption">{scan.scannedProduct.brand} — {scan.scannedProduct.category}</Text>
           {scan.molydalMatch && (

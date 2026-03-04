@@ -3,6 +3,7 @@ import { useOfflineStore } from '@/stores/offline.store';
 import { useNotificationStore } from '@/stores/notification.store';
 import type { OfflineActionRow } from '@/lib/database';
 import { markScanAsSynced, getUnsyncedScans } from '@/lib/database';
+import i18n from '@/i18n';
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -74,8 +75,8 @@ export function useSync(): UseSyncReturn {
       const notif = {
         id: `notif-sync-${Date.now()}`,
         type: 'system' as const,
-        title: 'Synchronisation terminée',
-        body: `${total} action(s) synchronisée(s) avec succès`,
+        title: i18n.t('sync.completedNotifTitle'),
+        body: i18n.t('sync.completedNotifBody', { count: total }),
         read: false,
         createdAt: new Date().toISOString(),
       };

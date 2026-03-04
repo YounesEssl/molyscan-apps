@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Card, Badge } from '@/components/ui';
@@ -16,11 +17,12 @@ export const ProductMatch: React.FC<ProductMatchProps> = ({
   scannedProduct,
   molydalMatch,
 }) => {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {/* Competitor product */}
       <Card style={styles.section}>
-        <Text variant="label">Produit concurrent</Text>
+        <Text variant="label">{t('product.competitorProduct')}</Text>
         <Text variant="heading" style={styles.productName}>
           {scannedProduct.name}
         </Text>
@@ -29,7 +31,7 @@ export const ProductMatch: React.FC<ProductMatchProps> = ({
           <Text variant="caption">{scannedProduct.category}</Text>
         </View>
         <Text variant="caption" style={styles.barcode}>
-          Code : {scannedProduct.barcode}
+          {t('product.code', { code: scannedProduct.barcode })}
         </Text>
       </Card>
 
@@ -46,12 +48,12 @@ export const ProductMatch: React.FC<ProductMatchProps> = ({
       {/* Molydal match */}
       <Card style={StyleSheet.flatten([styles.section, styles.molydalSection])}>
         <Text variant="label" color={COLORS.accent}>
-          Équivalent Molydal
+          {t('scanner.molydalEquivalent')}
         </Text>
         <Text variant="heading" color={COLORS.primary} style={styles.productName}>
           {molydalMatch.name}
         </Text>
-        <Text variant="caption">Réf. {molydalMatch.reference}</Text>
+        <Text variant="caption">{t('common.ref')} {molydalMatch.reference}</Text>
         <ConfidenceIndicator score={molydalMatch.confidence} />
       </Card>
     </View>

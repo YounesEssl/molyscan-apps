@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, FlatList, StyleSheet, ScrollView, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/i18n';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Card, Button, Badge, EmptyState } from '@/components/ui';
@@ -13,14 +15,15 @@ import type { ScanRecord } from '@/schemas/scan.schema';
 import { formatRelativeDate } from '@/utils/date';
 
 const STATUS_FILTERS = ['all', 'matched', 'partial', 'no_match'] as const;
-const STATUS_LABELS: Record<string, string> = {
-  all: 'Tous',
-  matched: 'Matchés',
-  partial: 'Partiels',
-  no_match: 'Sans match',
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  all: 'export.statusAll',
+  matched: 'export.statusMatched',
+  partial: 'export.statusPartial',
+  no_match: 'export.statusNoMatch',
 };
 
 export default function ExportScreen(): React.JSX.Element {
+  const { t } = useTranslation();
   const [exports, setExports] = useState<ExportRecord[]>([]);
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -82,11 +85,11 @@ export default function ExportScreen(): React.JSX.Element {
 
   return (
     <ScreenWrapper scroll padded={false}>
-      <Header title="Export & Intelligence" showBack />
+      <Header title={t('export.title')} showBack />
       <View style={styles.content}>
         {/* Format selection */}
         <Card style={styles.section}>
-          <Text variant="label">Format d'export</Text>
+          <Text variant="label">{t('export.formatLabel')}</Text>
           <Toggle
             options={[
               { label: 'PDF', value: 'pdf' },
@@ -100,12 +103,12 @@ export default function ExportScreen(): React.JSX.Element {
 
         {/* Status filter */}
         <Card style={styles.section}>
-          <Text variant="label">Filtrer par statut</Text>
+          <Text variant="label">{t('export.filterByStatus')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             {STATUS_FILTERS.map((s) => (
               <Badge
                 key={s}
-                label={STATUS_LABELS[s]}
+                label={t(STATUS_LABEL_KEYS[s])}
                 variant={statusFilter === s ? 'primary' : 'neutral'}
                 onPress={() => setStatusFilter(s)}
               />
@@ -115,7 +118,7 @@ export default function ExportScreen(): React.JSX.Element {
 
         {/* Brand filter */}
         <Card style={styles.section}>
-          <Text variant="label">Filtrer par marque concurrente</Text>
+          <Text variant="label">{t('export.filterByBrand')}</Text>
           <View style={styles.chipRow}>
             {brandOptions.map((brand) => (
               <Badge
@@ -131,33 +134,33 @@ export default function ExportScreen(): React.JSX.Element {
         {/* Preview */}
         <Card style={styles.section}>
           <View style={styles.previewHeader}>
-            <Text variant="label">Aperçu des données</Text>
+            <Text variant="label">{t('export.dataPreview')}</Text>
             <Text variant="caption" color={COLORS.textMuted}>
-              {filteredScans.length} scan(s)
+              {t('export.scanCount', { count: filteredScans.length })}
             </Text>
           </View>
           {filteredScans.slice(0, showPreview ? 20 : 3).map((scan) => (
             <View key={scan.id} style={styles.previewRow}>
               <View style={styles.previewProduct}>
                 <Text variant="caption" style={styles.previewName} numberOfLines={1}>
-                  {scan.scannedProduct?.name ?? 'Produit inconnu'}
+                  {scan.scannedProduct?.name ?? t('product.unknownProduct')}
                 </Text>
                 <Text variant="caption" color={COLORS.textMuted}>
                   {scan.scannedProduct?.brand ?? ''}
                 </Text>
               </View>
               <Badge
-                label={scan.status === 'matched' ? 'Match' : scan.status === 'partial' ? 'Partiel' : 'Aucun'}
+                label={scan.status === 'matched' ? t('product.statusBadgeMatch') : scan.status === 'partial' ? t('product.statusBadgePartial') : t('product.statusBadgeNone')}
                 variant={scan.status === 'matched' ? 'success' : scan.status === 'partial' ? 'warning' : 'danger'}
               />
               <Text variant="caption" color={COLORS.textMuted} style={styles.previewDate}>
-                {new Date(scan.scannedAt).toLocaleDateString('fr-FR')}
+                {new Date(scan.scannedAt).toLocaleDateString(i18n.language === 'en' ? 'en-US' : 'fr-FR')}
               </Text>
             </View>
           ))}
           {filteredScans.length > 3 && (
             <Button
-              title={showPreview ? 'Voir moins' : `Voir tout (${filteredScans.length})`}
+              title={showPreview ? t('common.seeLess') : t('common.seeAllCount', { count: filteredScans.length })}
               variant="ghost"
               size="sm"
               onPress={() => setShowPreview(!showPreview)}
@@ -167,7 +170,7 @@ export default function ExportScreen(): React.JSX.Element {
 
         {/* Generate */}
         <Button
-          title={`Générer le rapport ${format.toUpperCase()}`}
+          title={t('export.generateReport', { format: format.toUpperCase() })}
           variant="accent"
           icon="download-outline"
           loading={generating}
@@ -176,9 +179,9 @@ export default function ExportScreen(): React.JSX.Element {
         />
 
         {/* Recent exports */}
-        <Text variant="label" style={styles.sectionTitle}>Rapports récents</Text>
+        <Text variant="label" style={styles.sectionTitle}>{t('export.recentReports')}</Text>
         {exports.length === 0 ? (
-          <EmptyState icon="document-text-outline" title="Aucun export" />
+          <EmptyState icon="document-text-outline" title={t('export.noExport')} />
         ) : (
           exports.map((item) => (
             <Card key={item.id} style={styles.exportCard}>
@@ -195,7 +198,7 @@ export default function ExportScreen(): React.JSX.Element {
                   </Text>
                 </View>
                 {item.status === 'generating' ? (
-                  <Text variant="caption" color={COLORS.accent}>En cours...</Text>
+                  <Text variant="caption" color={COLORS.accent}>{t('export.generating')}</Text>
                 ) : (
                   <Ionicons name="cloud-download-outline" size={22} color={COLORS.accent} />
                 )}

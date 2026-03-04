@@ -8,8 +8,10 @@ import { ConversationCard } from '@/components/chat/ConversationCard';
 import { COLORS, SPACING } from '@/constants/theme';
 import { chatService } from '@/services/chat.service';
 import type { AIConversation } from '@/schemas/chat.schema';
+import { useTranslation } from 'react-i18next';
 
 export default function AssistantScreen(): React.JSX.Element {
+  const { t } = useTranslation();
   const router = useRouter();
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [search, setSearch] = useState('');
@@ -30,14 +32,14 @@ export default function AssistantScreen(): React.JSX.Element {
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Ionicons name="sparkles" size={22} color={COLORS.accent} />
-          <Text variant="heading">Assistant IA</Text>
+          <Text variant="heading">{t('chat.aiAssistant')}</Text>
         </View>
         <Text variant="caption" color={COLORS.textSecondary}>
-          Posez vos questions sur les équivalences Molydal
+          {t('chat.aiSubtitle')}
         </Text>
       </View>
       <View style={styles.searchContainer}>
-        <SearchBar value={search} onChangeText={setSearch} placeholder="Rechercher un produit..." />
+        <SearchBar value={search} onChangeText={setSearch} placeholder={t('chat.searchProduct')} />
       </View>
       <FlatList
         data={filtered}
@@ -53,8 +55,8 @@ export default function AssistantScreen(): React.JSX.Element {
         ListEmptyComponent={
           <EmptyState
             icon="sparkles-outline"
-            title="Aucune conversation"
-            subtitle="L'assistant est disponible après chaque scan"
+            title={t('chat.noConversation')}
+            subtitle={t('chat.noConversationSubtitle')}
           />
         }
       />

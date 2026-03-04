@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Card } from '@/components/ui';
@@ -11,14 +12,15 @@ import { useWorkflowStore } from '@/stores/workflow.store';
 
 export default function WorkflowDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useTranslation();
   const workflow = useWorkflowStore((s) => s.workflows.find((w) => w.id === id));
 
   if (!workflow) {
     return (
       <ScreenWrapper>
-        <Header title="Demande" showBack />
+        <Header title={t('workflow.requestTitle')} showBack />
         <View style={styles.empty}>
-          <Text variant="body" color={COLORS.textSecondary}>Demande introuvable</Text>
+          <Text variant="body" color={COLORS.textSecondary}>{t('workflow.requestNotFound')}</Text>
         </View>
       </ScreenWrapper>
     );
@@ -26,7 +28,7 @@ export default function WorkflowDetailScreen(): React.JSX.Element {
 
   return (
     <ScreenWrapper scroll>
-      <Header title="Détail demande" showBack />
+      <Header title={t('workflow.detailTitle')} showBack />
       <View style={styles.content}>
         <Card style={styles.infoCard}>
           <View style={styles.topRow}>
@@ -34,23 +36,23 @@ export default function WorkflowDetailScreen(): React.JSX.Element {
             <StatusIndicator status={workflow.status} />
           </View>
           <Text variant="caption" color={COLORS.textSecondary}>
-            Réf. {workflow.molydalRef}
+            {t('common.ref')} {workflow.molydalRef}
           </Text>
           <View style={styles.detailRow}>
-            <DetailItem label="Client" value={workflow.clientName} />
-            <DetailItem label="Quantité" value={`${workflow.quantity} ${workflow.unit}`} />
+            <DetailItem label={t('workflow.clientLabel')} value={workflow.clientName} />
+            <DetailItem label={t('workflow.quantityLabel')} value={`${workflow.quantity} ${workflow.unit}`} />
           </View>
           {workflow.requestedPrice && (
             <View style={styles.detailRow}>
-              <DetailItem label="Prix demandé" value={`${workflow.requestedPrice.toFixed(2)} €/${workflow.unit}`} />
+              <DetailItem label={t('workflow.requestedPrice')} value={`${workflow.requestedPrice.toFixed(2)} €/${workflow.unit}`} />
               {workflow.approvedPrice && (
-                <DetailItem label="Prix validé" value={`${workflow.approvedPrice.toFixed(2)} €/${workflow.unit}`} />
+                <DetailItem label={t('workflow.approvedPrice')} value={`${workflow.approvedPrice.toFixed(2)} €/${workflow.unit}`} />
               )}
             </View>
           )}
         </Card>
 
-        <Text variant="label" style={styles.timelineTitle}>Historique</Text>
+        <Text variant="label" style={styles.timelineTitle}>{t('workflow.timeline')}</Text>
         <WorkflowTimeline steps={workflow.steps} />
       </View>
     </ScreenWrapper>

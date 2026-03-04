@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,6 +8,7 @@ import { Text } from '@/components/ui';
 import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
 
 export const QuickActions: React.FC = () => {
+  const { t } = useTranslation();
   const router = useRouter();
 
   return (
@@ -25,7 +27,7 @@ export const QuickActions: React.FC = () => {
             <Ionicons name="scan" size={28} color={COLORS.accent} />
           </View>
           <Text variant="subheading" color={COLORS.surface}>
-            Scanner un produit
+            {t('dashboard.scanProduct')}
           </Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -36,7 +38,7 @@ export const QuickActions: React.FC = () => {
       >
         <Ionicons name="time-outline" size={22} color={COLORS.primary} />
         <Text variant="body" color={COLORS.primary} style={styles.secondaryText}>
-          Historique
+          {t('tabs.history')}
         </Text>
       </TouchableOpacity>
     </View>

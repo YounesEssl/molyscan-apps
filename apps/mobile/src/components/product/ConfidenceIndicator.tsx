@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 
@@ -18,6 +19,7 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
   score,
   compact = false,
 }) => {
+  const { t } = useTranslation();
   const color = getScoreColor(score);
 
   if (compact) {
@@ -33,7 +35,7 @@ export const ConfidenceIndicator: React.FC<ConfidenceIndicatorProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
-        <Text variant="label">Confiance</Text>
+        <Text variant="label">{t('product.confidence')}</Text>
         <Text variant="caption" style={[styles.score, { color }]}>
           {score}%
         </Text>

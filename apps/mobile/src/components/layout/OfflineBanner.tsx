@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING } from '@/constants/theme';
 import { useOfflineStore } from '@/stores/offline.store';
 
 export const OfflineBanner: React.FC = () => {
+  const { t } = useTranslation();
   const { manualOffline, pendingActions, isSyncing, syncProgress, lastSyncAt } = useOfflineStore();
   const [showSynced, setShowSynced] = useState(false);
 
@@ -23,7 +25,7 @@ export const OfflineBanner: React.FC = () => {
       <View style={[styles.banner, styles.syncBanner]}>
         <Ionicons name="sync" size={16} color={COLORS.surface} />
         <Text variant="caption" color={COLORS.surface} style={styles.text}>
-          Synchronisation en cours... ({syncProgress.current}/{syncProgress.total})
+          {t('sync.syncing', { current: syncProgress.current, total: syncProgress.total })}
         </Text>
         <View style={styles.progressTrack}>
           <View
@@ -42,7 +44,7 @@ export const OfflineBanner: React.FC = () => {
       <View style={[styles.banner, styles.syncedBanner]}>
         <Ionicons name="checkmark-circle" size={16} color={COLORS.surface} />
         <Text variant="caption" color={COLORS.surface} style={styles.text}>
-          Tout est à jour
+          {t('sync.allUpToDate')}
         </Text>
       </View>
     );
@@ -54,7 +56,7 @@ export const OfflineBanner: React.FC = () => {
     <View style={styles.banner}>
       <Ionicons name="cloud-offline" size={16} color={COLORS.surface} />
       <Text variant="caption" color={COLORS.surface} style={styles.text}>
-        Mode hors-ligne{pendingActions > 0 ? ` · ${pendingActions} action(s) en attente` : ''}
+        {t('sync.offlineMode')}{pendingActions > 0 ? t('sync.pendingActions', { count: pendingActions }) : ''}
       </Text>
     </View>
   );

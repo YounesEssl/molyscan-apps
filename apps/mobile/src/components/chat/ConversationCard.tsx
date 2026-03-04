@@ -1,5 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, View, StyleSheet, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
@@ -15,6 +16,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
   conversation,
   onPress,
 }) => {
+  const { t } = useTranslation();
   const lastMsg = conversation.messages[conversation.messages.length - 1];
 
   return (
@@ -38,7 +40,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
         </Text>
         {lastMsg && (
           <Text variant="caption" color={COLORS.textSecondary} numberOfLines={1} style={styles.preview}>
-            {lastMsg.role === 'user' ? 'Vous : ' : 'IA : '}
+            {lastMsg.role === 'user' ? t('chat.you') : t('chat.ai')}
             {lastMsg.text}
           </Text>
         )}

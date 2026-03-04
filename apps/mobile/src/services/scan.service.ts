@@ -3,6 +3,7 @@ import { ENDPOINTS } from '@/constants/api';
 import { useOfflineStore } from '@/stores/offline.store';
 import { insertOfflineScan } from '@/lib/database';
 import type { ScanRecord } from '@/schemas/scan.schema';
+import i18n from '@/i18n';
 
 export const scanService = {
   async getHistory(): Promise<ScanRecord[]> {
@@ -22,7 +23,7 @@ export const scanService = {
       const record: ScanRecord = {
         id: `scan-offline-${Date.now()}`,
         barcode,
-        scannedProduct: { name: barcode, brand: 'Inconnu', category: 'Non classé', barcode },
+        scannedProduct: { name: barcode, brand: i18n.t('common.unknown'), category: i18n.t('common.uncategorized'), barcode },
         molydalMatch: null,
         status: 'no_match',
         scannedAt: new Date().toISOString(),

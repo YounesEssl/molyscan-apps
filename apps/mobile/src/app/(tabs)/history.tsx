@@ -12,6 +12,7 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '@/constants/theme';
 import { scanService } from '@/services/scan.service';
 import type { ScanStatus } from '@/types/scan';
 import type { ScanRecord } from '@/schemas/scan.schema';
+import { useTranslation } from 'react-i18next';
 
 export default function HistoryScreen(): React.JSX.Element {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function HistoryScreen(): React.JSX.Element {
   const [filter, setFilter] = useState<ScanStatus | 'all'>('all');
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [scans, setScans] = useState<ScanRecord[]>([]);
+  const { t } = useTranslation();
 
   useEffect(() => {
     scanService.getHistory().then(setScans).catch(() => {});
@@ -53,7 +55,7 @@ export default function HistoryScreen(): React.JSX.Element {
   return (
     <ScreenWrapper padded={false}>
       <View style={styles.header}>
-        <Text variant="heading">Historique</Text>
+        <Text variant="heading">{t('history.title')}</Text>
       </View>
 
       {/* Search bar */}
@@ -64,7 +66,7 @@ export default function HistoryScreen(): React.JSX.Element {
           </View>
           <TextInput
             style={styles.searchInput}
-            placeholder="Rechercher un produit..."
+            placeholder={t('history.searchProduct')}
             placeholderTextColor={COLORS.textMuted}
             value={search}
             onChangeText={setSearch}
@@ -76,8 +78,8 @@ export default function HistoryScreen(): React.JSX.Element {
       <View style={styles.toggleContainer}>
         <Toggle
           options={[
-            { label: 'Liste', value: 'list' },
-            { label: 'Carte', value: 'map' },
+            { label: t('history.listView'), value: 'list' },
+            { label: t('history.mapView'), value: 'map' },
           ]}
           value={viewMode}
           onChange={(v) => setViewMode(v as 'list' | 'map')}
@@ -104,7 +106,7 @@ export default function HistoryScreen(): React.JSX.Element {
                   <Ionicons name="file-tray-outline" size={40} color={COLORS.textMuted} />
                 </View>
                 <Text variant="body" color={COLORS.textSecondary}>
-                  Aucun scan pour le moment
+                  {t('history.emptyState')}
                 </Text>
               </View>
             }

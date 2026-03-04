@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text, Card } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { scanService } from '@/services/scan.service';
 import type { ScanRecord } from '@/schemas/scan.schema';
 
 export const CompetitorChart: React.FC = () => {
+  const { t } = useTranslation();
   const [scans, setScans] = useState<ScanRecord[]>([]);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export const CompetitorChart: React.FC = () => {
 
   return (
     <Card style={styles.card}>
-      <Text variant="label" style={styles.title}>Top concurrents identifiés</Text>
+      <Text variant="label" style={styles.title}>{t('competitorChart.title')}</Text>
       <View style={styles.chart}>
         {competitors.map(([brand, count]) => (
           <View key={brand} style={styles.row}>

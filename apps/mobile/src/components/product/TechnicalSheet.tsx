@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, Card } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import i18n from '@/i18n';
 import type { MolydalMatch } from '@/schemas/scan.schema';
 
 interface TechnicalSheetProps {
@@ -13,8 +15,8 @@ interface TechnicalSheetProps {
 function getTechnicalData(reference: string): TechnicalSpec {
   const specs: Record<string, Partial<TechnicalSpec>> = {
     'MOL-GR-002': {
-      description: 'Graisse au lithium EP multi-usage hautes performances.',
-      application: 'Roulements, paliers, engrenages ouverts, mécanismes divers.',
+      description: i18n.t('technicalSheet.greaseLithiumDescription'),
+      application: i18n.t('technicalSheet.greaseLithiumApplication'),
       temperature: '-20°C à +130°C',
       nlgiGrade: '2',
       baseOilViscosity: '150 mm²/s à 40°C',
@@ -22,8 +24,8 @@ function getTechnicalData(reference: string): TechnicalSpec {
       certifications: ['DIN 51825 KP2K-30', 'ISO 6743-9'],
     },
     'MOL-HI-220': {
-      description: 'Huile pour engrenages industriels sous charges sévères.',
-      application: 'Réducteurs, engrenages fermés, paliers sous charge.',
+      description: i18n.t('technicalSheet.gearOilDescription'),
+      application: i18n.t('technicalSheet.gearOilApplication'),
       temperature: '-10°C à +100°C',
       viscosity40: '220 mm²/s',
       viscosity100: '19 mm²/s',
@@ -31,8 +33,8 @@ function getTechnicalData(reference: string): TechnicalSpec {
       certifications: ['ISO 12925-1 CKD', 'DIN 51517-3 CLP'],
     },
     'MOL-HY-046': {
-      description: 'Huile hydraulique anti-usure haute performance.',
-      application: 'Systèmes hydrauliques haute pression, pompes à pistons et palettes.',
+      description: i18n.t('technicalSheet.hydraulicOilDescription'),
+      application: i18n.t('technicalSheet.hydraulicOilApplication'),
       temperature: '-25°C à +90°C',
       viscosity40: '46 mm²/s',
       viscosity100: '6.8 mm²/s',
@@ -42,8 +44,8 @@ function getTechnicalData(reference: string): TechnicalSpec {
   };
 
   const base: TechnicalSpec = {
-    description: 'Lubrifiant industriel haute performance Molydal.',
-    application: 'Applications industrielles générales.',
+    description: i18n.t('technicalSheet.defaultDescription'),
+    application: i18n.t('technicalSheet.defaultApplication'),
     temperature: '-20°C à +120°C',
     certifications: ['ISO 6743'],
   };
@@ -65,6 +67,7 @@ interface TechnicalSpec {
 }
 
 export const TechnicalSheet: React.FC<TechnicalSheetProps> = ({ match }) => {
+  const { t } = useTranslation();
   const spec = getTechnicalData(match.reference);
 
   return (
@@ -82,31 +85,31 @@ export const TechnicalSheet: React.FC<TechnicalSheetProps> = ({ match }) => {
 
       {/* Description */}
       <Card style={styles.card}>
-        <Text variant="label">Description</Text>
+        <Text variant="label">{t('technicalSheet.description')}</Text>
         <Text variant="body" color={COLORS.textSecondary}>{spec.description}</Text>
       </Card>
 
       {/* Application */}
       <Card style={styles.card}>
-        <Text variant="label">Domaines d'application</Text>
+        <Text variant="label">{t('technicalSheet.applicationDomains')}</Text>
         <Text variant="body" color={COLORS.textSecondary}>{spec.application}</Text>
       </Card>
 
       {/* Specifications */}
       <Card style={styles.card}>
-        <Text variant="label">Caractéristiques techniques</Text>
-        <SpecRow label="Plage de température" value={spec.temperature} />
-        {spec.nlgiGrade && <SpecRow label="Grade NLGI" value={spec.nlgiGrade} />}
-        {spec.baseOilViscosity && <SpecRow label="Viscosité huile de base" value={spec.baseOilViscosity} />}
-        {spec.dropping && <SpecRow label="Point de goutte" value={spec.dropping} />}
-        {spec.viscosity40 && <SpecRow label="Viscosité à 40°C" value={spec.viscosity40} />}
-        {spec.viscosity100 && <SpecRow label="Viscosité à 100°C" value={spec.viscosity100} />}
-        {spec.vi && <SpecRow label="Indice de viscosité" value={spec.vi} />}
+        <Text variant="label">{t('technicalSheet.technicalSpecs')}</Text>
+        <SpecRow label={t('technicalSheet.temperatureRange')} value={spec.temperature} />
+        {spec.nlgiGrade && <SpecRow label={t('technicalSheet.nlgiGrade')} value={spec.nlgiGrade} />}
+        {spec.baseOilViscosity && <SpecRow label={t('technicalSheet.baseOilViscosity')} value={spec.baseOilViscosity} />}
+        {spec.dropping && <SpecRow label={t('technicalSheet.droppingPoint')} value={spec.dropping} />}
+        {spec.viscosity40 && <SpecRow label={t('technicalSheet.viscosity40')} value={spec.viscosity40} />}
+        {spec.viscosity100 && <SpecRow label={t('technicalSheet.viscosity100')} value={spec.viscosity100} />}
+        {spec.vi && <SpecRow label={t('technicalSheet.viscosityIndex')} value={spec.vi} />}
       </Card>
 
       {/* Certifications */}
       <Card style={styles.card}>
-        <Text variant="label">Certifications & normes</Text>
+        <Text variant="label">{t('technicalSheet.certifications')}</Text>
         <View style={styles.certList}>
           {spec.certifications.map((cert) => (
             <View key={cert} style={styles.certBadge}>

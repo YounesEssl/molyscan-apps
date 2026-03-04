@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Button, Input, Card } from '@/components/ui';
@@ -12,6 +13,7 @@ import type { ScanRecord } from '@/schemas/scan.schema';
 
 export default function PriceRequestScreen(): React.JSX.Element {
   const router = useRouter();
+  const { t } = useTranslation();
   const { scanId } = useLocalSearchParams<{ scanId: string }>();
   const addWorkflow = useWorkflowStore((s) => s.addWorkflow);
   const [scan, setScan] = useState<ScanRecord | null>(null);
@@ -29,7 +31,7 @@ export default function PriceRequestScreen(): React.JSX.Element {
 
   const handleSubmit = async () => {
     if (!clientName.trim() || !quantity.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir le client et la quantité.');
+      Alert.alert(t('common.error'), t('workflow.validationError'));
       return;
     }
     setLoading(true);
@@ -45,18 +47,18 @@ export default function PriceRequestScreen(): React.JSX.Element {
       });
       addWorkflow(wf);
       setLoading(false);
-      Alert.alert('Succès', 'Demande de prix envoyée.', [
+      Alert.alert(t('common.success'), t('workflow.submitSuccess'), [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch {
       setLoading(false);
-      Alert.alert('Erreur', "Impossible d'envoyer la demande.");
+      Alert.alert(t('common.error'), t('workflow.submitError'));
     }
   };
 
   return (
     <ScreenWrapper scroll>
-      <Header title="Demande de prix" showBack />
+      <Header title={t('workflow.priceRequest')} showBack />
       <View style={styles.content}>
         {scan?.molydalMatch && (
           <Card style={styles.productInfo}>
@@ -66,10 +68,10 @@ export default function PriceRequestScreen(): React.JSX.Element {
             </Text>
           </Card>
         )}
-        <Input label="Nom du client" icon="business-outline" placeholder="Ex: Airbus Toulouse" value={clientName} onChangeText={setClientName} />
-        <Input label="Quantité (L)" icon="beaker-outline" placeholder="Ex: 200" keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
-        <Input label="Prix souhaité (€/L)" icon="pricetag-outline" placeholder="Optionnel" keyboardType="decimal-pad" value={price} onChangeText={setPrice} />
-        <Button title="Envoyer la demande" variant="accent" size="lg" loading={loading} onPress={handleSubmit} style={styles.submit} />
+        <Input label={t('workflow.clientName')} icon="business-outline" placeholder={t('workflow.clientPlaceholder')} value={clientName} onChangeText={setClientName} />
+        <Input label={t('workflow.quantity')} icon="beaker-outline" placeholder={t('workflow.quantityPlaceholder')} keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
+        <Input label={t('workflow.desiredPrice')} icon="pricetag-outline" placeholder={t('workflow.optional')} keyboardType="decimal-pad" value={price} onChangeText={setPrice} />
+        <Button title={t('workflow.submitRequest')} variant="accent" size="lg" loading={loading} onPress={handleSubmit} style={styles.submit} />
       </View>
     </ScreenWrapper>
   );

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Button } from '@/components/ui';
@@ -11,16 +12,17 @@ import { scanService } from '@/services/scan.service';
 import { formatFullDate } from '@/utils/date';
 import type { ScanRecord } from '@/schemas/scan.schema';
 
-const SCAN_METHOD_LABELS: Record<string, string> = {
-  barcode: 'code-barres',
-  label: 'étiquette OCR',
-  voice: 'vocal',
-  camera: 'caméra',
+const SCAN_METHOD_KEYS: Record<string, string> = {
+  barcode: 'product.scanMethodBarcode',
+  label: 'product.scanMethodLabel',
+  voice: 'product.scanMethodVoice',
+  camera: 'product.scanMethodCamera',
 };
 
 export default function ProductDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useTranslation();
   const [showTechSheet, setShowTechSheet] = useState(false);
   const [scan, setScan] = useState<ScanRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,10 +36,10 @@ export default function ProductDetailScreen(): React.JSX.Element {
   if (!scan) {
     return (
       <ScreenWrapper>
-        <Header title="Détail" showBack />
+        <Header title={t('product.detail')} showBack />
         <View style={styles.notFound}>
           <Text variant="body" color={COLORS.textSecondary}>
-            Scan introuvable
+            {t('product.scanNotFound')}
           </Text>
         </View>
       </ScreenWrapper>
@@ -46,7 +48,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
   return (
     <ScreenWrapper scroll padded={false}>
-      <Header title="Détail produit" showBack />
+      <Header title={t('product.productDetail')} showBack />
 
       <View style={styles.content}>
         {/* Date + location */}
@@ -58,7 +60,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
             </Text>
           )}
           <Text variant="caption" color={COLORS.textMuted}>
-            Scanné via {SCAN_METHOD_LABELS[scan.scanMethod] ?? scan.scanMethod}
+            {t('product.scannedVia', { method: t(SCAN_METHOD_KEYS[scan.scanMethod] ?? scan.scanMethod) })}
           </Text>
         </View>
 
@@ -76,7 +78,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
             </Text>
             <View style={styles.noMatchBanner}>
               <Text variant="body" color={COLORS.danger}>
-                Aucun équivalent Molydal identifié pour ce produit.
+                {t('product.noMolydalEquivalent')}
               </Text>
             </View>
           </View>
@@ -86,28 +88,28 @@ export default function ProductDetailScreen(): React.JSX.Element {
         {scan.molydalMatch && (
           <View style={styles.actions}>
             <Button
-              title="Demander un prix"
+              title={t('product.requestPrice')}
               variant="accent"
               icon="pricetag-outline"
               onPress={() => router.push(`/workflow/price-request?scanId=${scan.id}`)}
               style={styles.actionButton}
             />
             <Button
-              title="Poser une question à l'IA"
+              title={t('product.askAI')}
               variant="primary"
               icon="sparkles-outline"
               onPress={() => router.push(`/chat/conv-${scan.id}`)}
               style={styles.actionButton}
             />
             <Button
-              title="Fiche technique"
+              title={t('product.technicalSheet')}
               variant="outline"
               icon="document-text-outline"
               onPress={() => setShowTechSheet(true)}
               style={styles.actionButton}
             />
             <Button
-              title="Partager"
+              title={t('product.share')}
               variant="ghost"
               icon="share-outline"
               onPress={() => {}}
@@ -123,7 +125,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
       {scan.molydalMatch && (
         <Modal visible={showTechSheet} animationType="slide" presentationStyle="pageSheet">
           <ScreenWrapper padded={false}>
-            <Header title="Fiche technique" showBack onBack={() => setShowTechSheet(false)} />
+            <Header title={t('product.technicalSheet')} showBack onBack={() => setShowTechSheet(false)} />
             <View style={styles.techSheetContent}>
               <TechnicalSheet match={scan.molydalMatch} />
             </View>

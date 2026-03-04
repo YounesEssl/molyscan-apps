@@ -7,6 +7,7 @@ import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Text, Button, Input } from '@/components/ui';
 import { COLORS, GRADIENTS, SPACING, SHADOW } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from 'react-i18next';
 
 export default function LoginScreen(): React.JSX.Element {
   const router = useRouter();
@@ -15,11 +16,12 @@ export default function LoginScreen(): React.JSX.Element {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { t } = useTranslation();
 
   const handleLogin = async () => {
     setError('');
     if (!email || !password) {
-      setError('Veuillez remplir tous les champs');
+      setError(t('auth.fillAllFields'));
       return;
     }
     setLoading(true);
@@ -27,7 +29,7 @@ export default function LoginScreen(): React.JSX.Element {
       await login({ email, password });
       router.replace('/(tabs)');
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || 'Erreur de connexion';
+      const msg = e?.response?.data?.message || e?.message || t('auth.loginError');
       setError(msg);
     } finally {
       setLoading(false);
@@ -55,25 +57,25 @@ export default function LoginScreen(): React.JSX.Element {
               MolyScan
             </Text>
             <Text variant="caption" style={styles.tagline}>
-              Identifiez les équivalents Molydal instantanément
+              {t('auth.tagline')}
             </Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
             <Input
-              label="Email"
+              label={t('auth.email')}
               icon="mail-outline"
-              placeholder="prenom.nom@molydal.com"
+              placeholder={t('auth.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
               value={email}
               onChangeText={setEmail}
             />
             <Input
-              label="Mot de passe"
+              label={t('auth.password')}
               icon="lock-closed-outline"
-              placeholder="Votre mot de passe"
+              placeholder={t('auth.passwordPlaceholder')}
               isPassword
               value={password}
               onChangeText={setPassword}
@@ -84,7 +86,7 @@ export default function LoginScreen(): React.JSX.Element {
               </Text>
             ) : null}
             <Button
-              title="Se connecter"
+              title={t('auth.login')}
               variant="accent"
               size="lg"
               loading={loading}
@@ -92,7 +94,7 @@ export default function LoginScreen(): React.JSX.Element {
               style={styles.loginButton}
             />
             <Text variant="caption" style={styles.forgotPassword}>
-              Mot de passe oublié ?
+              {t('auth.forgotPassword')}
             </Text>
           </View>
         </View>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { FlatList, StyleSheet, View, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/layout/Header';
@@ -14,6 +15,7 @@ import type { AIMessage, AIConversation } from '@/schemas/chat.schema';
 
 export default function ChatDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -61,7 +63,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
 
   const headerTitle = conversation
     ? `${conversation.product.scannedName} → ${conversation.product.molydalName}`
-    : 'Assistant IA';
+    : t('chat.aiAssistant');
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -71,7 +73,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
       <View style={styles.aiBadge}>
         <Ionicons name="sparkles" size={12} color={COLORS.accent} />
         <Text variant="caption" color={COLORS.accent} style={styles.aiBadgeText}>
-          Assistant IA Molydal
+          {t('chat.aiBadge')}
         </Text>
       </View>
 
@@ -93,7 +95,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
                 <Ionicons name="sparkles" size={32} color={COLORS.accent} />
               </View>
               <Text variant="body" color={COLORS.textSecondary} style={styles.emptyText}>
-                Posez une question sur l'équivalence produit
+                {t('chat.emptyChat')}
               </Text>
             </View>
           }
@@ -107,7 +109,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
                   <View style={styles.typingBubble}>
                     <ActivityIndicator size="small" color={COLORS.accent} />
                     <Text variant="caption" color={COLORS.textMuted}>
-                      Réflexion en cours...
+                      {t('chat.thinking')}
                     </Text>
                   </View>
                 </View>

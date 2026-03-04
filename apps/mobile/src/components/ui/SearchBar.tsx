@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TextInput, StyleSheet, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '@/constants/theme';
 
@@ -13,22 +14,25 @@ interface SearchBarProps {
 export const SearchBar: React.FC<SearchBarProps> = ({
   value,
   onChangeText,
-  placeholder = 'Rechercher...',
+  placeholder,
   style,
-}) => (
-  <View style={[styles.container, SHADOW.sm as ViewStyle, style]}>
-    <View style={styles.iconBox}>
-      <Ionicons name="search" size={16} color={COLORS.textMuted} />
+}) => {
+  const { t } = useTranslation();
+  return (
+    <View style={[styles.container, SHADOW.sm as ViewStyle, style]}>
+      <View style={styles.iconBox}>
+        <Ionicons name="search" size={16} color={COLORS.textMuted} />
+      </View>
+      <TextInput
+        style={styles.input}
+        placeholder={placeholder ?? t('common.search')}
+        placeholderTextColor={COLORS.textMuted}
+        value={value}
+        onChangeText={onChangeText}
+      />
     </View>
-    <TextInput
-      style={styles.input}
-      placeholder={placeholder}
-      placeholderTextColor={COLORS.textMuted}
-      value={value}
-      onChangeText={onChangeText}
-    />
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

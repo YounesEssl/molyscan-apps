@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -17,6 +18,7 @@ const MOCK_DICTATIONS = [
 ];
 
 export const VoiceInput: React.FC<VoiceInputProps> = ({ onResult }) => {
+  const { t } = useTranslation();
   const [isListening, setIsListening] = useState(false);
   const [displayText, setDisplayText] = useState('');
   const [phase, setPhase] = useState<'idle' | 'listening' | 'processing'>('idle');
@@ -75,15 +77,15 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onResult }) => {
           </Text>
           {phase === 'processing' && (
             <Text variant="caption" color={COLORS.accent} style={styles.searchingText}>
-              Recherche en cours...
+              {t('scanner.searchingProduct')}
             </Text>
           )}
         </View>
       ) : (
         <Text variant="body" color={COLORS.surface} style={styles.instruction}>
           {isListening
-            ? 'Dictez le nom du produit...'
-            : 'Appuyez pour dicter le nom du produit'}
+            ? t('scanner.dictateInstruction')
+            : t('scanner.dictatePrompt')}
         </Text>
       )}
 
@@ -118,7 +120,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onResult }) => {
 
       {isListening && (
         <Text variant="caption" color="rgba(255,255,255,0.5)" style={styles.hint}>
-          Appuyez à nouveau pour arrêter
+          {t('scanner.tapToStop')}
         </Text>
       )}
     </View>

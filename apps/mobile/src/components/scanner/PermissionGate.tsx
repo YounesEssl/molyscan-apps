@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Button } from '@/components/ui';
@@ -12,6 +13,7 @@ interface PermissionGateProps {
 export const PermissionGate: React.FC<PermissionGateProps> = ({
   onRequestPermission,
 }) => {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -21,14 +23,13 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({
         <Ionicons name="camera-outline" size={48} color={COLORS.surface} />
       </LinearGradient>
       <Text variant="heading" style={styles.title}>
-        Accès caméra requis
+        {t('scanner.cameraRequired')}
       </Text>
       <Text variant="body" style={styles.description}>
-        MolyScan utilise votre caméra pour scanner les codes-barres des produits
-        concurrents et identifier l'équivalent Molydal.
+        {t('scanner.cameraDescription')}
       </Text>
       <Button
-        title="Autoriser la caméra"
+        title={t('scanner.authorizeCamera')}
         variant="accent"
         icon="camera"
         onPress={onRequestPermission}

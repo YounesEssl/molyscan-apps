@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
@@ -9,6 +10,7 @@ import { scanService } from '@/services/scan.service';
 import type { ScanRecord } from '@/schemas/scan.schema';
 
 export const RecentScans: React.FC = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const [scans, setScans] = useState<ScanRecord[]>([]);
 
@@ -19,14 +21,14 @@ export const RecentScans: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text variant="subheading">Derniers scans</Text>
+        <Text variant="subheading">{t('dashboard.recentScans')}</Text>
         <TouchableOpacity
           onPress={() => router.push('/(tabs)/history')}
           style={styles.seeAll}
           hitSlop={8}
         >
           <Text variant="caption" color={COLORS.accent} style={styles.seeAllText}>
-            Voir tout
+            {t('common.seeAll')}
           </Text>
           <Ionicons name="chevron-forward" size={14} color={COLORS.accent} />
         </TouchableOpacity>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -10,40 +11,43 @@ interface ScanModeSwitchProps {
   onChange: (mode: ScanMethod) => void;
 }
 
-const MODES: { value: ScanMethod; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: 'barcode', label: 'Code', icon: 'barcode-outline' },
-  { value: 'label', label: 'Étiquette', icon: 'camera-outline' },
-  { value: 'voice', label: 'Vocal', icon: 'mic-outline' },
+const MODES: { value: ScanMethod; labelKey: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { value: 'barcode', labelKey: 'scanner.modeBarcode', icon: 'barcode-outline' },
+  { value: 'label', labelKey: 'scanner.modeLabel', icon: 'camera-outline' },
+  { value: 'voice', labelKey: 'scanner.modeVoice', icon: 'mic-outline' },
 ];
 
-export const ScanModeSwitch: React.FC<ScanModeSwitchProps> = ({ mode, onChange }) => (
-  <View style={styles.container}>
-    {MODES.map((m) => {
-      const active = mode === m.value;
-      return (
-        <TouchableOpacity
-          key={m.value}
-          style={[styles.option, active && styles.active]}
-          onPress={() => onChange(m.value)}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={m.icon}
-            size={16}
-            color={active ? COLORS.surface : 'rgba(255,255,255,0.6)'}
-          />
-          <Text
-            variant="caption"
-            color={active ? COLORS.surface : 'rgba(255,255,255,0.6)'}
-            style={styles.label}
+export const ScanModeSwitch: React.FC<ScanModeSwitchProps> = ({ mode, onChange }) => {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.container}>
+      {MODES.map((m) => {
+        const active = mode === m.value;
+        return (
+          <TouchableOpacity
+            key={m.value}
+            style={[styles.option, active && styles.active]}
+            onPress={() => onChange(m.value)}
+            activeOpacity={0.7}
           >
-            {m.label}
-          </Text>
-        </TouchableOpacity>
-      );
-    })}
-  </View>
-);
+            <Ionicons
+              name={m.icon}
+              size={16}
+              color={active ? COLORS.surface : 'rgba(255,255,255,0.6)'}
+            />
+            <Text
+              variant="caption"
+              color={active ? COLORS.surface : 'rgba(255,255,255,0.6)'}
+              style={styles.label}
+            >
+              {t(m.labelKey)}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
