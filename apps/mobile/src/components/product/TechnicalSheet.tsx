@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
+import { Document } from 'react-native-solar-icons/icons/bold-duotone';
+import { ShieldCheck } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text, Card } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import i18n from '@/i18n';
@@ -75,7 +76,7 @@ export const TechnicalSheet: React.FC<TechnicalSheetProps> = ({ match }) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.iconBox}>
-          <Ionicons name="document-text" size={24} color={COLORS.primary} />
+          <Document size={24} color={COLORS.primary} />
         </View>
         <View style={styles.headerText}>
           <Text variant="subheading">{match.name}</Text>
@@ -113,7 +114,7 @@ export const TechnicalSheet: React.FC<TechnicalSheetProps> = ({ match }) => {
         <View style={styles.certList}>
           {spec.certifications.map((cert) => (
             <View key={cert} style={styles.certBadge}>
-              <Ionicons name="shield-checkmark" size={14} color={COLORS.success} />
+              <ShieldCheck size={14} color={COLORS.success} />
               <Text variant="caption" style={styles.certText}>{cert}</Text>
             </View>
           ))}

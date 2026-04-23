@@ -7,14 +7,15 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Eye } from 'react-native-solar-icons/icons/bold-duotone';
+import { EyeClosed } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from './Text';
 import { COLORS, RADIUS, SPACING, FONT_SIZE, SHADOW } from '@/constants/theme';
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: React.ReactNode;
   isPassword?: boolean;
   containerStyle?: ViewStyle;
 }
@@ -43,7 +44,7 @@ export const Input: React.FC<InputProps> = ({
       >
         {icon && (
           <View style={styles.iconBox}>
-            <Ionicons name={icon} size={18} color={focused ? COLORS.primary : COLORS.textMuted} />
+            {icon}
           </View>
         )}
         <TextInput
@@ -56,11 +57,11 @@ export const Input: React.FC<InputProps> = ({
         />
         {isPassword && (
           <TouchableOpacity onPress={() => setSecureEntry((v) => !v)}>
-            <Ionicons
-              name={secureEntry ? 'eye-off-outline' : 'eye-outline'}
-              size={20}
-              color={COLORS.textMuted}
-            />
+            {secureEntry ? (
+              <EyeClosed size={20} color={COLORS.textMuted} />
+            ) : (
+              <Eye size={20} color={COLORS.textMuted} />
+            )}
           </TouchableOpacity>
         )}
       </View>

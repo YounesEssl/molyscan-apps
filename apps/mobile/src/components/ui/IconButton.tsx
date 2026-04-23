@@ -1,12 +1,9 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, type ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { COLORS, RADIUS } from '@/constants/theme';
 
 interface IconButtonProps {
-  icon: keyof typeof Ionicons.glyphMap;
-  size?: number;
-  color?: string;
+  icon: React.ReactNode;
   backgroundColor?: string;
   onPress: () => void;
   style?: ViewStyle;
@@ -14,8 +11,6 @@ interface IconButtonProps {
 
 export const IconButton: React.FC<IconButtonProps> = ({
   icon,
-  size = 22,
-  color = COLORS.text,
   backgroundColor = COLORS.muted,
   onPress,
   style,
@@ -25,7 +20,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
     onPress={onPress}
     hitSlop={8}
   >
-    <Ionicons name={icon} size={size} color={color} />
+    {icon}
   </TouchableOpacity>
 );
 

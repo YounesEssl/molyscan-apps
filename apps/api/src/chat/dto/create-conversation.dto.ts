@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class ConversationProductDto {
@@ -21,9 +21,10 @@ class ConversationProductDto {
 }
 
 export class CreateConversationDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsString()
-  scanId!: string;
+  @IsOptional()
+  scanId?: string;
 
   @ApiProperty({ type: ConversationProductDto })
   @ValidateNested()

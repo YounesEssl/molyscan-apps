@@ -60,10 +60,10 @@ export const ScanMap: React.FC<ScanMapProps> = ({ scans }) => {
         >
           <Callout onPress={() => router.push(`/product/${scan.id}`)}>
             <Text variant="caption" style={styles.calloutTitle}>
-              {scan.scannedProduct.name}
+              {scan.scannedProduct?.name ?? 'Produit inconnu'}
             </Text>
             <Text variant="caption" style={styles.calloutSub}>
-              {scan.scannedProduct.brand} · {new Date(scan.scannedAt).toLocaleDateString('fr-FR')}
+              {scan.scannedProduct?.brand ?? ''} · {new Date(scan.scannedAt).toLocaleDateString('fr-FR')}
             </Text>
           </Callout>
         </Marker>

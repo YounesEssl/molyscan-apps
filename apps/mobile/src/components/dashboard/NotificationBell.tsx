@@ -1,23 +1,25 @@
 import React from 'react';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Bell } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from '@/components/ui';
-import { COLORS, RADIUS } from '@/constants/theme';
-import { useNotificationStore } from '@/stores/notification.store';
+import { colors } from '@/design/tokens/colors';
+import { radius } from '@/design/tokens/radius';
 
 interface NotificationBellProps {
   onPress: () => void;
 }
 
 export const NotificationBell: React.FC<NotificationBellProps> = ({ onPress }) => {
-  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  // notification store import is unchanged
+  const { useNotificationStore } = require('@/stores/notification.store');
+  const unreadCount = useNotificationStore((s: { unreadCount: number }) => s.unreadCount);
 
   return (
     <TouchableOpacity onPress={onPress} hitSlop={12}>
-      <Ionicons name="notifications-outline" size={24} color={COLORS.text} />
+      <Bell size={24} color={colors.surface} />
       {unreadCount > 0 && (
         <View style={styles.badge}>
-          <Text variant="caption" color={COLORS.surface} style={styles.badgeText}>
+          <Text variant="caption" color={colors.textOnRed} style={styles.badgeText}>
             {unreadCount > 9 ? '9+' : unreadCount}
           </Text>
         </View>
@@ -34,7 +36,7 @@ const styles = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: COLORS.danger,
+    backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,

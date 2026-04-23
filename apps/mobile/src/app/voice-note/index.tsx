@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, FlatList, StyleSheet, type ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
@@ -35,8 +35,8 @@ export default function VoiceNoteScreen(): React.JSX.Element {
       <View style={styles.recordButtonContainer}>
         <Button
           title={t('voiceNote.newNote')}
-          variant="accent"
-          icon="mic"
+          variant="primary"
+          icon={<Microphone2 size={20} color={COLORS.surface} />}
           onPress={() => router.push('/voice-note/record')}
           style={styles.recordButton}
         />
@@ -50,7 +50,7 @@ export default function VoiceNoteScreen(): React.JSX.Element {
           <Card style={styles.card}>
             <View style={styles.topRow}>
               <View style={styles.clientRow}>
-                <Ionicons name="mic" size={18} color={COLORS.accent} />
+                <Microphone2 size={18} color={COLORS.accent} />
                 <Text variant="body" style={styles.clientName}>{item.clientName}</Text>
               </View>
               <Text variant="caption" color={COLORS.textMuted}>
@@ -77,7 +77,7 @@ export default function VoiceNoteScreen(): React.JSX.Element {
           </Card>
         )}
         ListEmptyComponent={
-          <EmptyState icon="mic-outline" title={t('voiceNote.emptyState')} />
+          <EmptyState icon={<Microphone2 size={32} color={COLORS.textMuted} />} title={t('voiceNote.emptyState')} />
         }
       />
     </ScreenWrapper>

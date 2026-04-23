@@ -1,15 +1,19 @@
 import React from 'react';
 import { View, type ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
-import { COLORS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { radius } from '@/design/tokens/radius';
+import { spacing } from '@/design/tokens/spacing';
+import { typography } from '@/design/tokens/typography';
 import { StyleSheet } from 'react-native';
 
 interface StatCardProps {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: React.ReactNode;
   label: string;
   value: string;
   color?: string;
+  trend?: { value: number; direction: 'up' | 'down' };
   style?: ViewStyle;
 }
 
@@ -17,13 +21,14 @@ export const StatCard: React.FC<StatCardProps> = ({
   icon,
   label,
   value,
-  color = COLORS.primary,
+  color = colors.red,
+  trend,
   style,
 }) => {
   return (
-    <View style={StyleSheet.flatten([styles.card, SHADOW.md as ViewStyle, style])}>
+    <View style={[styles.card, style]}>
       <View style={[styles.iconWrapper, { backgroundColor: color + '15' }]}>
-        <Ionicons name={icon} size={22} color={color} />
+        {icon}
       </View>
       <Text variant="label" style={styles.label}>
         {label}
@@ -31,6 +36,15 @@ export const StatCard: React.FC<StatCardProps> = ({
       <Text variant="heading" style={styles.value}>
         {value}
       </Text>
+      {trend && (
+        <Text
+          variant="caption"
+          color={trend.direction === 'up' ? colors.success : colors.error}
+          style={styles.trend}
+        >
+          {trend.direction === 'up' ? '↑' : '↓'} {trend.value}%
+        </Text>
+      )}
     </View>
   );
 };
@@ -38,22 +52,30 @@ export const StatCard: React.FC<StatCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     width: 160,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xxl,
-    padding: SPACING.xl - 4,
-    gap: SPACING.sm,
-  },
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    ...shadows.md,
+  } as ViewStyle,
   iconWrapper: {
     width: 44,
     height: 44,
-    borderRadius: RADIUS.md,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   label: {
-    marginTop: SPACING.xs,
+    marginTop: spacing.xs,
   },
   value: {
-    fontSize: 22,
+    fontSize: typography.sizes.xxxl,
+    fontFamily: typography.fonts.display,
+  },
+  trend: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
   },
 });

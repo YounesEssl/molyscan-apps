@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Plain2 } from 'react-native-solar-icons/icons/bold';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '@/constants/theme';
 
 interface ChatInputProps {
@@ -34,7 +34,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled }) => {
         onPress={handleSend}
         disabled={!text.trim() || disabled}
       >
-        <Ionicons name="send" size={20} color={COLORS.surface} />
+        <Plain2 size={20} color={COLORS.surface} />
       </TouchableOpacity>
     </View>
   );

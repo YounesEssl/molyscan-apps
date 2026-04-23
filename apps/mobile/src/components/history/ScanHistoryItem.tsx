@@ -1,9 +1,15 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle } from 'react-native-solar-icons/icons/bold-duotone';
+import { ClockCircle } from 'react-native-solar-icons/icons/bold-duotone';
+import { DangerCircle } from 'react-native-solar-icons/icons/bold-duotone';
+import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
 import { Text } from '@/components/ui';
-import { COLORS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { spacing } from '@/design/tokens/spacing';
+import { radius } from '@/design/tokens/radius';
 import { formatRelativeDate } from '@/utils/date';
 import type { ScanRecord } from '@/schemas/scan.schema';
 
@@ -12,10 +18,10 @@ interface ScanHistoryItemProps {
   onPress: () => void;
 }
 
-const STATUS_ICON = {
-  matched: { name: 'checkmark-circle' as const, color: COLORS.success },
-  partial: { name: 'time' as const, color: COLORS.warning },
-  no_match: { name: 'close-circle' as const, color: COLORS.danger },
+const STATUS_CONFIG = {
+  matched: { Icon: CheckCircle, color: colors.matched, accentColor: colors.matched },
+  partial: { Icon: ClockCircle, color: colors.partial, accentColor: colors.partial },
+  no_match: { Icon: DangerCircle, color: colors.unmatched, accentColor: colors.unmatched },
 } as const;
 
 export const ScanHistoryItem: React.FC<ScanHistoryItemProps> = ({
@@ -23,37 +29,38 @@ export const ScanHistoryItem: React.FC<ScanHistoryItemProps> = ({
   onPress,
 }) => {
   const { t } = useTranslation();
-  const icon = STATUS_ICON[scan.status];
+  const config = STATUS_CONFIG[scan.status];
+  const Icon = config.Icon;
 
   return (
     <TouchableOpacity
-      style={[styles.container, SHADOW.md as ViewStyle]}
+      style={[styles.container]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.85}
     >
-      <View style={[styles.iconBox, { backgroundColor: icon.color + '15' }]}>
-        <Ionicons name={icon.name} size={24} color={icon.color} />
+      <View style={[styles.iconBox, { backgroundColor: config.color + '15' }]}>
+        <Icon size={24} color={config.color} />
       </View>
       <View style={styles.content}>
         <Text variant="subheading" numberOfLines={1}>
-          {scan.scannedProduct.name}
+          {scan.scannedProduct?.name ?? t('history.unknownProduct', 'Produit inconnu')}
         </Text>
         <Text variant="caption">
-          {scan.scannedProduct.brand}
+          {scan.scannedProduct?.brand ?? '—'}
         </Text>
         {scan.molydalMatch ? (
-          <Text variant="caption" color={COLORS.primary} style={styles.matchText}>
+          <Text variant="caption" color={colors.red} style={styles.matchText}>
             → {scan.molydalMatch.name} ({scan.molydalMatch.confidence}%)
           </Text>
         ) : (
-          <Text variant="caption" color={COLORS.danger}>
+          <Text variant="caption" color={colors.error}>
             {t('history.noEquivalent')}
           </Text>
         )}
       </View>
       <View style={styles.right}>
         <Text variant="caption">{formatRelativeDate(scan.scannedAt)}</Text>
-        <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+        <AltArrowRight size={16} color={colors.textMuted} />
       </View>
     </TouchableOpacity>
   );
@@ -63,15 +70,18 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xxl,
-    padding: SPACING.md + 4,
-  },
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    ...shadows.md,
+  } as ViewStyle,
   iconBox: {
     width: 44,
     height: 44,
-    borderRadius: RADIUS.md,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -84,6 +94,6 @@ const styles = StyleSheet.create({
   },
   right: {
     alignItems: 'flex-end',
-    gap: SPACING.xs,
+    gap: spacing.xs,
   },
 });

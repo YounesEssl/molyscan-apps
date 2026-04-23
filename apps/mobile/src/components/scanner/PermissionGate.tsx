@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
+import { Camera } from 'react-native-solar-icons/icons/bold-duotone';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Button } from '@/components/ui';
 import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
@@ -20,7 +20,7 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({
         colors={[...GRADIENTS.primary]}
         style={[styles.iconWrapper, SHADOW.primary as ViewStyle]}
       >
-        <Ionicons name="camera-outline" size={48} color={COLORS.surface} />
+        <Camera size={48} color={COLORS.surface} />
       </LinearGradient>
       <Text variant="heading" style={styles.title}>
         {t('scanner.cameraRequired')}
@@ -30,8 +30,8 @@ export const PermissionGate: React.FC<PermissionGateProps> = ({
       </Text>
       <Button
         title={t('scanner.authorizeCamera')}
-        variant="accent"
-        icon="camera"
+        variant="primary"
+        icon={<Camera size={20} color={COLORS.surface} />}
         onPress={onRequestPermission}
         size="lg"
       />

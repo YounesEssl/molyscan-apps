@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { RefreshCircle } from 'react-native-solar-icons/icons/bold-duotone';
+import { CloudUpload } from 'react-native-solar-icons/icons/bold-duotone';
 import { useTranslation } from 'react-i18next';
 import { Text, Card } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -22,11 +23,11 @@ export const SyncQueue: React.FC<SyncQueueProps> = ({ onSyncNow }) => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={[styles.iconBox, isSyncing && styles.iconBoxSyncing]}>
-            <Ionicons
-              name={isSyncing ? 'sync' : 'cloud-upload-outline'}
-              size={18}
-              color={isSyncing ? COLORS.surface : COLORS.warning}
-            />
+            {isSyncing ? (
+              <RefreshCircle size={18} color={COLORS.surface} />
+            ) : (
+              <CloudUpload size={18} color={COLORS.warning} />
+            )}
           </View>
           <View>
             <Text variant="body" style={styles.title}>
@@ -41,7 +42,7 @@ export const SyncQueue: React.FC<SyncQueueProps> = ({ onSyncNow }) => {
         </View>
         {!isSyncing && !isOffline && onSyncNow && pendingActions > 0 && (
           <TouchableOpacity style={styles.syncButton} onPress={onSyncNow}>
-            <Ionicons name="refresh" size={16} color={COLORS.surface} />
+            <RefreshCircle size={16} color={COLORS.surface} />
             <Text variant="caption" color={COLORS.surface} style={styles.syncButtonText}>
               {t('sync.syncButton')}
             </Text>

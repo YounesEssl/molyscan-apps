@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TextInput, StyleSheet, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
+import { Magnifer } from 'react-native-solar-icons/icons/bold-duotone';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '@/constants/theme';
 
 interface SearchBarProps {
@@ -21,7 +21,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <View style={[styles.container, SHADOW.sm as ViewStyle, style]}>
       <View style={styles.iconBox}>
-        <Ionicons name="search" size={16} color={COLORS.textMuted} />
+        <Magnifer size={16} color={COLORS.textMuted} />
       </View>
       <TextInput
         style={styles.input}

@@ -11,7 +11,7 @@ async function main() {
 
   const marc = await prisma.user.upsert({
     where: { email: 'marc.dupont@molydal.com' },
-    update: {},
+    update: { avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg' },
     create: {
       id: 'usr-001',
       email: 'marc.dupont@molydal.com',
@@ -21,6 +21,7 @@ async function main() {
       role: UserRole.commercial,
       company: 'Molydal',
       phone: '+33 6 12 34 56 78',
+      avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
       createdAt: new Date('2024-01-15T09:00:00.000Z'),
     },
   });
@@ -57,19 +58,18 @@ async function main() {
     },
   });
 
-  // Blank test account — no scans, no workflows, no notifications
-  const testUser = await prisma.user.upsert({
-    where: { email: 'test@molydal.com' },
+  const guillaume = await prisma.user.upsert({
+    where: { email: 'lepage@molydal.com' },
     update: {},
     create: {
-      id: 'usr-100',
-      email: 'test@molydal.com',
+      id: 'usr-004',
+      email: 'lepage@molydal.com',
       passwordHash,
-      firstName: 'Test',
-      lastName: 'Utilisateur',
+      firstName: 'Guillaume',
+      lastName: 'Le Page',
       role: UserRole.commercial,
       company: 'Molydal',
-      phone: '+33 6 00 00 00 00',
+      phone: '+33 6 11 22 33 44',
       createdAt: new Date(),
     },
   });

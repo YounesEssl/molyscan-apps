@@ -4,7 +4,8 @@ import {
   StyleSheet,
   type TextProps as RNTextProps,
 } from 'react-native';
-import { COLORS, FONT_SIZE } from '@/constants/theme';
+import { colors } from '@/design/tokens/colors';
+import { typography } from '@/design/tokens/typography';
 
 interface TextProps extends RNTextProps {
   variant?: 'title' | 'heading' | 'subheading' | 'body' | 'caption' | 'label';
@@ -27,38 +28,44 @@ export const Text: React.FC<TextProps> = ({
 
 const styles = StyleSheet.create({
   title: {
-    fontSize: FONT_SIZE.hero,
+    fontSize: typography.sizes.hero,
     fontWeight: '800',
-    color: COLORS.text,
-    letterSpacing: -0.5,
+    fontFamily: typography.fonts.display,
+    color: colors.textPrimary,
+    letterSpacing: typography.letterSpacing.tight,
   },
   heading: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '800',
-    color: COLORS.text,
-    letterSpacing: -0.3,
+    fontSize: typography.sizes.xxl,
+    fontWeight: '700',
+    fontFamily: typography.fonts.display,
+    color: colors.textPrimary,
+    letterSpacing: typography.letterSpacing.tight,
   },
   subheading: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.text,
+    fontSize: typography.sizes.lg,
+    fontWeight: '600',
+    fontFamily: typography.fonts.displaySemibold,
+    color: colors.textPrimary,
   },
   body: {
-    fontSize: FONT_SIZE.md,
+    fontSize: typography.sizes.md,
     fontWeight: '400',
-    color: COLORS.text,
-    lineHeight: 22,
+    fontFamily: typography.fonts.body,
+    color: colors.textPrimary,
+    lineHeight: typography.sizes.md * typography.lineHeights.normal,
   },
   caption: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: typography.sizes.sm,
     fontWeight: '500',
-    color: COLORS.textSecondary,
+    fontFamily: typography.fonts.body,
+    color: colors.textSecondary,
   },
   label: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: typography.sizes.xs,
     fontWeight: '700',
-    color: COLORS.textSecondary,
+    fontFamily: typography.fonts.displaySemibold,
+    color: colors.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: typography.letterSpacing.wider,
   },
 });

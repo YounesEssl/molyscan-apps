@@ -1,99 +1,84 @@
-import { Platform } from 'react-native';
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { radius } from '@/design/tokens/radius';
+import { spacing } from '@/design/tokens/spacing';
+import { typography } from '@/design/tokens/typography';
+// Bridge: map old COLORS keys → new design tokens
+// All existing files import these and they still work
+export const COLORS: Record<string, string> = {
+  primary: colors.red,
+  primaryLight: colors.redLight,
+  accent: colors.red,
+  accentLight: colors.redLight,
 
-export const COLORS = {
-  // Brand
-  primary: '#1B3A5C',
-  primaryLight: '#2D5A8E',
-  accent: '#E87722',
-  accentLight: '#FF9E5E',
+  background: colors.background,
+  surface: colors.surface,
 
-  // Backgrounds
-  background: '#F1F5F9',
-  surface: '#FFFFFF',
+  text: colors.textPrimary,
+  textSecondary: colors.textSecondary,
+  textMuted: colors.textMuted,
 
-  // Text
-  text: '#1B3A5C',
-  textSecondary: '#64748B',
-  textMuted: '#94A3B8',
+  success: colors.success,
+  successLight: 'rgba(22, 163, 74, 0.10)',
+  warning: colors.warning,
+  warningLight: 'rgba(217, 119, 6, 0.10)',
+  danger: colors.error,
+  dangerLight: 'rgba(237, 28, 35, 0.10)',
 
-  // Status
-  success: '#10B981',
-  successLight: '#ECFDF5',
-  warning: '#F59E0B',
-  warningLight: '#FFF7ED',
-  danger: '#EF4444',
-  dangerLight: '#FEF2F2',
-
-  // UI
-  muted: '#E2E8F0',
-  border: '#E2E8F0',
+  muted: colors.surfaceAlt,
+  border: colors.border,
   overlay: 'rgba(0,0,0,0.5)',
 
-  // Tab bar
-  tabBarBackground: '#FFFFFF',
-  tabBarActive: '#E87722',
-  tabBarInactive: '#94A3B8',
-} as const;
+  tabBarBackground: colors.surface,
+  tabBarActive: colors.red,
+  tabBarInactive: colors.textMuted,
+};
 
-export const GRADIENTS = {
-  primary: ['#1B3A5C', '#2D5A8E'] as const,
-  accent: ['#E87722', '#FF9E5E'] as const,
-  card: ['#FFFFFF', '#F8FAFC'] as const,
-} as const;
+export const GRADIENTS: { primary: [string, string]; accent: [string, string]; card: [string, string] } = {
+  primary: [colors.red, colors.redLight],
+  accent: [colors.red, colors.redLight],
+  card: [colors.surface, colors.surfaceAlt],
+};
 
+// Bridge: old SPACING mapped from new tokens
 export const SPACING = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
+  xs: spacing.xs,
+  sm: spacing.sm,
+  md: spacing.lg,    // old md=16, new lg=16
+  lg: spacing.xxl,   // old lg=24, new xxl=24
+  xl: spacing.xxxl,  // old xl=32, new xxxl=32
   xxl: 48,
 } as const;
 
 export const RADIUS = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  full: 9999,
+  sm: radius.sm,
+  md: radius.md,
+  lg: radius.lg,
+  xl: radius.xl,
+  xxl: radius.xxl,
+  full: radius.pill,
 } as const;
 
 export const FONT_SIZE = {
-  xs: 11,
-  sm: 13,
-  md: 15,
-  lg: 17,
-  xl: 20,
-  xxl: 24,
-  xxxl: 28,
-  hero: 32,
+  xs: typography.sizes.xs,
+  sm: typography.sizes.sm,
+  md: typography.sizes.md,
+  lg: typography.sizes.lg,
+  xl: typography.sizes.xl,
+  xxl: typography.sizes.xxl,
+  xxxl: typography.sizes.xxxl,
+  hero: typography.sizes.hero,
 } as const;
 
-export const SHADOW = {
-  sm: Platform.select({
-    ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
-    android: { elevation: 2 },
-    default: {},
-  }) as Record<string, unknown>,
-  md: Platform.select({
-    ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12 },
-    android: { elevation: 4 },
-    default: {},
-  }) as Record<string, unknown>,
-  lg: Platform.select({
-    ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 20 },
-    android: { elevation: 8 },
-    default: {},
-  }) as Record<string, unknown>,
-  accent: Platform.select({
-    ios: { shadowColor: '#E87722', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 12 },
-    android: { elevation: 8 },
-    default: {},
-  }) as Record<string, unknown>,
-  primary: Platform.select({
-    ios: { shadowColor: '#1B3A5C', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20 },
-    android: { elevation: 10 },
-    default: {},
-  }) as Record<string, unknown>,
+export const SHADOW: Record<string, Record<string, unknown>> = {
+  sm: { ...shadows.sm },
+  md: { ...shadows.md },
+  lg: { ...shadows.lg },
+  xl: { ...shadows.xl },
+  accent: { ...shadows.red },
+  primary: { ...shadows.red },
+  red: { ...shadows.red },
+  redSm: { ...shadows.redSm },
+  none: { ...shadows.none },
 };
+

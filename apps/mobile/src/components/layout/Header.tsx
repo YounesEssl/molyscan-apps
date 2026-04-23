@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Platform, type ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { AltArrowLeft } from 'react-native-solar-icons/icons/bold';
 import { useRouter } from 'expo-router';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
@@ -10,7 +10,7 @@ interface HeaderProps {
   showBack?: boolean;
   onBack?: () => void;
   rightAction?: {
-    icon: keyof typeof Ionicons.glyphMap;
+    icon: React.ReactNode;
     onPress: () => void;
   };
 }
@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
           style={[styles.iconButton, SHADOW.sm as ViewStyle]}
           hitSlop={8}
         >
-          <Ionicons name="chevron-back" size={22} color={COLORS.text} />
+          <AltArrowLeft size={22} color={COLORS.text} />
         </TouchableOpacity>
       ) : (
         <View style={styles.iconButton} />
@@ -45,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
           style={[styles.iconButton, SHADOW.sm as ViewStyle]}
           hitSlop={8}
         >
-          <Ionicons name={rightAction.icon} size={22} color={COLORS.text} />
+          {rightAction.icon}
         </TouchableOpacity>
       ) : (
         <View style={styles.iconButton} />

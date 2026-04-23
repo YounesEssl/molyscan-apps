@@ -136,10 +136,15 @@ export class ScansService {
     const product = scan.competitorProduct;
     const equiv = product?.equivalences?.[0];
 
-    return {
-      id: scan.id,
-      barcode: scan.barcode,
-      scannedProduct: product
+    // Image-based scan (new flow)
+    const scannedProduct = scan.identifiedName
+      ? {
+          name: scan.identifiedName,
+          brand: scan.identifiedBrand || 'Inconnu',
+          category: scan.identifiedType || 'lubrifiant',
+          barcode: scan.barcode || '',
+        }
+      : product
         ? {
             name: product.name,
             brand: product.brand,
@@ -147,8 +152,17 @@ export class ScansService {
             subcategory: product.subcategory,
             barcode: product.barcode,
           }
-        : null,
-      molydalMatch: equiv
+        : null;
+
+    const molydalMatch = scan.molydalEquivalent
+      ? {
+          id: scan.id,
+          name: scan.molydalEquivalent,
+          reference: scan.molydalEquivalent,
+          category: scan.equivalentFamily || '',
+          confidence: scan.compatibility || 0,
+        }
+      : equiv
         ? {
             id: equiv.molydalProduct.id,
             name: equiv.molydalProduct.name,
@@ -157,7 +171,16 @@ export class ScansService {
             confidence: equiv.confidenceScore,
             pricingTier: equiv.molydalProduct.pricingTier,
           }
-        : null,
+        : null;
+
+    return {
+      id: scan.id,
+      barcode: scan.barcode,
+      scannedProduct,
+      molydalMatch,
+      equivalents: (scan.equivalentsJson as any[]) || [],
+      analysisText: scan.analysisText || null,
+      identifiedSpecs: scan.identifiedSpecs || null,
       status: scan.status,
       scannedAt: scan.scannedAt.toISOString(),
       scanMethod: scan.scanMethod,

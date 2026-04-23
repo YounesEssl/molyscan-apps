@@ -11,6 +11,7 @@ export const UserSchema = z.object({
   role: UserRoleSchema,
   company: z.string().nullish(),
   phone: z.string().nullish(),
+  avatarUrl: z.string().nullish(),
   createdAt: z.coerce.string(),
 });
 

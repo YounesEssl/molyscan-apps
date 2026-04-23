@@ -1,19 +1,33 @@
 import React from 'react';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle } from 'react-native-solar-icons/icons/bold-duotone';
+import { Like } from 'react-native-solar-icons/icons/bold-duotone';
+import { Dislike } from 'react-native-solar-icons/icons/bold-duotone';
+import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
+import { BranchingPathsDown } from 'react-native-solar-icons/icons/bold-duotone';
+import { InfoCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import type { AppNotification } from '@/schemas/notification.schema';
 import { formatRelativeDate } from '@/utils/date';
 
-const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
-  scan_match: 'checkmark-circle',
-  price_approved: 'thumbs-up',
-  price_rejected: 'thumbs-down',
-  ai_response: 'sparkles',
-  workflow_update: 'git-branch',
-  system: 'information-circle',
-};
+function getNotificationIcon(type: string, color: string, size: number): React.ReactNode {
+  switch (type) {
+    case 'scan_match':
+      return <CheckCircle size={size} color={color} />;
+    case 'price_approved':
+      return <Like size={size} color={color} />;
+    case 'price_rejected':
+      return <Dislike size={size} color={color} />;
+    case 'ai_response':
+      return <Stars size={size} color={color} />;
+    case 'workflow_update':
+      return <BranchingPathsDown size={size} color={color} />;
+    case 'system':
+    default:
+      return <InfoCircle size={size} color={color} />;
+  }
+}
 
 const COLOR_MAP: Record<string, string> = {
   scan_match: COLORS.success,
@@ -30,7 +44,6 @@ interface NotificationItemProps {
 }
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onPress }) => {
-  const icon = ICON_MAP[notification.type] ?? 'ellipse';
   const color = COLOR_MAP[notification.type] ?? COLORS.textMuted;
 
   return (
@@ -40,7 +53,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({ notification
       activeOpacity={0.7}
     >
       <View style={[styles.iconBox, { backgroundColor: color + '15' }]}>
-        <Ionicons name={icon} size={20} color={color} />
+        {getNotificationIcon(notification.type, color, 20)}
       </View>
       <View style={styles.content}>
         <Text variant="body" style={!notification.read ? styles.boldTitle : undefined}>

@@ -1,7 +1,8 @@
 import React from 'react';
 import { TouchableOpacity, View, StyleSheet, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
+import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
+import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
 import type { AIConversation } from '@/schemas/chat.schema';
@@ -22,7 +23,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
   return (
     <TouchableOpacity style={[styles.card, SHADOW.sm as ViewStyle]} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.aiIcon}>
-        <Ionicons name="sparkles" size={20} color={COLORS.accent} />
+        <Stars size={20} color={COLORS.accent} />
       </View>
       <View style={styles.content}>
         <View style={styles.topRow}>
@@ -45,7 +46,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
           </Text>
         )}
       </View>
-      <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+      <AltArrowRight size={16} color={COLORS.textMuted} />
     </TouchableOpacity>
   );
 };

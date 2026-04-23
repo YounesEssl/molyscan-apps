@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   View,
+  ScrollView,
   StyleSheet,
   Animated,
   Dimensions,
@@ -73,7 +74,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           style={[styles.sheet, { transform: [{ translateY }] }]}
         >
           <View style={styles.handle} />
-          {children}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            {children}
+          </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
     </View>

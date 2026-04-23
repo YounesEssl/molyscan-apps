@@ -1,145 +1,147 @@
 import React from 'react';
 import {
   TouchableOpacity,
-  Text,
+  Text as RNText,
   StyleSheet,
   ActivityIndicator,
   View,
   type ViewStyle,
-  type TextStyle,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, GRADIENTS, RADIUS, SHADOW, FONT_SIZE } from '@/constants/theme';
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { radius } from '@/design/tokens/radius';
+import { typography } from '@/design/tokens/typography';
 
 interface ButtonProps {
-  title: string;
+  label?: string;
+  title?: string; // backwards compat alias for label
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'accent' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive' | 'icon';
   size?: 'sm' | 'md' | 'lg';
+  icon?: React.ReactNode;
+  iconPosition?: 'left' | 'right';
   loading?: boolean;
   disabled?: boolean;
-  icon?: keyof typeof Ionicons.glyphMap;
+  fullWidth?: boolean;
   style?: ViewStyle;
 }
 
 export const Button: React.FC<ButtonProps> = ({
+  label,
   title,
   onPress,
   variant = 'primary',
   size = 'md',
+  icon,
+  iconPosition = 'left',
   loading = false,
   disabled = false,
-  icon,
+  fullWidth = false,
   style,
 }) => {
-  const isGradient = variant === 'accent';
-  const textColor =
-    variant === 'outline' || variant === 'ghost'
-      ? COLORS.primary
-      : COLORS.surface;
+  const text = label ?? title ?? '';
+  const isPrimary = variant === 'primary';
+  const isDestructive = variant === 'destructive';
+  const isGhost = variant === 'ghost';
+  const isIcon = variant === 'icon';
+  const isSecondary = variant === 'secondary';
 
-  const inner = (
-    <View style={styles.inner}>
-      {loading ? (
-        <ActivityIndicator color={textColor} />
-      ) : (
-        <>
-          {icon && (
-            <Ionicons
-              name={icon}
-              size={size === 'sm' ? 16 : 20}
-              color={textColor}
-              style={styles.icon}
-            />
-          )}
-          <Text style={[styles.text, textSizeStyles[size], { color: textColor }]}>
-            {title}
-          </Text>
-        </>
-      )}
-    </View>
-  );
+  const textColor = isPrimary || isDestructive || isIcon
+    ? colors.textOnRed
+    : isGhost
+      ? colors.red
+      : colors.textPrimary;
 
-  if (isGradient) {
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        disabled={disabled || loading}
-        activeOpacity={0.8}
-        style={[disabled && styles.disabled, style]}
-      >
-        <LinearGradient
-          colors={[...GRADIENTS.accent]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[styles.base, sizeStyles[size], SHADOW.accent as ViewStyle]}
-        >
-          {inner}
-        </LinearGradient>
-      </TouchableOpacity>
-    );
-  }
+  const bgStyle = isPrimary
+    ? { backgroundColor: colors.red, ...shadows.red }
+    : isDestructive
+      ? { backgroundColor: colors.error, ...shadows.red }
+      : isSecondary
+        ? { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, ...shadows.sm }
+        : isIcon
+          ? { backgroundColor: colors.red, ...shadows.red, width: 64, height: 64, borderRadius: 32, paddingHorizontal: 0, paddingVertical: 0 }
+          : { backgroundColor: 'transparent' };
 
   return (
     <TouchableOpacity
       style={[
         styles.base,
-        sizeStyles[size],
-        variantStyles[variant],
+        sizeStyles[isIcon ? 'icon' : size],
+        bgStyle as ViewStyle,
+        fullWidth && styles.fullWidth,
         disabled && styles.disabled,
         style,
       ]}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.7}
+      activeOpacity={0.85}
     >
-      {inner}
+      {loading ? (
+        <ActivityIndicator color={textColor} />
+      ) : (
+        <View style={styles.inner}>
+          {icon && iconPosition === 'left' && icon}
+          {text ? (
+            <RNText
+              style={[
+                styles.text,
+                textSizeStyles[size],
+                { color: textColor },
+                isPrimary && styles.primaryText,
+                isSecondary && styles.secondaryText,
+              ]}
+            >
+              {text}
+            </RNText>
+          ) : null}
+          {icon && iconPosition === 'right' && icon}
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: RADIUS.xl,
+    borderRadius: radius.pill,
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   disabled: {
     opacity: 0.5,
   },
-  text: {
-    fontWeight: '700',
+  fullWidth: {
+    width: '100%',
   },
-  icon: {
-    marginRight: 8,
+  text: {
+    fontFamily: typography.fonts.bodySemibold,
+  },
+  primaryText: {
+    fontFamily: typography.fonts.display,
+    textTransform: 'uppercase',
+    letterSpacing: typography.letterSpacing.wider,
+  },
+  secondaryText: {
+    fontFamily: typography.fonts.bodySemibold,
   },
 });
 
 const sizeStyles = StyleSheet.create({
-  sm: { paddingVertical: 10, paddingHorizontal: 18, minHeight: 38 },
-  md: { paddingVertical: 14, paddingHorizontal: 24, minHeight: 50 },
-  lg: { paddingVertical: 18, paddingHorizontal: 32, minHeight: 56 },
+  sm: { paddingVertical: 10, paddingHorizontal: 20, minHeight: 38 },
+  md: { paddingVertical: 14, paddingHorizontal: 24, minHeight: 48 },
+  lg: { paddingVertical: 16, paddingHorizontal: 28, minHeight: 56 },
+  icon: { width: 64, height: 64 },
 });
 
 const textSizeStyles = StyleSheet.create({
-  sm: { fontSize: FONT_SIZE.sm },
-  md: { fontSize: FONT_SIZE.md },
-  lg: { fontSize: FONT_SIZE.lg },
-});
-
-const variantStyles = StyleSheet.create({
-  primary: { backgroundColor: COLORS.primary },
-  secondary: { backgroundColor: COLORS.textSecondary },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-  },
-  accent: { backgroundColor: COLORS.accent },
-  ghost: { backgroundColor: 'transparent' },
+  sm: { fontSize: typography.sizes.sm },
+  md: { fontSize: typography.sizes.md },
+  lg: { fontSize: typography.sizes.lg },
 });

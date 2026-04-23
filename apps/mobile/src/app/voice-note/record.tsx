@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
-import { Ionicons } from '@expo/vector-icons';
+import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
+import { StopCircle } from 'react-native-solar-icons/icons/bold-duotone';
+import { Document } from 'react-native-solar-icons/icons/bold-duotone';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
@@ -169,11 +171,11 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
               onPress={isRecording ? stopRecording : startRecording}
               activeOpacity={0.7}
             >
-              <Ionicons
-                name={isRecording ? 'stop' : 'mic'}
-                size={40}
-                color={COLORS.surface}
-              />
+              {isRecording ? (
+                <StopCircle size={40} color={COLORS.surface} />
+              ) : (
+                <Microphone2 size={40} color={COLORS.surface} />
+              )}
             </TouchableOpacity>
 
             {isRecording && (
@@ -196,7 +198,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         {phase === 'transcribing' && (
           <View style={styles.transcribingSection}>
             <View style={styles.transcribingIcon}>
-              <Ionicons name="document-text-outline" size={40} color={COLORS.primary} />
+              <Document size={40} color={COLORS.primary} />
             </View>
             <Text variant="body" color={COLORS.textSecondary}>
               {t('voiceNote.transcribing')}
@@ -292,16 +294,16 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
             <View style={styles.actions}>
               <Button
                 title={t('voiceNote.saveNote')}
-                variant="accent"
-                icon="save-outline"
+                variant="primary"
+                icon={<Document size={20} color={COLORS.surface} />}
                 loading={saving}
                 onPress={handleSave}
                 style={styles.actionButton}
               />
               <Button
                 title={t('voiceNote.reRecord')}
-                variant="outline"
-                icon="mic-outline"
+                variant="secondary"
+                icon={<Microphone2 size={20} color={COLORS.primary} />}
                 onPress={() => {
                   setPhase('idle');
                   setDuration(0);

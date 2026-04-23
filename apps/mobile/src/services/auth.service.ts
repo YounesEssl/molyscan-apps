@@ -31,8 +31,8 @@ export const authService = {
     return tokens;
   },
 
-  getMe: async (): Promise<User> => {
-    const { data } = await api.get(ENDPOINTS.auth.me);
+  getMe: async (config?: { signal?: AbortSignal }): Promise<User> => {
+    const { data } = await api.get(ENDPOINTS.auth.me, config);
     return UserSchema.parse(data);
   },
 

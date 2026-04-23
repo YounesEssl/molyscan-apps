@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, Alert, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { QrCode } from 'react-native-solar-icons/icons/bold-duotone';
+import { Letter } from 'react-native-solar-icons/icons/bold-duotone';
+import { Lock } from 'react-native-solar-icons/icons/bold-duotone';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Text, Button, Input } from '@/components/ui';
 import { COLORS, GRADIENTS, SPACING, SHADOW } from '@/constants/theme';
@@ -51,7 +53,7 @@ export default function LoginScreen(): React.JSX.Element {
               end={{ x: 1, y: 1 }}
               style={[styles.logoCircle, SHADOW.primary as ViewStyle]}
             >
-              <Ionicons name="scan" size={36} color={COLORS.surface} />
+              <QrCode size={36} color={COLORS.surface} />
             </LinearGradient>
             <Text variant="title" color={COLORS.primary}>
               MolyScan
@@ -65,7 +67,7 @@ export default function LoginScreen(): React.JSX.Element {
           <View style={styles.form}>
             <Input
               label={t('auth.email')}
-              icon="mail-outline"
+              icon={<Letter size={18} color={COLORS.textMuted} />}
               placeholder={t('auth.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -74,7 +76,7 @@ export default function LoginScreen(): React.JSX.Element {
             />
             <Input
               label={t('auth.password')}
-              icon="lock-closed-outline"
+              icon={<Lock size={18} color={COLORS.textMuted} />}
               placeholder={t('auth.passwordPlaceholder')}
               isPassword
               value={password}
@@ -87,7 +89,7 @@ export default function LoginScreen(): React.JSX.Element {
             ) : null}
             <Button
               title={t('auth.login')}
-              variant="accent"
+              variant="primary"
               size="lg"
               loading={loading}
               onPress={handleLogin}

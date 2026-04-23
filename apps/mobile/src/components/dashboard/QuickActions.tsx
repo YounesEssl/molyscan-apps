@@ -2,7 +2,8 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { QrCode } from 'react-native-solar-icons/icons/bold-duotone';
+import { ClockCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@/components/ui';
 import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
@@ -24,7 +25,7 @@ export const QuickActions: React.FC = () => {
           style={[styles.scanButton, SHADOW.accent as ViewStyle]}
         >
           <View style={styles.scanIconCircle}>
-            <Ionicons name="scan" size={28} color={COLORS.accent} />
+            <QrCode size={28} color={COLORS.accent} />
           </View>
           <Text variant="subheading" color={COLORS.surface}>
             {t('dashboard.scanProduct')}
@@ -36,7 +37,7 @@ export const QuickActions: React.FC = () => {
         onPress={() => router.push('/(tabs)/history')}
         activeOpacity={0.7}
       >
-        <Ionicons name="time-outline" size={22} color={COLORS.primary} />
+        <ClockCircle size={22} color={COLORS.primary} />
         <Text variant="body" color={COLORS.primary} style={styles.secondaryText}>
           {t('tabs.history')}
         </Text>

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { FlatList, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { CheckCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, EmptyState } from '@/components/ui';
@@ -24,7 +25,7 @@ export default function NotificationsScreen(): React.JSX.Element {
         showBack
         rightAction={
           unreadCount > 0
-            ? { icon: 'checkmark-done' as const, onPress: () => { notificationService.markAllAsRead().catch(() => {}); markAllAsRead(); } }
+            ? { icon: <CheckCircle size={22} color={COLORS.text} />, onPress: () => { notificationService.markAllAsRead().catch(() => {}); markAllAsRead(); } }
             : undefined
         }
       />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Tag } from 'react-native-solar-icons/icons/bold-duotone';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 
 interface CompetitorBadgeProps {
@@ -10,7 +10,7 @@ interface CompetitorBadgeProps {
 export const CompetitorBadge: React.FC<CompetitorBadgeProps> = ({ brand }) => {
   return (
     <View style={styles.container}>
-      <Ionicons name="business-outline" size={14} color={COLORS.textSecondary} />
+      <Tag size={14} color={COLORS.textSecondary} />
       <Text style={styles.text}>{brand}</Text>
     </View>
   );

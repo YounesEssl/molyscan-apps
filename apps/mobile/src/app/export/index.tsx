@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, FlatList, StyleSheet, ScrollView, type ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { FileDownload } from 'react-native-solar-icons/icons/bold-duotone';
+import { Document } from 'react-native-solar-icons/icons/bold-duotone';
+import { Widget } from 'react-native-solar-icons/icons/bold-duotone';
+import { ListCheck } from 'react-native-solar-icons/icons/bold-duotone';
 import { useTranslation } from 'react-i18next';
 import i18n from '@/i18n';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
@@ -171,8 +174,8 @@ export default function ExportScreen(): React.JSX.Element {
         {/* Generate */}
         <Button
           title={t('export.generateReport', { format: format.toUpperCase() })}
-          variant="accent"
-          icon="download-outline"
+          variant="primary"
+          icon={<FileDownload size={20} color={COLORS.surface} />}
           loading={generating}
           onPress={handleGenerate}
           style={styles.generateBtn}
@@ -181,16 +184,18 @@ export default function ExportScreen(): React.JSX.Element {
         {/* Recent exports */}
         <Text variant="label" style={styles.sectionTitle}>{t('export.recentReports')}</Text>
         {exports.length === 0 ? (
-          <EmptyState icon="document-text-outline" title={t('export.noExport')} />
+          <EmptyState icon={<Document size={32} color={COLORS.textMuted} />} title={t('export.noExport')} />
         ) : (
           exports.map((item) => (
             <Card key={item.id} style={styles.exportCard}>
               <View style={styles.exportRow}>
-                <Ionicons
-                  name={item.format === 'pdf' ? 'document' : item.format === 'xlsx' ? 'grid' : 'list'}
-                  size={24}
-                  color={COLORS.primary}
-                />
+                {item.format === 'pdf' ? (
+                  <Document size={24} color={COLORS.primary} />
+                ) : item.format === 'xlsx' ? (
+                  <Widget size={24} color={COLORS.primary} />
+                ) : (
+                  <ListCheck size={24} color={COLORS.primary} />
+                )}
                 <View style={styles.exportInfo}>
                   <Text variant="body" style={styles.fileName}>{item.fileName}</Text>
                   <Text variant="caption" color={COLORS.textMuted}>
@@ -200,7 +205,7 @@ export default function ExportScreen(): React.JSX.Element {
                 {item.status === 'generating' ? (
                   <Text variant="caption" color={COLORS.accent}>{t('export.generating')}</Text>
                 ) : (
-                  <Ionicons name="cloud-download-outline" size={22} color={COLORS.accent} />
+                  <FileDownload size={22} color={COLORS.accent} />
                 )}
               </View>
             </Card>

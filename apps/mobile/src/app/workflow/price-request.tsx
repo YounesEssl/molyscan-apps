@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { Shop } from 'react-native-solar-icons/icons/bold-duotone';
+import { TestTube } from 'react-native-solar-icons/icons/bold-duotone';
+import { Tag } from 'react-native-solar-icons/icons/bold-duotone';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Button, Input, Card } from '@/components/ui';
@@ -68,10 +71,10 @@ export default function PriceRequestScreen(): React.JSX.Element {
             </Text>
           </Card>
         )}
-        <Input label={t('workflow.clientName')} icon="business-outline" placeholder={t('workflow.clientPlaceholder')} value={clientName} onChangeText={setClientName} />
-        <Input label={t('workflow.quantity')} icon="beaker-outline" placeholder={t('workflow.quantityPlaceholder')} keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
-        <Input label={t('workflow.desiredPrice')} icon="pricetag-outline" placeholder={t('workflow.optional')} keyboardType="decimal-pad" value={price} onChangeText={setPrice} />
-        <Button title={t('workflow.submitRequest')} variant="accent" size="lg" loading={loading} onPress={handleSubmit} style={styles.submit} />
+        <Input label={t('workflow.clientName')} icon={<Shop size={18} color={COLORS.textMuted} />} placeholder={t('workflow.clientPlaceholder')} value={clientName} onChangeText={setClientName} />
+        <Input label={t('workflow.quantity')} icon={<TestTube size={18} color={COLORS.textMuted} />} placeholder={t('workflow.quantityPlaceholder')} keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
+        <Input label={t('workflow.desiredPrice')} icon={<Tag size={18} color={COLORS.textMuted} />} placeholder={t('workflow.optional')} keyboardType="decimal-pad" value={price} onChangeText={setPrice} />
+        <Button title={t('workflow.submitRequest')} variant="primary" size="lg" loading={loading} onPress={handleSubmit} style={styles.submit} />
       </View>
     </ScreenWrapper>
   );

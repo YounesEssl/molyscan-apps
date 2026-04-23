@@ -1,14 +1,22 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, View, TextInput, type ViewStyle } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import React, { lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { FlatList, Platform, StyleSheet, View, TextInput, type ViewStyle } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Magnifer } from 'react-native-solar-icons/icons/bold-duotone';
+import { Box } from 'react-native-solar-icons/icons/bold-duotone';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Text } from '@/components/ui';
 import { Toggle } from '@/components/ui/Toggle';
 import { ScanHistoryItem } from '@/components/history/ScanHistoryItem';
 import { ScanHistoryFilter } from '@/components/history/ScanHistoryFilter';
-import { ScanMap } from '@/components/history/ScanMap';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '@/constants/theme';
+
+const ScanMap = Platform.OS === 'web'
+  ? () => null
+  : lazy(() => import('@/components/history/ScanMap').then(m => ({ default: m.ScanMap })));
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { spacing } from '@/design/tokens/spacing';
+import { radius } from '@/design/tokens/radius';
+import { typography } from '@/design/tokens/typography';
 import { scanService } from '@/services/scan.service';
 import type { ScanStatus } from '@/types/scan';
 import type { ScanRecord } from '@/schemas/scan.schema';
@@ -22,9 +30,11 @@ export default function HistoryScreen(): React.JSX.Element {
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const { t } = useTranslation();
 
-  useEffect(() => {
-    scanService.getHistory().then(setScans).catch(() => {});
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      scanService.getHistory().then(setScans).catch(() => {});
+    }, []),
+  );
 
   const filteredScans = useMemo(() => {
     let result: ScanRecord[] = scans;
@@ -60,14 +70,14 @@ export default function HistoryScreen(): React.JSX.Element {
 
       {/* Search bar */}
       <View style={styles.searchContainer}>
-        <View style={[styles.searchBar, SHADOW.sm as ViewStyle]}>
+        <View style={styles.searchBar}>
           <View style={styles.searchIconBox}>
-            <Ionicons name="search" size={16} color={COLORS.textMuted} />
+            <Magnifer size={16} color={colors.textMuted} />
           </View>
           <TextInput
             style={styles.searchInput}
             placeholder={t('history.searchProduct')}
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={colors.textMuted}
             value={search}
             onChangeText={setSearch}
           />
@@ -103,9 +113,9 @@ export default function HistoryScreen(): React.JSX.Element {
             ListEmptyComponent={
               <View style={styles.empty}>
                 <View style={styles.emptyIcon}>
-                  <Ionicons name="file-tray-outline" size={40} color={COLORS.textMuted} />
+                  <Box size={40} color={colors.textMuted} />
                 </View>
-                <Text variant="body" color={COLORS.textSecondary}>
+                <Text variant="body" color={colors.textSecondary}>
                   {t('history.emptyState')}
                 </Text>
               </View>
@@ -113,7 +123,9 @@ export default function HistoryScreen(): React.JSX.Element {
           />
         </>
       ) : (
-        <ScanMap scans={filteredScans} />
+        <Suspense fallback={null}>
+          <ScanMap scans={filteredScans} />
+        </Suspense>
       )}
     </ScreenWrapper>
   );
@@ -121,65 +133,70 @@ export default function HistoryScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.md,
+    paddingHorizontal: spacing.section,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
   },
   searchContainer: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
+    paddingHorizontal: spacing.section,
+    marginBottom: spacing.sm,
   },
   toggleContainer: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    paddingHorizontal: spacing.section,
+    marginBottom: spacing.lg,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl,
-    paddingHorizontal: SPACING.md,
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
     height: 48,
-  },
+    ...shadows.sm,
+  } as ViewStyle,
   searchIconBox: {
     width: 32,
     height: 32,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.background,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchInput: {
     flex: 1,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    fontSize: typography.sizes.md,
+    color: colors.textPrimary,
     paddingVertical: 0,
     fontWeight: '500',
+    fontFamily: typography.fonts.body,
   },
   filterContainer: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    paddingHorizontal: spacing.section,
+    marginBottom: spacing.lg,
   },
   listContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.xl,
+    paddingHorizontal: spacing.section,
+    paddingBottom: 100,
   },
   separator: {
-    height: SPACING.md,
+    height: spacing.md,
   },
   empty: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 80,
-    gap: SPACING.md,
+    gap: spacing.lg,
   },
   emptyIcon: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.background,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
-  },
+    ...shadows.sm,
+  } as ViewStyle,
 });

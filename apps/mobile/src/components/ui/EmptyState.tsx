@@ -1,27 +1,44 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Text } from './Text';
-import { COLORS, SPACING } from '@/constants/theme';
+import { Button } from './Button';
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { radius } from '@/design/tokens/radius';
+import { spacing } from '@/design/tokens/spacing';
 
 interface EmptyStateProps {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: React.ReactNode;
   title: string;
+  description?: string;
   subtitle?: string;
+  action?: { label: string; onPress: () => void };
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle }) => (
+export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, description, subtitle, action }) => (
   <View style={styles.container}>
     <View style={styles.iconCircle}>
-      <Ionicons name={icon} size={40} color={COLORS.textMuted} />
+      {typeof icon === 'string' ? (
+        <Text variant="body" color={colors.textMuted}>{icon}</Text>
+      ) : (
+        icon
+      )}
     </View>
-    <Text variant="body" color={COLORS.textSecondary}>
+    <Text variant="subheading" color={colors.textPrimary}>
       {title}
     </Text>
-    {subtitle && (
-      <Text variant="caption" color={COLORS.textMuted}>
-        {subtitle}
+    {(description || subtitle) && (
+      <Text variant="caption" color={colors.textMuted} style={styles.description}>
+        {description ?? subtitle}
       </Text>
+    )}
+    {action && (
+      <Button
+        label={action.label}
+        variant="secondary"
+        size="sm"
+        onPress={action.onPress}
+      />
     )}
   </View>
 );
@@ -31,14 +48,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 80,
-    gap: SPACING.md,
+    gap: spacing.md,
   },
   iconCircle: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.background,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadows.sm,
+  },
+  description: {
+    textAlign: 'center',
+    paddingHorizontal: spacing.xxxl,
   },
 });

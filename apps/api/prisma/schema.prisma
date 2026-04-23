@@ -27,6 +27,7 @@ enum ScanMethod {
   barcode
   label
   voice
+  image
 }
 
 enum WorkflowStatus {
@@ -75,6 +76,7 @@ model User {
   role           UserRole
   company        String?
   phone          String?
+  avatarUrl      String?
   organizationId String?
   pushToken      String?
   createdAt      DateTime  @default(now())
@@ -165,6 +167,17 @@ model Scan {
   competitorProductId String?
   organizationId      String?
 
+  // Image analysis results (stored directly, no CompetitorProduct needed)
+  identifiedName      String?
+  identifiedBrand     String?
+  identifiedType      String?
+  identifiedSpecs     String?
+  molydalEquivalent   String?
+  equivalentFamily    String?
+  compatibility       Int?
+  analysisText        String?
+  equivalentsJson     Json?
+
   user              User               @relation(fields: [userId], references: [id])
   competitorProduct CompetitorProduct?  @relation(fields: [competitorProductId], references: [id])
 
@@ -219,15 +232,17 @@ model WorkflowStep {
 }
 
 model AIConversation {
-  id               String @id @default(uuid())
-  scanId           String
-  scannedName      String
-  scannedBrand     String
-  molydalName      String
-  molydalReference String
+  id               String  @id @default(uuid())
+  type             String  @default("product") // "free" | "product"
+  title            String  @default("Nouvelle conversation")
+  scanId           String?
+  scannedName      String?
+  scannedBrand     String?
+  molydalName      String?
+  molydalReference String?
   userId           String
 
-  scan     Scan        @relation(fields: [scanId], references: [id])
+  scan     Scan?       @relation(fields: [scanId], references: [id])
   user     User        @relation(fields: [userId], references: [id])
   messages AIMessage[]
 

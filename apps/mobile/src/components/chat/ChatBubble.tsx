@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
+import { DocumentText } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import type { AIMessage } from '@/schemas/chat.schema';
@@ -16,7 +17,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
     <View style={[styles.row, isUser && styles.rowUser]}>
       {!isUser && (
         <View style={styles.aiAvatar}>
-          <Ionicons name="sparkles" size={16} color={COLORS.accent} />
+          <Stars size={16} color={COLORS.accent} />
         </View>
       )}
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAI]}>
@@ -25,7 +26,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
         </Text>
         {message.sources && message.sources.length > 0 && (
           <View style={styles.sources}>
-            <Ionicons name="document-text-outline" size={12} color={COLORS.textMuted} />
+            <DocumentText size={12} color={COLORS.textMuted} />
             <Text variant="caption" color={COLORS.textMuted} style={styles.sourcesText}>
               {message.sources.join(' · ')}
             </Text>

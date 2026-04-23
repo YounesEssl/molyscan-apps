@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, StyleSheet, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Card, Badge } from '@/components/ui';
-import { ConfidenceIndicator } from './ConfidenceIndicator';
-import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
+import { ScoreIndicator } from '@/components/ui/ScoreIndicator';
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { spacing } from '@/design/tokens/spacing';
+import { radius } from '@/design/tokens/radius';
 import type { ScannedProduct, MolydalMatch } from '@/schemas/scan.schema';
 
 interface ProductMatchProps {
@@ -19,44 +20,39 @@ export const ProductMatch: React.FC<ProductMatchProps> = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <View style={styles.container}>
+    <Card variant="elevated" padding="xl" style={styles.container}>
       {/* Competitor product */}
-      <Card style={styles.section}>
-        <Text variant="label">{t('product.competitorProduct')}</Text>
+      <View style={styles.section}>
+        <Badge label={t('product.competitorProduct')} variant="neutral" size="sm" />
         <Text variant="heading" style={styles.productName}>
           {scannedProduct.name}
         </Text>
         <View style={styles.metaRow}>
-          <Badge label={scannedProduct.brand} variant="neutral" />
+          <Text variant="caption">{scannedProduct.brand}</Text>
+          <Text variant="caption" color={colors.textMuted}>•</Text>
           <Text variant="caption">{scannedProduct.category}</Text>
         </View>
-        <Text variant="caption" style={styles.barcode}>
+        <Text variant="caption" color={colors.textMuted} style={styles.barcode}>
           {t('product.code', { code: scannedProduct.barcode })}
         </Text>
-      </Card>
+      </View>
 
-      {/* Arrow */}
-      <View style={styles.arrowContainer}>
-        <LinearGradient
-          colors={[...GRADIENTS.accent]}
-          style={[styles.arrowCircle, SHADOW.accent as ViewStyle]}
-        >
-          <Ionicons name="swap-vertical" size={24} color={COLORS.surface} />
-        </LinearGradient>
+      {/* Score divider */}
+      <View style={styles.scoreDivider}>
+        <View style={styles.dividerLine} />
+        <ScoreIndicator score={molydalMatch.confidence} size="sm" showLabel={false} />
+        <View style={styles.dividerLine} />
       </View>
 
       {/* Molydal match */}
-      <Card style={StyleSheet.flatten([styles.section, styles.molydalSection])}>
-        <Text variant="label" color={COLORS.accent}>
-          {t('scanner.molydalEquivalent')}
-        </Text>
-        <Text variant="heading" color={COLORS.primary} style={styles.productName}>
+      <View style={[styles.section, styles.molydalSection]}>
+        <Badge label={t('scanner.molydalEquivalent')} variant="primary" size="sm" />
+        <Text variant="heading" color={colors.red} style={styles.productName}>
           {molydalMatch.name}
         </Text>
         <Text variant="caption">{t('common.ref')} {molydalMatch.reference}</Text>
-        <ConfidenceIndicator score={molydalMatch.confidence} />
-      </Card>
-    </View>
+      </View>
+    </Card>
   );
 };
 
@@ -65,59 +61,32 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   section: {
-    gap: SPACING.xs,
+    gap: spacing.xs,
   },
   molydalSection: {
-    borderWidth: 2,
-    borderColor: COLORS.accent + '25',
+    paddingTop: spacing.sm,
   },
   productName: {
-    marginTop: SPACING.xs,
+    marginTop: spacing.xs,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: spacing.sm,
   },
   barcode: {
     fontFamily: 'monospace',
-    marginTop: SPACING.xs,
+    marginTop: spacing.xs,
   },
-  arrowContainer: {
-    alignItems: 'center',
-    marginVertical: -SPACING.md,
-    zIndex: 1,
-  },
-  arrowCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  advantages: {
-    marginTop: SPACING.md,
-    gap: SPACING.sm,
-  },
-  advantagesTitle: {
-    marginBottom: 2,
-  },
-  advantageRow: {
+  scoreDivider: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING.sm,
-  },
-  checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: COLORS.success,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
+    gap: spacing.md,
+    marginVertical: spacing.lg,
   },
-  advantageText: {
+  dividerLine: {
     flex: 1,
-    fontSize: 14,
+    height: 1,
+    backgroundColor: colors.border,
   },
 });

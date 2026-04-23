@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
 import { Text } from '@/components/ui';
 import { ProductCard } from '@/components/product/ProductCard';
-import { COLORS, SPACING } from '@/constants/theme';
+import { colors } from '@/design/tokens/colors';
+import { spacing } from '@/design/tokens/spacing';
 import { scanService } from '@/services/scan.service';
 import type { ScanRecord } from '@/schemas/scan.schema';
 
@@ -14,9 +15,11 @@ export const RecentScans: React.FC = () => {
   const router = useRouter();
   const [scans, setScans] = useState<ScanRecord[]>([]);
 
-  useEffect(() => {
-    scanService.getHistory().then((all) => setScans(all.slice(0, 3))).catch(() => {});
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      scanService.getHistory().then((all) => setScans(all.filter((s) => s.scannedProduct).slice(0, 3))).catch(() => {});
+    }, []),
+  );
 
   return (
     <View style={styles.container}>
@@ -27,10 +30,10 @@ export const RecentScans: React.FC = () => {
           style={styles.seeAll}
           hitSlop={8}
         >
-          <Text variant="caption" color={COLORS.accent} style={styles.seeAllText}>
+          <Text variant="caption" color={colors.red} style={styles.seeAllText}>
             {t('common.seeAll')}
           </Text>
-          <Ionicons name="chevron-forward" size={14} color={COLORS.accent} />
+          <AltArrowRight size={14} color={colors.red} />
         </TouchableOpacity>
       </View>
       <View style={styles.list}>
@@ -48,7 +51,7 @@ export const RecentScans: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    gap: SPACING.md,
+    gap: spacing.md,
   },
   header: {
     flexDirection: 'row',
@@ -64,6 +67,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   list: {
-    gap: SPACING.md,
+    gap: spacing.md,
   },
 });

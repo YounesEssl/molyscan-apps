@@ -1,19 +1,35 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform, type ViewStyle } from 'react-native';
+import { View, Text, Image, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, GRADIENTS } from '@/constants/theme';
 
 interface AvatarProps {
   firstName: string;
   lastName: string;
+  imageUri?: string | null;
   size?: number;
 }
 
 export const Avatar: React.FC<AvatarProps> = ({
   firstName,
   lastName,
+  imageUri,
   size = 44,
 }) => {
+  const borderRadius = size / 2;
+
+  if (imageUri) {
+    return (
+      <Image
+        source={{ uri: imageUri }}
+        style={[
+          styles.image,
+          { width: size, height: size, borderRadius },
+        ]}
+      />
+    );
+  }
+
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 
   return (
@@ -23,11 +39,7 @@ export const Avatar: React.FC<AvatarProps> = ({
       end={{ x: 1, y: 1 }}
       style={[
         styles.container,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-        },
+        { width: size, height: size, borderRadius },
       ]}
     >
       <Text style={[styles.text, { fontSize: size * 0.36 }]}>{initials}</Text>
@@ -39,6 +51,17 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#1B3A5C',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
+  },
+  image: {
     ...Platform.select({
       ios: {
         shadowColor: '#1B3A5C',

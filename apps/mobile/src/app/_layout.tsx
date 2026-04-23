@@ -12,7 +12,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { authService } from '@/services/auth.service';
 import { storage } from '@/lib/storage';
 import { COLORS } from '@/constants/theme';
-
+import { ThemeProvider } from '@/providers/ThemeProvider';
 function AppHooks(): null {
   useNetworkStatus();
   useSync();
@@ -31,8 +31,14 @@ function AuthGuard({ children }: { children: React.ReactNode }): React.JSX.Eleme
       try {
         const token = await storage.getToken();
         if (token && !isAuthenticated) {
-          const me = await authService.getMe();
-          setUser(me);
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 3000);
+          try {
+            const me = await authService.getMe({ signal: controller.signal });
+            setUser(me);
+          } finally {
+            clearTimeout(timeout);
+          }
         }
       } catch {
         await storage.clearTokens();
@@ -65,9 +71,9 @@ function AuthGuard({ children }: { children: React.ReactNode }): React.JSX.Eleme
   return <>{children}</>;
 }
 
-export default function RootLayout(): React.JSX.Element {
+function RootContent(): React.JSX.Element {
   return (
-    <QueryClientProvider client={queryClient}>
+    <View style={{ flex: 1 }}>
       <AppHooks />
       <OfflineBanner />
       <AuthGuard>
@@ -82,6 +88,16 @@ export default function RootLayout(): React.JSX.Element {
           <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
         </Stack>
       </AuthGuard>
-    </QueryClientProvider>
+    </View>
+  );
+}
+
+export default function RootLayout(): React.JSX.Element {
+  return (
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <RootContent />
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

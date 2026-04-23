@@ -1,38 +1,36 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { FlatList, StyleSheet, View, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import {
+  FlatList,
+  StyleSheet,
+  View,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { Ionicons } from '@expo/vector-icons';
+import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/layout/Header';
 import { Text } from '@/components/ui';
-import { ChatBubble } from '@/components/chat/ChatBubble';
-import { ChatInput } from '@/components/chat/ChatInput';
-import { SuggestedQuestions } from '@/components/chat/SuggestedQuestions';
+import { ChatBubbleFree } from '@/components/chat/ChatBubbleFree';
+import { ChatInputWithUpload } from '@/components/chat/ChatInputWithUpload';
+import { FreeChatSuggestions } from '@/components/chat/FreeChatSuggestions';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { chatService } from '@/services/chat.service';
-import type { AIMessage, AIConversation } from '@/schemas/chat.schema';
+import { chatFreeService, type ChatMessage } from '@/services/chatFree.service';
 
 export default function ChatDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { t } = useTranslation();
-  const [messages, setMessages] = useState<AIMessage[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [title, setTitle] = useState('Assistant IA');
   const listRef = useRef<FlatList>(null);
-  const [conversation, setConversation] = useState<AIConversation | null>(null);
 
   useEffect(() => {
-    if (id) {
-      chatService.getConversations().then((convs) => {
-        const c = convs.find((c) => c.id === id);
-        if (c) setConversation(c);
-      }).catch(() => {});
-      chatService.getMessages(id).then((msgs) => {
-        setMessages(msgs);
-        setShowSuggestions(msgs.length === 0 || msgs[msgs.length - 1]?.role === 'assistant');
-      }).catch(() => {});
-    }
+    if (!id) return;
+    chatFreeService.getMessages(id).then((msgs) => {
+      setMessages(msgs);
+    }).catch(() => {});
   }, [id]);
 
   const scrollToEnd = useCallback(() => {
@@ -40,40 +38,80 @@ export default function ChatDetailScreen(): React.JSX.Element {
   }, []);
 
   const handleSend = async (text: string) => {
-    if (!id) return;
-    setShowSuggestions(false);
-    setIsTyping(true);
+    if (!text.trim() || isLoading || !id) return;
 
-    const userMsg: AIMessage = {
-      id: `msg-${Date.now()}`,
-      conversationId: id,
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
       role: 'user',
-      text,
-      timestamp: new Date().toISOString(),
+      content: text.trim(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+    const assistantId = `assistant-${Date.now()}`;
+
+    setMessages((prev) => [
+      ...prev,
+      userMsg,
+      { id: assistantId, role: 'assistant', content: '', isStreaming: true },
+    ]);
+    setIsLoading(true);
     scrollToEnd();
 
-    const { aiResponse } = await chatService.sendMessage(id, text);
-    setMessages((prev) => [...prev, aiResponse]);
-    setIsTyping(false);
-    setShowSuggestions(true);
-    scrollToEnd();
+    // Update title from first message
+    if (messages.length === 0) {
+      const newTitle = text.length > 40 ? text.slice(0, 40) + '...' : text;
+      setTitle(newTitle);
+    }
+
+    let fullContent = '';
+
+    await chatFreeService.sendMessageStreaming(id, text.trim(), {
+      onToken: (token) => {
+        fullContent += token;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: fullContent } : m,
+          ),
+        );
+        scrollToEnd();
+      },
+      onSources: (sources) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, sources } : m,
+          ),
+        );
+      },
+      onDone: () => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, isStreaming: false } : m,
+          ),
+        );
+        setIsLoading(false);
+      },
+      onError: (error) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: `Erreur : ${error}`, isStreaming: false }
+              : m,
+          ),
+        );
+        setIsLoading(false);
+      },
+    });
   };
 
-  const headerTitle = conversation
-    ? `${conversation.product.scannedName} → ${conversation.product.molydalName}`
-    : t('chat.aiAssistant');
+  const isEmpty = messages.length === 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Header title={headerTitle} showBack />
+      <Header title={title} showBack />
 
       {/* AI badge */}
       <View style={styles.aiBadge}>
-        <Ionicons name="sparkles" size={12} color={COLORS.accent} />
+        <Stars size={12} color={COLORS.accent} />
         <Text variant="caption" color={COLORS.accent} style={styles.aiBadgeText}>
-          {t('chat.aiBadge')}
+          Powered by AI
         </Text>
       </View>
 
@@ -86,41 +124,46 @@ export default function ChatDetailScreen(): React.JSX.Element {
           ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ChatBubble message={item} />}
+          renderItem={({ item }) => <ChatBubbleFree message={item} />}
           contentContainerStyle={styles.list}
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+          onContentSizeChange={() =>
+            listRef.current?.scrollToEnd({ animated: false })
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="sparkles" size={32} color={COLORS.accent} />
+                <Stars size={36} color={COLORS.accent} />
               </View>
-              <Text variant="body" color={COLORS.textSecondary} style={styles.emptyText}>
-                {t('chat.emptyChat')}
+              <Text variant="subheading" style={styles.emptyTitle}>
+                Comment puis-je vous aider ?
               </Text>
+              <Text
+                variant="caption"
+                color={COLORS.textSecondary}
+                style={styles.emptySubtitle}
+              >
+                Posez une question sur les lubrifiants, graisses ou huiles Molydal
+              </Text>
+              <FreeChatSuggestions onSelect={handleSend} />
             </View>
           }
           ListFooterComponent={
-            <>
-              {isTyping && (
-                <View style={styles.typingRow}>
-                  <View style={styles.typingAvatar}>
-                    <Ionicons name="sparkles" size={14} color={COLORS.accent} />
-                  </View>
-                  <View style={styles.typingBubble}>
-                    <ActivityIndicator size="small" color={COLORS.accent} />
-                    <Text variant="caption" color={COLORS.textMuted}>
-                      {t('chat.thinking')}
-                    </Text>
-                  </View>
+            isLoading && !messages.some((m) => m.isStreaming) ? (
+              <View style={styles.typingRow}>
+                <View style={styles.typingAvatar}>
+                  <Stars size={14} color={COLORS.accent} />
                 </View>
-              )}
-              {showSuggestions && !isTyping && (
-                <SuggestedQuestions onSelect={handleSend} />
-              )}
-            </>
+                <View style={styles.typingBubble}>
+                  <ActivityIndicator size="small" color={COLORS.accent} />
+                  <Text variant="caption" color={COLORS.textMuted}>
+                    Réflexion en cours...
+                  </Text>
+                </View>
+              </View>
+            ) : null
           }
         />
-        <ChatInput onSend={handleSend} disabled={isTyping} />
+        <ChatInputWithUpload onSend={handleSend} disabled={isLoading} />
       </KeyboardAvoidingView>
       <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
     </SafeAreaView>
@@ -132,9 +175,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  flex: {
-    flex: 1,
-  },
+  flex: { flex: 1 },
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -154,20 +195,26 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 60,
-    gap: SPACING.md,
+    paddingTop: 40,
+    gap: SPACING.sm,
   },
   emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: COLORS.accent + '12',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: SPACING.sm,
   },
-  emptyText: {
+  emptyTitle: {
+    fontWeight: '700',
     textAlign: 'center',
-    maxWidth: 240,
+  },
+  emptySubtitle: {
+    textAlign: 'center',
+    maxWidth: 260,
+    marginBottom: SPACING.md,
   },
   typingRow: {
     flexDirection: 'row',

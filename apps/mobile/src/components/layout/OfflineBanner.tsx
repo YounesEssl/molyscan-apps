@@ -1,17 +1,49 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { CloundCross } from 'react-native-solar-icons/icons/bold';
+import { RefreshCircle } from 'react-native-solar-icons/icons/bold';
+import { CheckCircle } from 'react-native-solar-icons/icons/bold';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui';
-import { COLORS, SPACING } from '@/constants/theme';
+import { colors } from '@/design/tokens/colors';
+import { radius } from '@/design/tokens/radius';
+import { spacing } from '@/design/tokens/spacing';
 import { useOfflineStore } from '@/stores/offline.store';
 
 export const OfflineBanner: React.FC = () => {
   const { t } = useTranslation();
   const { manualOffline, pendingActions, isSyncing, syncProgress, lastSyncAt } = useOfflineStore();
   const [showSynced, setShowSynced] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-60)).current;
+  const spinAnim = useRef(new Animated.Value(0)).current;
 
-  // Show "all synced" message briefly after sync completes
+  const shouldShow = isSyncing || showSynced || manualOffline;
+
+  // Slide animation
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: shouldShow ? 0 : -60,
+      useNativeDriver: true,
+    }).start();
+  }, [shouldShow]);
+
+  // Spin animation for sync icon
+  useEffect(() => {
+    if (isSyncing) {
+      const spin = Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      );
+      spin.start();
+      return () => spin.stop();
+    }
+    spinAnim.setValue(0);
+  }, [isSyncing]);
+
+  // Show "synced" briefly
   useEffect(() => {
     if (!isSyncing && lastSyncAt && !manualOffline) {
       setShowSynced(true);
@@ -20,11 +52,18 @@ export const OfflineBanner: React.FC = () => {
     }
   }, [isSyncing, lastSyncAt, manualOffline]);
 
+  const spinRotate = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   if (isSyncing && syncProgress) {
     return (
-      <View style={[styles.banner, styles.syncBanner]}>
-        <Ionicons name="sync" size={16} color={COLORS.surface} />
-        <Text variant="caption" color={COLORS.surface} style={styles.text}>
+      <Animated.View style={[styles.banner, styles.syncBanner, { transform: [{ translateY: slideAnim }] }]}>
+        <Animated.View style={{ transform: [{ rotate: spinRotate }] }}>
+          <RefreshCircle size={18} color={colors.textOnRed} />
+        </Animated.View>
+        <Text variant="caption" color={colors.textOnRed} style={styles.text}>
           {t('sync.syncing', { current: syncProgress.current, total: syncProgress.total })}
         </Text>
         <View style={styles.progressTrack}>
@@ -35,30 +74,30 @@ export const OfflineBanner: React.FC = () => {
             ]}
           />
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
   if (showSynced) {
     return (
-      <View style={[styles.banner, styles.syncedBanner]}>
-        <Ionicons name="checkmark-circle" size={16} color={COLORS.surface} />
-        <Text variant="caption" color={COLORS.surface} style={styles.text}>
+      <Animated.View style={[styles.banner, styles.syncedBanner, { transform: [{ translateY: slideAnim }] }]}>
+        <CheckCircle size={18} color={colors.textOnRed} />
+        <Text variant="caption" color={colors.textOnRed} style={styles.text}>
           {t('sync.allUpToDate')}
         </Text>
-      </View>
+      </Animated.View>
     );
   }
 
   if (!manualOffline) return null;
 
   return (
-    <View style={styles.banner}>
-      <Ionicons name="cloud-offline" size={16} color={COLORS.surface} />
-      <Text variant="caption" color={COLORS.surface} style={styles.text}>
-        {t('sync.offlineMode')}{pendingActions > 0 ? t('sync.pendingActions', { count: pendingActions }) : ''}
+    <Animated.View style={[styles.banner, { transform: [{ translateY: slideAnim }] }]}>
+      <CloundCross size={18} color={colors.textOnRed} />
+      <Text variant="caption" color={colors.textOnRed} style={styles.text}>
+        {t('sync.offlineMode')}{pendingActions > 0 ? ` • ${pendingActions} ${t('sync.pendingActions', { count: pendingActions })}` : ''}
       </Text>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -67,17 +106,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
-    paddingVertical: 6,
-    backgroundColor: COLORS.warning,
+    gap: spacing.sm,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: '#1a2540',
   },
   syncBanner: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#1a2540',
     flexWrap: 'wrap',
-    paddingHorizontal: SPACING.md,
   },
   syncedBanner: {
-    backgroundColor: COLORS.success,
+    backgroundColor: colors.success,
   },
   text: {
     fontWeight: '600',
@@ -85,13 +124,13 @@ const styles = StyleSheet.create({
   progressTrack: {
     width: '100%',
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 2,
     marginTop: 4,
   },
   progressFill: {
     height: 3,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderRadius: 2,
   },
 });

@@ -1,14 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Switch, TouchableOpacity, Platform, type ViewStyle } from 'react-native';
+import { View, StyleSheet, Switch, TouchableOpacity, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Letter } from 'react-native-solar-icons/icons/bold-duotone';
+import { Phone } from 'react-native-solar-icons/icons/bold-duotone';
+import { Shop } from 'react-native-solar-icons/icons/bold-duotone';
+import { Bell } from 'react-native-solar-icons/icons/bold-duotone';
+import { CloundCross } from 'react-native-solar-icons/icons/bold-duotone';
+import { ChartSquare } from 'react-native-solar-icons/icons/bold-duotone';
+import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
+import { InfoCircle } from 'react-native-solar-icons/icons/bold-duotone';
+import { ShieldCheck } from 'react-native-solar-icons/icons/bold-duotone';
+import { Logout2 } from 'react-native-solar-icons/icons/bold';
+import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Text, Avatar, Card } from '@/components/ui';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { SyncQueue } from '@/components/layout/SyncQueue';
-import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { spacing } from '@/design/tokens/spacing';
+import { radius } from '@/design/tokens/radius';
 import { useAuthStore } from '@/stores/auth.store';
 import { useOfflineStore } from '@/stores/offline.store';
 import { useSync } from '@/hooks/useSync';
@@ -44,10 +57,10 @@ export default function ProfileScreen(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <ScreenWrapper scroll padded={false}>
+      <ScreenWrapper scroll padded={false} tabSafe>
         {/* Profile hero */}
         <LinearGradient
-          colors={[...GRADIENTS.primary]}
+          colors={[colors.red, colors.redLight]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.heroGradient}
@@ -58,9 +71,10 @@ export default function ProfileScreen(): React.JSX.Element {
               <Avatar
                 firstName={user?.firstName ?? ''}
                 lastName={user?.lastName ?? ''}
+                imageUri={user?.avatarUrl}
                 size={80}
               />
-              <Text variant="heading" color={COLORS.surface} style={styles.name}>
+              <Text variant="heading" color={colors.textOnRed} style={styles.name}>
                 {user?.firstName} {user?.lastName}
               </Text>
               <Text variant="caption" color="rgba(255,255,255,0.7)">
@@ -76,16 +90,16 @@ export default function ProfileScreen(): React.JSX.Element {
             <Text variant="label" style={styles.sectionTitle}>{t('profile.statistics')}</Text>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text variant="heading" color={COLORS.primary}>{scans.length}</Text>
-                <Text variant="caption" color={COLORS.textMuted}>{t('profile.scans')}</Text>
+                <Text variant="heading" color={colors.red}>{scans.length}</Text>
+                <Text variant="caption" color={colors.textMuted}>{t('profile.scans')}</Text>
               </View>
               <View style={styles.statItem}>
-                <Text variant="heading" color={COLORS.success}>{matchedCount}</Text>
-                <Text variant="caption" color={COLORS.textMuted}>{t('profile.matches')}</Text>
+                <Text variant="heading" color={colors.success}>{matchedCount}</Text>
+                <Text variant="caption" color={colors.textMuted}>{t('profile.matches')}</Text>
               </View>
               <View style={styles.statItem}>
-                <Text variant="heading" color={COLORS.accent}>{matchRate}%</Text>
-                <Text variant="caption" color={COLORS.textMuted}>{t('profile.rate')}</Text>
+                <Text variant="heading" color={colors.red}>{matchRate}%</Text>
+                <Text variant="caption" color={colors.textMuted}>{t('profile.rate')}</Text>
               </View>
             </View>
           </Card>
@@ -93,9 +107,9 @@ export default function ProfileScreen(): React.JSX.Element {
           {/* Info section */}
           <Card style={styles.section}>
             <Text variant="label" style={styles.sectionTitle}>{t('profile.information')}</Text>
-            <ProfileRow icon="mail-outline" label={t('profile.emailLabel')} value={user?.email ?? ''} />
-            <ProfileRow icon="call-outline" label={t('profile.phone')} value={user?.phone ?? ''} />
-            <ProfileRow icon="business-outline" label={t('profile.company')} value={user?.company ?? 'Molydal'} />
+            <ProfileRow icon={<Letter size={18} color={colors.red} />} label={t('profile.emailLabel')} value={user?.email ?? ''} />
+            <ProfileRow icon={<Phone size={18} color={colors.red} />} label={t('profile.phone')} value={user?.phone ?? ''} />
+            <ProfileRow icon={<Shop size={18} color={colors.red} />} label={t('profile.company')} value={user?.company ?? 'Molydal'} />
           </Card>
 
           {/* Preferences */}
@@ -104,29 +118,29 @@ export default function ProfileScreen(): React.JSX.Element {
             <View style={styles.row}>
               <View style={styles.rowLeft}>
                 <View style={styles.rowIconBox}>
-                  <Ionicons name="notifications-outline" size={18} color={COLORS.accent} />
+                  <Bell size={18} color={colors.red} />
                 </View>
                 <Text variant="body">{t('profile.notifications')}</Text>
               </View>
               <Switch
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
-                trackColor={{ false: COLORS.border, true: COLORS.accent + '60' }}
-                thumbColor={notificationsEnabled ? COLORS.accent : '#f4f3f4'}
+                trackColor={{ false: colors.border, true: colors.red + '60' }}
+                thumbColor={notificationsEnabled ? colors.red : '#f4f3f4'}
               />
             </View>
             <View style={styles.row}>
               <View style={styles.rowLeft}>
-                <View style={[styles.rowIconBox, { backgroundColor: COLORS.warning + '15' }]}>
-                  <Ionicons name="cloud-offline-outline" size={18} color={COLORS.warning} />
+                <View style={[styles.rowIconBox, { backgroundColor: colors.warning + '15' }]}>
+                  <CloundCross size={18} color={colors.warning} />
                 </View>
                 <Text variant="body">{t('profile.offlineMode')}</Text>
               </View>
               <Switch
                 value={manualOffline}
                 onValueChange={setManualOffline}
-                trackColor={{ false: COLORS.border, true: COLORS.warning + '60' }}
-                thumbColor={manualOffline ? COLORS.warning : '#f4f3f4'}
+                trackColor={{ false: colors.border, true: colors.warning + '60' }}
+                thumbColor={manualOffline ? colors.warning : '#f4f3f4'}
               />
             </View>
           </Card>
@@ -136,36 +150,35 @@ export default function ProfileScreen(): React.JSX.Element {
 
           {/* RBAC shortcuts */}
           {hasPermission(role, 'canExportData') && (
-            <TouchableOpacity style={[styles.shortcutRow, SHADOW.sm as ViewStyle]} onPress={() => router.push('/export')}>
-              <Ionicons name="analytics-outline" size={20} color={COLORS.primary} />
+            <TouchableOpacity style={styles.shortcutRow} onPress={() => router.push('/export')}>
+              <ChartSquare size={20} color={colors.red} />
               <Text variant="body" style={styles.shortcutText}>{t('profile.exportIntelligence')}</Text>
-              <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+              <AltArrowRight size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
           {hasPermission(role, 'canUpdateCRM') && (
-            <TouchableOpacity style={[styles.shortcutRow, SHADOW.sm as ViewStyle]} onPress={() => router.push('/voice-note')}>
-              <Ionicons name="mic-outline" size={20} color={COLORS.primary} />
+            <TouchableOpacity style={styles.shortcutRow} onPress={() => router.push('/voice-note')}>
+              <Microphone2 size={20} color={colors.red} />
               <Text variant="body" style={styles.shortcutText}>{t('profile.voiceNotesCRM')}</Text>
-              <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+              <AltArrowRight size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
 
           {/* About */}
           <Card style={styles.section}>
             <Text variant="label" style={styles.sectionTitle}>{t('profile.about')}</Text>
-            <ProfileRow icon="information-circle-outline" label={t('profile.version')} value="1.0.0" />
-            <ProfileRow icon="shield-checkmark-outline" label={t('profile.legalNotice')} value="" />
+            <ProfileRow icon={<InfoCircle size={18} color={colors.red} />} label={t('profile.version')} value="1.0.0" />
+            <ProfileRow icon={<ShieldCheck size={18} color={colors.red} />} label={t('profile.legalNotice')} value="" />
           </Card>
 
           {/* Logout */}
-          <TouchableOpacity style={[styles.logoutButton, SHADOW.sm as ViewStyle]} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
-            <Text variant="body" color={COLORS.danger} style={styles.logoutText}>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Logout2 size={20} color={colors.error} />
+            <Text variant="body" color={colors.error} style={styles.logoutText}>
               {t('profile.logout')}
             </Text>
           </TouchableOpacity>
 
-          <View style={styles.bottomSpacer} />
         </View>
       </ScreenWrapper>
     </View>
@@ -173,7 +186,7 @@ export default function ProfileScreen(): React.JSX.Element {
 }
 
 interface ProfileRowProps {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: React.ReactNode;
   label: string;
   value: string;
 }
@@ -182,7 +195,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ icon, label, value }) => (
   <View style={profileRowStyles.row}>
     <View style={profileRowStyles.left}>
       <View style={profileRowStyles.iconBox}>
-        <Ionicons name={icon} size={18} color={COLORS.primary} />
+        {icon}
       </View>
       <Text variant="body">{label}</Text>
     </View>
@@ -197,18 +210,18 @@ const profileRowStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.sm + 2,
+    paddingVertical: spacing.sm + 2,
   },
   left: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: spacing.sm,
   },
   iconBox: {
     width: 36,
     height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.primary + '10',
+    borderRadius: radius.sm,
+    backgroundColor: colors.redDim,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -221,11 +234,11 @@ const profileRowStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   heroGradient: {
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.xxl,
+    paddingTop: spacing.lg,
+    paddingBottom: 48,
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
     overflow: 'hidden',
@@ -241,27 +254,27 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: 'center',
-    paddingVertical: SPACING.lg,
-    gap: SPACING.xs,
+    paddingVertical: spacing.xxl,
+    gap: spacing.xs,
   },
   name: {
-    marginTop: SPACING.sm,
+    marginTop: spacing.sm,
   },
   content: {
-    paddingHorizontal: SPACING.lg,
-    marginTop: -SPACING.lg,
+    paddingHorizontal: spacing.section,
+    marginTop: -spacing.xxl,
   },
   section: {
-    marginBottom: SPACING.md,
-    gap: SPACING.xs,
+    marginBottom: spacing.lg,
+    gap: spacing.xs,
   },
   sectionTitle: {
-    marginBottom: SPACING.xs,
+    marginBottom: spacing.xs,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: SPACING.sm,
+    paddingVertical: spacing.sm,
   },
   statItem: {
     alignItems: 'center',
@@ -271,30 +284,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.sm + 2,
+    paddingVertical: spacing.sm + 2,
   },
   rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: spacing.sm,
   },
   rowIconBox: {
     width: 36,
     height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.accent + '10',
+    borderRadius: radius.sm,
+    backgroundColor: colors.redDim,
     alignItems: 'center',
     justifyContent: 'center',
   },
   shortcutRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
-    padding: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl,
-    marginBottom: SPACING.md,
-  },
+    gap: spacing.lg,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.lg,
+    ...shadows.sm,
+  } as ViewStyle,
   shortcutText: {
     flex: 1,
     fontWeight: '600',
@@ -303,16 +319,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.md,
-    marginTop: SPACING.sm,
-    backgroundColor: COLORS.dangerLight,
-    borderRadius: RADIUS.xl,
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    marginTop: spacing.sm,
+    backgroundColor: colors.redDim,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.red + '25',
   },
   logoutText: {
     fontWeight: '700',
-  },
-  bottomSpacer: {
-    height: SPACING.xl,
   },
 });

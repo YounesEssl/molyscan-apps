@@ -2,15 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChartSquare } from 'react-native-solar-icons/icons/bold-duotone';
+import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
+import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
+import { QrCode } from 'react-native-solar-icons/icons/bold-duotone';
+import { CheckCircle } from 'react-native-solar-icons/icons/bold-duotone';
+import { Route } from 'react-native-solar-icons/icons/bold-duotone';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
-import { Text, Card } from '@/components/ui';
+import { Text, Card, ScanFAB } from '@/components/ui';
 import { NotificationBell } from '@/components/dashboard/NotificationBell';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RecentScans } from '@/components/dashboard/RecentScans';
 import { PriceRequestCard } from '@/components/workflow/PriceRequestCard';
-import { COLORS, GRADIENTS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { spacing } from '@/design/tokens/spacing';
+import { radius } from '@/design/tokens/radius';
 import { useAuthStore } from '@/stores/auth.store';
 import { useWorkflowStore } from '@/stores/workflow.store';
 import { scanService } from '@/services/scan.service';
@@ -40,10 +48,10 @@ export default function DashboardScreen(): React.JSX.Element {
   const totalScans = scans.length;
 
   return (
-    <ScreenWrapper scroll padded={false}>
+    <ScreenWrapper scroll padded={false} tabSafe>
       {/* Hero */}
       <LinearGradient
-        colors={[...GRADIENTS.primary]}
+        colors={[colors.red, colors.redLight]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.hero}
@@ -55,7 +63,7 @@ export default function DashboardScreen(): React.JSX.Element {
                 <Text variant="body" color="rgba(255,255,255,0.7)">
                   {t('dashboard.greeting')}
                 </Text>
-                <Text variant="heading" color={COLORS.surface}>
+                <Text variant="heading" color={colors.textOnRed}>
                   {user?.firstName} {user?.lastName}
                 </Text>
                 <Text variant="caption" color="rgba(255,255,255,0.6)">
@@ -75,40 +83,55 @@ export default function DashboardScreen(): React.JSX.Element {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.statsRow}
         >
-          <StatCard icon="scan" label={t('dashboard.scans')} value={totalScans.toString()} />
-          <StatCard icon="checkmark-circle" label={t('dashboard.matches')} value={matchedCount.toString()} />
-          <StatCard icon="git-branch" label={t('dashboard.requests')} value={workflows.length.toString()} />
+          <StatCard
+            icon={<QrCode size={22} color={colors.red} />}
+            label={t('dashboard.scans')}
+            value={totalScans.toString()}
+          />
+          <StatCard
+            icon={<CheckCircle size={22} color={colors.matched} />}
+            label={t('dashboard.matches')}
+            value={matchedCount.toString()}
+            color={colors.matched}
+          />
+          <StatCard
+            icon={<Route size={22} color={colors.info} />}
+            label={t('dashboard.requests')}
+            value={workflows.length.toString()}
+            color={colors.info}
+          />
         </ScrollView>
 
-        {/* Quick actions */}
-        <TouchableOpacity
-          style={[styles.scanButton, SHADOW.primary as ViewStyle]}
-          onPress={() => router.push('/(tabs)/scanner')}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={[COLORS.accent, '#F59E0B']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.scanButtonGradient}
-          >
-            <Ionicons name="scan" size={24} color={COLORS.surface} />
-            <Text variant="body" color={COLORS.surface} style={styles.scanButtonText}>
-              {t('dashboard.scanProduct')}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        {/* Scan FAB */}
+        <View style={styles.fabContainer}>
+          <ScanFAB onPress={() => router.push('/(tabs)/scanner')} />
+          <Text variant="subheading" style={styles.fabLabel}>
+            {t('dashboard.scanProduct')}
+          </Text>
+        </View>
 
         {/* Role-based shortcuts */}
         <View style={styles.shortcuts}>
           {hasPermission(role, 'canExportData') && (
-            <ShortcutCard icon="analytics-outline" label={t('dashboard.export')} onPress={() => router.push('/export')} />
+            <ShortcutCard
+              icon={<ChartSquare size={22} color={colors.red} />}
+              label={t('dashboard.export')}
+              onPress={() => router.push('/export')}
+            />
           )}
           {hasPermission(role, 'canUpdateCRM') && (
-            <ShortcutCard icon="mic-outline" label={t('dashboard.crmNotes')} onPress={() => router.push('/voice-note')} />
+            <ShortcutCard
+              icon={<Microphone2 size={22} color={colors.red} />}
+              label={t('dashboard.crmNotes')}
+              onPress={() => router.push('/voice-note')}
+            />
           )}
           {hasPermission(role, 'canAccessChat') && (
-            <ShortcutCard icon="sparkles-outline" label={t('dashboard.aiAssistant')} onPress={() => router.push('/(tabs)/chat')} />
+            <ShortcutCard
+              icon={<Stars size={22} color={colors.red} />}
+              label={t('dashboard.aiAssistant')}
+              onPress={() => router.push('/(tabs)/chat')}
+            />
           )}
         </View>
 
@@ -131,21 +154,19 @@ export default function DashboardScreen(): React.JSX.Element {
         {/* Recent scans */}
         <RecentScans />
 
-
-        <View style={styles.bottomSpacer} />
       </View>
     </ScreenWrapper>
   );
 }
 
 const ShortcutCard: React.FC<{
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: React.ReactNode;
   label: string;
   onPress: () => void;
 }> = ({ icon, label, onPress }) => (
-  <TouchableOpacity style={[styles.shortcutCard, SHADOW.sm as ViewStyle]} onPress={onPress} activeOpacity={0.7}>
+  <TouchableOpacity style={styles.shortcutCard} onPress={onPress} activeOpacity={0.85}>
     <View style={styles.shortcutIcon}>
-      <Ionicons name={icon} size={22} color={COLORS.primary} />
+      {icon}
     </View>
     <Text variant="caption" style={styles.shortcutLabel}>{label}</Text>
   </TouchableOpacity>
@@ -153,13 +174,13 @@ const ShortcutCard: React.FC<{
 
 const styles = StyleSheet.create({
   hero: {
-    paddingBottom: SPACING.xl,
+    paddingBottom: spacing.xxxl,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
   },
   heroContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.sm,
+    paddingHorizontal: spacing.section,
+    paddingTop: spacing.sm,
   },
   heroTop: {
     flexDirection: 'row',
@@ -167,62 +188,55 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   content: {
-    paddingHorizontal: SPACING.lg,
-    marginTop: -SPACING.md,
+    paddingHorizontal: spacing.section,
+    marginTop: -spacing.lg,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
-  scanButton: {
-    borderRadius: RADIUS.xl,
-    overflow: 'hidden',
-    marginBottom: SPACING.md,
-  },
-  scanButtonGradient: {
-    flexDirection: 'row',
+  fabContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.md + 2,
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
   },
-  scanButtonText: {
-    fontWeight: '700',
-    fontSize: 16,
+  fabLabel: {
+    textAlign: 'center',
   },
   shortcuts: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
+    gap: spacing.sm,
+    marginBottom: spacing.xxl,
   },
   shortcutCard: {
     flex: 1,
     alignItems: 'center',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl,
-  },
+    gap: spacing.xs,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.sm,
+  } as ViewStyle,
   shortcutIcon: {
     width: 44,
     height: 44,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.primary + '10',
+    borderRadius: radius.md,
+    backgroundColor: colors.redDim,
     alignItems: 'center',
     justifyContent: 'center',
   },
   shortcutLabel: {
     fontWeight: '600',
+    textAlign: 'center',
   },
   section: {
-    marginBottom: SPACING.lg,
-    gap: SPACING.sm,
+    marginBottom: spacing.xxl,
+    gap: spacing.sm,
   },
   sectionTitle: {
-    marginBottom: SPACING.xs,
-  },
-  bottomSpacer: {
-    height: SPACING.xl,
+    marginBottom: spacing.xs,
   },
 });

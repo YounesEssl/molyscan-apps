@@ -1,50 +1,60 @@
-import React, { useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
 import { CameraView } from 'expo-camera';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Flashlight } from 'react-native-solar-icons/icons/bold';
+import { Camera } from 'react-native-solar-icons/icons/bold-duotone';
+import { Gallery } from 'react-native-solar-icons/icons/bold-duotone';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Text, BottomSheet } from '@/components/ui';
-import { ScanOverlay } from '@/components/scanner/ScanOverlay';
-import { ScanResult } from '@/components/scanner/ScanResult';
 import { PermissionGate } from '@/components/scanner/PermissionGate';
-import { ScanModeSwitch } from '@/components/scanner/ScanModeSwitch';
-import { VoiceInput } from '@/components/scanner/VoiceInput';
-import { LabelCaptureOverlay } from '@/components/scanner/LabelCaptureOverlay';
+import { ImageAnalysisResult } from '@/components/scanner/ImageAnalysisResult';
 import { useCameraPermission } from '@/hooks/useCameraPermission';
-import { useBarcodeScan } from '@/hooks/useBarcodeScan';
-import { useScannerStore } from '@/stores/scanner.store';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { scanService } from '@/services/scan.service';
-import { useTranslation } from 'react-i18next';
+import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { colors } from '@/design/tokens/colors';
+import { spacing } from '@/design/tokens/spacing';
+import { radius } from '@/design/tokens/radius';
+import { shadows } from '@/design/tokens/shadows';
+import { api } from '@/lib/axios';
+import { useLocation } from '@/hooks/useLocation';
+interface AnalysisResult {
+  identified: { name: string; brand: string; type: string; specs: string };
+  equivalents: Array<{
+    name: string;
+    family: string;
+    compatibility: number;
+    reason: string;
+  }>;
+  analysis: string;
+  sources: string[];
+}
 
 export default function ScannerScreen(): React.JSX.Element {
   const cameraRef = useRef<CameraView>(null);
-  const { isLoading, isGranted, requestPermission } = useCameraPermission();
-  const {
-    handleBarcodeScanned,
-    captureLabel,
-    isAnalyzingLabel,
-    lastScanRecord,
-    isScanning,
-    flashEnabled,
-    toggleFlash,
-    resetScan,
-  } = useBarcodeScan();
-  const { scanMode, setScanMode } = useScannerStore();
-  const { t } = useTranslation();
+  const { isLoading: permLoading, isGranted, requestPermission } = useCameraPermission();
+  const { getCurrentLocation } = useLocation();
+  const [flashEnabled, setFlashEnabled] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = 64 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0);
 
-  const needsCamera = scanMode === 'barcode' || scanMode === 'label';
-
-  if (isLoading) {
+  if (permLoading) {
     return (
       <ScreenWrapper style={styles.centered}>
-        <Text variant="body">{t('common.loading')}</Text>
+        <Text variant="body">Chargement...</Text>
       </ScreenWrapper>
     );
   }
 
-  if (!isGranted && needsCamera) {
+  if (!isGranted) {
     return (
       <ScreenWrapper>
         <PermissionGate onRequestPermission={requestPermission} />
@@ -52,84 +62,187 @@ export default function ScannerScreen(): React.JSX.Element {
     );
   }
 
+  const analyzeBase64 = async (base64: string, mimeType = 'image/jpeg') => {
+    // Get location in parallel with API call prep
+    const location = await getCurrentLocation();
+
+    // Send to API (longer timeout — image analysis takes time)
+    const response = await api.post('/scans/analyze-image', {
+      image: base64,
+      mimeType,
+      locationLat: location?.lat,
+      locationLng: location?.lng,
+      locationLabel: location?.label,
+    }, { timeout: 60000 });
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setResult(response.data);
+  };
+
+  const handlePickFromGallery = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+    const asset = result.assets[0];
+
+    setIsAnalyzing(true);
+    try {
+      const mime = asset.mimeType || 'image/jpeg';
+      await analyzeBase64(asset.base64!, mime);
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (__DEV__) console.error('[Scanner] Analysis failed:', error);
+      setResult({
+        identified: { name: '', brand: '', type: '', specs: '' },
+        equivalents: [],
+        analysis: "L'analyse a échoué. Vérifiez votre connexion et réessayez.",
+        sources: [],
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleCapture = async () => {
+    if (isAnalyzing) return;
+    setIsAnalyzing(true);
+
+    try {
+      const photo = await cameraRef.current?.takePictureAsync({
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!photo?.base64) {
+        throw new Error('Capture échouée');
+      }
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      await analyzeBase64(photo.base64);
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (__DEV__) console.error('[Scanner] Analysis failed:', error);
+      // Show a user-friendly error in the result sheet
+      setResult({
+        identified: { name: '', brand: '', type: '', specs: '' },
+        equivalents: [],
+        analysis: "L'analyse a échoué. Vérifiez votre connexion et réessayez.",
+        sources: [],
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleReset = () => {
+    setResult(null);
+  };
+
   return (
     <View style={styles.container}>
-      {needsCamera ? (
-        <>
-          <CameraView
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            enableTorch={flashEnabled}
-            barcodeScannerSettings={scanMode === 'barcode' ? {
-              barcodeTypes: [
-                'ean13',
-                'ean8',
-                'upc_a',
-                'upc_e',
-                'code128',
-                'code39',
-                'qr',
-              ],
-            } : undefined}
-            onBarcodeScanned={scanMode === 'barcode' && isScanning ? handleBarcodeScanned : undefined}
-          />
-          {scanMode === 'barcode' && isScanning && <ScanOverlay />}
-          {scanMode === 'label' && (
-            <LabelCaptureOverlay
-              onCapture={() => captureLabel(cameraRef)}
-              isAnalyzing={isAnalyzingLabel}
-            />
-          )}
-        </>
-      ) : (
-        <VoiceInput
-          onResult={(text) => {
-            handleBarcodeScanned({ type: 'qr', data: text } as never, 'voice');
-          }}
-        />
-      )}
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        enableTorch={flashEnabled}
+      />
+
+      {/* Overlay with viewfinder */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        {/* Top dark zone */}
+        <View style={styles.overlayTop} />
+
+        {/* Middle row with viewfinder */}
+        <View style={styles.overlayMiddle}>
+          <View style={styles.overlaySide} />
+          <View style={styles.viewfinder}>
+            {/* Corner markers */}
+            <View style={[styles.corner, styles.cornerTL]} />
+            <View style={[styles.corner, styles.cornerTR]} />
+            <View style={[styles.corner, styles.cornerBL]} />
+            <View style={[styles.corner, styles.cornerBR]} />
+          </View>
+          <View style={styles.overlaySide} />
+        </View>
+
+        {/* Bottom dark zone */}
+        <View style={styles.overlayBottom} />
+      </View>
 
       {/* Top controls */}
       <SafeAreaView style={styles.topControls} edges={['top']}>
         <View style={styles.topRow}>
-          <View style={styles.modeContainer}>
-            <ScanModeSwitch mode={scanMode} onChange={setScanMode} />
-          </View>
-          {needsCamera && (
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={toggleFlash}
-              hitSlop={12}
-            >
-              <Ionicons
-                name={flashEnabled ? 'flash' : 'flash-off'}
-                size={22}
-                color={COLORS.surface}
-              />
-            </TouchableOpacity>
-          )}
+          <Text variant="subheading" color="#fff" style={styles.title}>
+            Scanner un produit
+          </Text>
+          <TouchableOpacity
+            style={styles.flashButton}
+            onPress={() => setFlashEnabled(!flashEnabled)}
+          >
+            <Flashlight size={22} color={flashEnabled ? colors.red : '#fff'} />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
-      {/* Instruction text when scanning barcode */}
-      {isScanning && scanMode === 'barcode' && (
-        <View style={styles.instructionContainer}>
-          <Text variant="body" color={COLORS.surface} style={styles.instruction}>
-            {t('scanner.barcodeInstruction')}
-          </Text>
-        </View>
-      )}
+      {/* Instruction */}
+      <View style={[styles.instructionWrap, { bottom: tabBarHeight + 100 }]}>
+        <Text variant="caption" color="#fff" style={styles.instruction}>
+          Photographiez l'étiquette ou le produit concurrent
+        </Text>
+      </View>
 
-      {/* Bottom sheet result */}
-      <BottomSheet visible={!!lastScanRecord} onClose={resetScan}>
-        {lastScanRecord && (
-          <ScanResult scan={lastScanRecord} onScanAgain={resetScan} />
+      {/* Capture + gallery buttons */}
+      <View style={[styles.captureWrap, { bottom: tabBarHeight + 24 }]}>
+        <View style={styles.captureRow}>
+          {/* Gallery button */}
+          <TouchableOpacity
+            style={styles.galleryButton}
+            onPress={handlePickFromGallery}
+            disabled={isAnalyzing}
+            activeOpacity={0.7}
+          >
+            <Gallery size={24} color="#fff" />
+          </TouchableOpacity>
+
+          {/* Capture button */}
+          <TouchableOpacity
+            style={[styles.captureButton, shadows.red]}
+            onPress={handleCapture}
+            disabled={isAnalyzing}
+            activeOpacity={0.8}
+          >
+            {isAnalyzing ? (
+              <ActivityIndicator size="large" color="#fff" />
+            ) : (
+              <Camera size={32} color="#fff" />
+            )}
+          </TouchableOpacity>
+
+          {/* Spacer for symmetry */}
+          <View style={styles.galleryButton} />
+        </View>
+        {isAnalyzing && (
+          <Text variant="caption" color="#fff" style={styles.analyzingText}>
+            Analyse en cours...
+          </Text>
+        )}
+      </View>
+
+      {/* Result bottom sheet */}
+      <BottomSheet visible={!!result} onClose={handleReset}>
+        {result && (
+          <ImageAnalysisResult result={result} onScanAgain={handleReset} />
         )}
       </BottomSheet>
     </View>
   );
 }
+
+const VIEWFINDER_SIZE = 280;
 
 const styles = StyleSheet.create({
   container: {
@@ -140,45 +253,111 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Overlay
+  overlayTop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  overlayMiddle: {
+    flexDirection: 'row',
+    height: VIEWFINDER_SIZE,
+  },
+  overlaySide: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  viewfinder: {
+    width: VIEWFINDER_SIZE,
+    height: VIEWFINDER_SIZE,
+  },
+  overlayBottom: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  corner: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderColor: colors.red,
+    borderWidth: 3,
+  },
+  cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 8 },
+  cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 8 },
+  cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 8 },
+  cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 8 },
+  // Top controls
   topControls: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     zIndex: 10,
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: spacing.section,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: SPACING.sm,
   },
-  modeContainer: {
-    flex: 1,
+  title: {
+    fontWeight: '700',
   },
-  controlButton: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.md,
+  flashButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  instructionContainer: {
+  // Bottom
+  instructionWrap: {
     position: 'absolute',
-    bottom: 120,
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   instruction: {
     backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm + 2,
-    borderRadius: RADIUS.full,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
     overflow: 'hidden',
-    fontSize: 14,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  captureWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  captureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 28,
+  },
+  galleryButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  analyzingText: {
     fontWeight: '600',
   },
 });
