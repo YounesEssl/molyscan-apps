@@ -5,6 +5,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Image,
+  Alert,
 } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { Flashlight } from 'react-native-solar-icons/icons/bold';
@@ -43,6 +45,7 @@ export default function ScannerScreen(): React.JSX.Element {
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const tabBarHeight = 64 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0);
 
@@ -80,15 +83,28 @@ export default function ScannerScreen(): React.JSX.Element {
   };
 
   const handlePickFromGallery = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
+    if (isAnalyzing) return;
+
+    // Android requires explicit media library permission
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission requise',
+        "Veuillez autoriser l'accès à votre galerie dans les paramètres.",
+      );
+      return;
+    }
+
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.7,
       base64: true,
     });
-    if (result.canceled || !result.assets?.[0]?.base64) return;
-    const asset = result.assets[0];
+    if (pickerResult.canceled || !pickerResult.assets?.[0]?.base64) return;
+    const asset = pickerResult.assets[0];
 
     setIsAnalyzing(true);
+    if (asset.uri) setCapturedPhotoUri(asset.uri);
     try {
       const mime = asset.mimeType || 'image/jpeg';
       await analyzeBase64(asset.base64!, mime);
@@ -111,22 +127,28 @@ export default function ScannerScreen(): React.JSX.Element {
     setIsAnalyzing(true);
 
     try {
-      const photo = await cameraRef.current?.takePictureAsync({
+      // Timeout protection: takePictureAsync can hang on some Android devices
+      const photoPromise = cameraRef.current?.takePictureAsync({
         quality: 0.7,
         base64: true,
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Capture timeout')), 10000),
+      );
+      const photo = await Promise.race([photoPromise, timeoutPromise]);
 
       if (!photo?.base64) {
         throw new Error('Capture échouée');
       }
 
+      // Freeze frame: show the taken photo immediately so the user sees it was captured
+      setCapturedPhotoUri(photo.uri);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       await analyzeBase64(photo.base64);
     } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       if (__DEV__) console.error('[Scanner] Analysis failed:', error);
-      // Show a user-friendly error in the result sheet
       setResult({
         identified: { name: '', brand: '', type: '', specs: '' },
         equivalents: [],
@@ -140,6 +162,8 @@ export default function ScannerScreen(): React.JSX.Element {
 
   const handleReset = () => {
     setResult(null);
+    setCapturedPhotoUri(null);
+    setIsAnalyzing(false); // Safety reset — ensures button is never stuck in loading
   };
 
   return (
@@ -150,6 +174,15 @@ export default function ScannerScreen(): React.JSX.Element {
         facing="back"
         enableTorch={flashEnabled}
       />
+
+      {/* Freeze frame: shown immediately after capture so the user sees a still image */}
+      {capturedPhotoUri && (
+        <Image
+          source={{ uri: capturedPhotoUri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+      )}
 
       {/* Overlay with viewfinder */}
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
