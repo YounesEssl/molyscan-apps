@@ -26,7 +26,10 @@
     },
     "android": {
       "package": "com.molyscan.app",
-      "versionCode": 5,
+      "versionCode": 6,
+      "blockedPermissions": [
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
