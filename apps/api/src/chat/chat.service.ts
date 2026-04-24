@@ -135,16 +135,17 @@ export class ChatService {
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
 
-    // Save user message
-    const userMessage = await this.prisma.aIMessage.create({
-      data: { conversationId, role: 'user', text, sources: [] },
-    });
-
-    // Get history
+    // Fetch history BEFORE saving the current user message to avoid duplicating
+    // it in the messages array sent to Anthropic (history + explicit question)
     const history = await this.prisma.aIMessage.findMany({
       where: { conversationId },
       orderBy: { timestamp: 'asc' },
       take: 20,
+    });
+
+    // Save user message
+    const userMessage = await this.prisma.aIMessage.create({
+      data: { conversationId, role: 'user', text, sources: [] },
     });
 
     // Generate AI response
@@ -190,16 +191,16 @@ export class ChatService {
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
 
-    // Save user message
-    await this.prisma.aIMessage.create({
-      data: { conversationId, role: 'user', text, sources: [] },
-    });
-
-    // Get history
+    // Fetch history BEFORE saving the current user message (same fix as sendMessage)
     const history = await this.prisma.aIMessage.findMany({
       where: { conversationId },
       orderBy: { timestamp: 'asc' },
       take: 20,
+    });
+
+    // Save user message
+    await this.prisma.aIMessage.create({
+      data: { conversationId, role: 'user', text, sources: [] },
     });
 
     // Update conversation title

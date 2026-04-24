@@ -11,6 +11,21 @@ interface ChunkResult {
   metadata: Record<string, unknown>;
 }
 
+// Product names or keyword patterns that are equipment/accessories, not lubricants.
+// Returned by the vector store when "P 68", "M", "E" etc. match equipment identifiers.
+const EQUIPMENT_PATTERNS = [
+  /^PULSARLUBE/i,
+  /^POMPE\s+S[ÉE]RIE/i,
+  /^KIT\s+DE\s+DISTRIBUTION/i,
+  /^RACCORD\s+/i,
+  /^FONTAINE\s+FUT/i,
+  /^CENTRALE\s+/i,
+];
+
+function isEquipment(productName: string): boolean {
+  return EQUIPMENT_PATTERNS.some((re) => re.test(productName));
+}
+
 @Injectable()
 export class VectorStoreService implements OnModuleInit {
   private readonly logger = new Logger(VectorStoreService.name);
@@ -30,7 +45,7 @@ export class VectorStoreService implements OnModuleInit {
 
   async searchChunks(
     query: string,
-    matchCount = 20,
+    matchCount = 40,
     matchThreshold = 0.2,
   ): Promise<ChunkResult[]> {
     const embedding = await this.embeddingService.generateEmbedding(query);
@@ -48,7 +63,10 @@ export class VectorStoreService implements OnModuleInit {
       return [];
     }
 
-    return data || [];
+    // Remove equipment/accessories — they are not lubricant equivalents
+    return (data as ChunkResult[] ?? []).filter(
+      (chunk) => !isEquipment(chunk.product_name),
+    );
   }
 
   /**
@@ -64,7 +82,7 @@ export class VectorStoreService implements OnModuleInit {
       this.searchChunks(reformulatedQuery),
     ]);
 
-    // Merge and deduplicate
+    // Merge and deduplicate, keeping highest similarity per chunk
     const chunkMap = new Map<string, ChunkResult>();
 
     for (const chunk of [...directResults, ...reformulatedResults]) {
@@ -79,7 +97,7 @@ export class VectorStoreService implements OnModuleInit {
       (a, b) => b.similarity - a.similarity,
     );
 
-    // Diversity: best chunk per product first, then extras
+    // Diversity pass: one best chunk per product first, then extra chunks
     const bestPerProduct = new Map<string, ChunkResult>();
     const extras: ChunkResult[] = [];
 
@@ -91,14 +109,15 @@ export class VectorStoreService implements OnModuleInit {
       }
     }
 
-    const topProducts = Array.from(bestPerProduct.values()).slice(0, 12);
+    // 15 unique products (up from 12) to capture more relevant alternatives
+    const topProducts = Array.from(bestPerProduct.values()).slice(0, 15);
     return [
       ...topProducts,
       ...extras
         .filter((c) =>
           topProducts.some((p) => p.product_name === c.product_name),
         )
-        .slice(0, 12),
+        .slice(0, 15),
     ];
   }
 }
