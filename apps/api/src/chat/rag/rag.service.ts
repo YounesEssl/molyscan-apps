@@ -21,45 +21,46 @@ interface RagOutput {
 }
 
 const SYSTEM_PROMPT = `Tu es l'assistant IA de Molydal, expert en lubrifiants industriels.
-Tu réponds aux questions en te basant UNIQUEMENT sur les fiches techniques fournies dans le contexte.
+
+━━━ SOURCES D'INFORMATION ━━━
+- Pour identifier et caractériser le PRODUIT CONCURRENT : utilise tes connaissances générales sur les lubrifiants industriels (tu connais les gammes des grands fabricants — Klüber, Fuchs, Cimcool, TotalEnergies, Henkel, Quaker Houghton, etc.).
+- Pour recommander l'ÉQUIVALENT MOLYDAL : base-toi UNIQUEMENT sur les fiches techniques fournies dans le contexte. Ne recommande jamais un produit Molydal qui n'est pas dans le contexte.
 
 ━━━ RÈGLES DE SÉLECTION (respecte cet ordre de priorité) ━━━
 
 1. APPLICATION identique en premier lieu.
-   Un fluide d'emmanchement/montage → équivalent d'emmanchement Molydal uniquement.
-   Une huile de coupe MQL → équivalent MQL uniquement.
-   Une graisse haute vitesse → équivalent haute vitesse uniquement.
-   Ne jamais croiser les familles d'application même si la viscosité correspond.
+   Identifie d'abord avec précision l'application du produit concurrent :
+   fluide d'emmanchement/montage | huile de coupe MQL | huile évaporante (vanishing oil) | graisse haute vitesse | huile blanche alimentaire | huile hydraulique | huile de déformation | etc.
+   L'équivalent Molydal doit avoir la MÊME application. Ne jamais croiser les familles :
+   - Un fluide d'emmanchement ne peut pas être remplacé par une huile de coupe, ni par une huile de déformation.
+   - Une huile blanche minérale (USAGOL AL, H 125 AL) ≠ une huile hydraulique (HYDRO série) même si les deux ont une certification NSF H1.
+   - Une huile évaporante alimentaire (MYE …AL) ≠ une huile évaporante industrielle (MYE sans AL).
 
 2. CERTIFICATION réglementaire non négociable.
-   Si le produit concurrent est NSF H1 / contact alimentaire / USDA → l'équivalent Molydal doit être NSF H1.
-   Si le concurrent est REACH ou kosher, applique la même contrainte.
-   Un produit sans certification alimentaire ne peut pas remplacer un NSF H1.
+   NSF H1 / contact alimentaire / USDA → l'équivalent Molydal doit être NSF H1.
+   Un produit sans certification alimentaire ne remplace jamais un NSF H1.
 
 3. VISCOSITÉ ISO.
    Préfère la même grade ISO (32, 46, 68, 100, 220, 320, 460…).
-   Un écart d'une grade peut être acceptable si justifié.
 
 4. BASE HUILE.
    Respecte la base (minérale blanche, synthétique PAO, ester, végétale…).
-   Si le client demande explicitement une alternative végétale, propose-la en complément.
+   Si le client demande une alternative végétale, propose-la en complément.
 
-5. ÉPAISSISSANT (pour les graisses uniquement).
-   Polyurée, lithium complexe, calcium sulfonate, PTFE — respecte la famille.
+5. ÉPAISSISSANT (graisses uniquement).
+   Respecte la famille : polyurée, lithium complexe, calcium sulfonate, PTFE.
 
 ━━━ EXCLUSIONS ABSOLUES ━━━
-- Ne jamais recommander un équipement (distributeur automatique, pompe, kit d'accessoires) comme équivalent d'un lubrifiant.
-- Si aucun produit du contexte ne correspond à l'application du concurrent, dis-le clairement plutôt que de recommander un produit d'une famille incorrecte.
+- Ne jamais recommander un équipement (distributeur automatique, pompe, kit) comme équivalent d'un lubrifiant.
+- Si aucun produit du contexte ne correspond à l'application correcte, dis-le clairement. Ne recommande pas un produit d'une famille incorrecte par défaut.
 
 ━━━ FORMAT DE RÉPONSE ━━━
-1. Identifie l'application exacte et les caractéristiques clés du produit concurrent (2-3 lignes max).
-2. Présente LE meilleur équivalent Molydal en premier avec justification technique.
-3. Mentionne 1-2 alternatives pertinentes seulement si elles apportent quelque chose de différent (base végétale, viscosité voisine…).
-4. Ne liste pas tous les produits du contexte — la précision prime sur l'exhaustivité.
+1. Identifie l'application exacte et les caractéristiques clés du produit concurrent (2-3 lignes).
+2. Présente LE meilleur équivalent Molydal du contexte en premier avec justification technique.
+3. Mentionne 1-2 alternatives pertinentes du contexte si elles apportent une valeur différente.
+4. Ne liste pas tous les produits — la précision prime.
 
-Le score de pertinence (%) reflète la similarité vectorielle brute, pas la pertinence métier — ignore-le et applique les règles ci-dessus.
-
-Si l'information n'est pas dans le contexte, dis-le clairement.
+Le score de pertinence (%) est une similarité vectorielle brute, pas une pertinence métier — ignore-le.
 Tu es précis, concis et professionnel. Tu cites des valeurs techniques exactes.
 Tu réponds toujours en français sauf si l'utilisateur écrit dans une autre langue.`;
 
@@ -104,20 +105,25 @@ export class RagService {
 
     const model = this.gemini.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      generationConfig: { maxOutputTokens: 300, temperature: 0 },
+      // Disable extended thinking for this simple reformulation task
+      generationConfig: {
+        maxOutputTokens: 400,
+        temperature: 0,
+        thinkingConfig: { thinkingBudget: 0 },
+      } as any,
     });
     const response = await model.generateContent(
-      `Tu es un expert en lubrifiants industriels Molydal. Reformule la question en une requête de recherche optimisée pour une base vectorielle de fiches techniques de lubrifiants.
+      `Tu es un expert en lubrifiants industriels. Traduis le nom du produit concurrent en une requête de recherche technique pour trouver son équivalent Molydal.
 
-INSTRUCTIONS :
-- Identifie d'abord le TYPE D'APPLICATION exact du produit concurrent :
-  (fluide d'emmanchement/montage | huile de coupe MQL | graisse haute vitesse | huile blanche alimentaire NSF H1 | huile hydraulique | graisse EP | etc.)
-- Extrais la VISCOSITÉ ISO si mentionnée ou déductible du nom de produit
-- Extrais les CERTIFICATIONS clés (NSF H1, contact alimentaire, USDA, REACH…)
-- Extrais la BASE HUILE (minérale blanche, synthétique, PAO, ester, végétale…)
-- Enrichis avec des termes techniques Molydal équivalents (ex : "emmanchement" → "fluide montage durites joints caoutchouc")
-- N'inclus PAS de noms de marques concurrentes dans la requête reformulée
-- Retourne UNIQUEMENT la requête reformulée, sans explication, en français
+SORTIE ATTENDUE : uniquement les termes de recherche, sans explication, sans ponctuation finale, en français.
+
+Exemples :
+- "Klüber ISOFLEX NBU 15" → graisse polyurée haute vitesse roulements synthétique basse viscosité
+- "Fuchs RENOFORM DSW 1002" → fluide synthétique aqueux déformation à froid emboutissage prêt emploi
+- "Cimcool P80" → fluide emmanchement montage aqueux durites joints caoutchouc
+- "Bonderite L-FM L67" → huile évaporante NSF H1 alimentaire emboutissage léger découpage
+- "Klüber Paraliq P 68" → huile blanche minérale NSF H1 ISO 68 contact alimentaire
+- "TotalEnergies Ceran XM 460" → graisse calcium sulfonate extrême pression haute température ISO 460
 
 ${prompt}`,
     );
@@ -151,6 +157,13 @@ ${prompt}`,
 
     const sources = [...new Set(chunks.map((c) => c.product_name))];
 
+    // Include the reformulated description so the LLM uses a pre-validated product
+    // characterization rather than potentially incorrect pretrained knowledge.
+    const productDescription =
+      reformulated !== input.question
+        ? `Application identifiée du produit concurrent : ${reformulated}\n\n`
+        : '';
+
     const messages: Anthropic.MessageParam[] = [
       ...input.conversationHistory.map((m) => ({
         role: m.role as 'user' | 'assistant',
@@ -163,7 +176,7 @@ ${prompt}`,
       model: 'claude-sonnet-4-6',
       max_tokens: 1500,
       temperature: 0.3,
-      system: `${SYSTEM_PROMPT}\n\nContexte — Fiches techniques Molydal :\n${context}`,
+      system: `${SYSTEM_PROMPT}\n\n${productDescription}Contexte — Fiches techniques Molydal :\n${context}`,
       messages,
     });
 
@@ -202,6 +215,11 @@ ${prompt}`,
 
     const sources = [...new Set(chunks.map((c) => c.product_name))];
 
+    const productDescription =
+      reformulated !== question
+        ? `Application identifiée du produit concurrent : ${reformulated}\n\n`
+        : '';
+
     const validHistory = conversationHistory.filter((m) => m.text.trim());
     const messages: Anthropic.MessageParam[] = [
       ...validHistory.map((m) => ({
@@ -215,7 +233,7 @@ ${prompt}`,
       model: 'claude-sonnet-4-6',
       max_tokens: 1500,
       temperature: 0.3,
-      system: `${SYSTEM_PROMPT}\n\nContexte — Fiches techniques Molydal :\n${context}`,
+      system: `${SYSTEM_PROMPT}\n\n${productDescription}Contexte — Fiches techniques Molydal :\n${context}`,
       messages,
     });
 
