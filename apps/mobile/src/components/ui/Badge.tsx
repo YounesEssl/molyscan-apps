@@ -14,19 +14,19 @@ interface BadgeProps {
   onPress?: () => void;
 }
 
-const BADGE_COLORS: Record<string, { color: string }> = {
-  matched: { color: colors.matched },
-  success: { color: colors.success },
-  partial: { color: colors.partial },
-  warning: { color: colors.warning },
-  unmatched: { color: colors.unmatched },
-  danger: { color: colors.error },
-  pending: { color: colors.textMuted },
-  neutral: { color: colors.textSecondary },
-  primary: { color: colors.red },
-  ai: { color: '#6366f1' },
-  offline: { color: colors.textMuted },
-  custom: { color: colors.textSecondary },
+const BADGE_COLORS: Record<string, string> = {
+  matched:   colors.ok,
+  success:   colors.ok,
+  partial:   colors.warn,
+  warning:   colors.warn,
+  unmatched: colors.red,
+  danger:    colors.red,
+  primary:   colors.red,
+  pending:   colors.ink3,
+  neutral:   colors.ink2,
+  ai:        colors.purple,
+  offline:   colors.ink3,
+  custom:    colors.ink2,
 };
 
 export const Badge: React.FC<BadgeProps> = ({
@@ -37,9 +37,9 @@ export const Badge: React.FC<BadgeProps> = ({
   customColor,
   onPress,
 }) => {
-  const badgeColor = customColor ?? BADGE_COLORS[variant]?.color ?? colors.textSecondary;
-  const bgColor = badgeColor + '18'; // ~10% opacity
-  const borderColor = badgeColor + '40'; // ~25% opacity
+  const badgeColor = customColor ?? BADGE_COLORS[variant] ?? colors.ink2;
+  const bgColor = badgeColor + '18';
+  const borderColor = badgeColor + '40';
 
   const content = (
     <View style={[styles.badge, size === 'md' && styles.badgeMd, { backgroundColor: bgColor, borderColor }]}>
@@ -79,10 +79,9 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: typography.sizes.xs,
-    fontFamily: typography.fonts.displaySemibold,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: typography.letterSpacing.wider,
+    fontFamily: typography.fonts.sansSemibold,
+    fontWeight: '600',
+    letterSpacing: 0.4,
   },
   textMd: {
     fontSize: typography.sizes.sm,

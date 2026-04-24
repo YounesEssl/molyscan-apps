@@ -12,4 +12,3 @@ export { StatusIndicator } from './StatusIndicator';
 export { IconButton } from './IconButton';
 export { ProgressBar } from './ProgressBar';
 export { ScoreIndicator } from './ScoreIndicator';
-export { ScanFAB } from './ScanFAB';

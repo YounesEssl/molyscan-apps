@@ -6,6 +6,23 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from '../chat/rag/rag.service';
 import { VectorStoreService } from '../chat/rag/vector-store.service';
 
+/**
+ * Canonical form of a product name/brand for cache lookups.
+ * Prevents "MOLYKOTE BR-2" / "Molykote BR 2" / "molykote br2" from
+ * being treated as different products.
+ */
+function normalize(s: string | null | undefined): string {
+  if (!s) return '';
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip accents
+    .replace(/[-_\s]+/g, ' ')         // collapse separators
+    .replace(/\s+/g, ' ')             // collapse whitespace
+    .trim();
+}
+
 export interface ImageAnalysisResult {
   /** Scan ID (persisted in DB) */
   id: string;
@@ -85,15 +102,24 @@ export class ImageAnalysisService {
       };
     }
 
-    // Check cache: has this product been analyzed before?
-    const cachedScan = await this.prisma.scan.findFirst({
+    // L1 CACHE — by identified name+brand. Normalized so "Molykote BR-2" and
+    // "MOLYKOTE BR 2" hit the same entry. Postgres doesn't have a normalize fn
+    // on index, so we fetch candidates and filter in JS by normalized form.
+    const idName = normalize(identification.name);
+    const idBrand = normalize(identification.brand);
+    const candidates = await this.prisma.scan.findMany({
       where: {
-        identifiedName: identification.name,
-        identifiedBrand: identification.brand,
         equivalentsJson: { not: null as any },
+        identifiedBrand: { equals: identification.brand, mode: 'insensitive' },
       },
       orderBy: { createdAt: 'desc' },
+      take: 20,
     });
+    const cachedScan = candidates.find(
+      (s) =>
+        normalize(s.identifiedName) === idName &&
+        normalize(s.identifiedBrand) === idBrand,
+    );
 
     if (cachedScan?.equivalentsJson) {
       this.logger.log(`⚡ Cache hit pour "${identification.name}" — réutilisation des résultats`);
@@ -228,7 +254,16 @@ Si l'image ne contient PAS de produit lubrifiant identifiable, retourne :
 
 Retourne UNIQUEMENT le JSON, sans markdown.${userMessage ? `\n\nContexte de l'utilisateur : ${userMessage}` : ''}`;
 
-    const model = this.gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // Greedy decoding — temperature 0, topP 0.1, topK 1 — eliminates the main
+    // source of variability in scan results (same image → same identification).
+    const model = this.gemini.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        temperature: 0,
+        topP: 0.1,
+        topK: 1,
+      },
+    });
     const response = await model.generateContent([
       { inlineData: { mimeType, data: imageBase64 } },
       prompt,

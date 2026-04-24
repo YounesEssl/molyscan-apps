@@ -30,23 +30,27 @@ export const Card: React.FC<CardProps> = ({
   padded = true,
   accentColor,
 }) => {
-  const variantStyle = variantStyles[variant];
+  const outerVariantStyle = outerVariantStyles[variant];
+  const innerVariantStyle = innerVariantStyles[variant];
   const paddingValue = padding ? spacing[padding] : padded ? spacing.lg : 0;
   const accentStyle: ViewStyle | undefined = accentColor
     ? { borderLeftWidth: 3, borderLeftColor: accentColor }
     : undefined;
 
   const content = (
-    <View
-      style={[
-        styles.base,
-        variantStyle,
-        { padding: paddingValue },
-        accentStyle,
-        style as ViewStyle,
-      ]}
-    >
-      {children}
+    // Outer View: carries shadow + backgroundColor (no overflow — would kill iOS shadow)
+    <View style={[styles.outer, outerVariantStyle, style as ViewStyle]}>
+      {/* Inner View: carries clipping (overflow) + border + radius */}
+      <View
+        style={[
+          styles.inner,
+          innerVariantStyle,
+          { padding: paddingValue },
+          accentStyle,
+        ]}
+      >
+        {children}
+      </View>
     </View>
   );
 
@@ -62,33 +66,49 @@ export const Card: React.FC<CardProps> = ({
 };
 
 const styles = StyleSheet.create({
-  base: {
+  outer: {
+    borderRadius: radius.lg,
+    // no overflow here — shadow would be clipped on iOS
+  },
+  inner: {
     borderRadius: radius.lg,
     overflow: 'hidden',
   },
 });
 
-const variantStyles = StyleSheet.create({
+// Outer (shadow + backgroundColor — required for iOS shadow to render)
+const outerVariantStyles = StyleSheet.create({
   default: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.md,
+    backgroundColor: colors.paper2,
+    ...shadows.card,
   } as ViewStyle,
   elevated: {
-    backgroundColor: colors.surface,
-    ...shadows.lg,
+    backgroundColor: colors.paper2,
+    ...shadows.float,
   } as ViewStyle,
   outlined: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
+    backgroundColor: colors.paperWarm,
     ...shadows.none,
   } as ViewStyle,
   ghost: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.border,
     ...shadows.none,
+  } as ViewStyle,
+});
+
+// Inner (border — kept on the clipped view so it renders crisply)
+const innerVariantStyles = StyleSheet.create({
+  default: {
+    borderWidth: 1,
+    borderColor: 'rgba(26,20,16,0.07)',
+  } as ViewStyle,
+  elevated: {} as ViewStyle,
+  outlined: {
+    borderWidth: 1,
+    borderColor: colors.ink4,
+  } as ViewStyle,
+  ghost: {
+    borderWidth: 1,
+    borderColor: colors.ink4,
   } as ViewStyle,
 });

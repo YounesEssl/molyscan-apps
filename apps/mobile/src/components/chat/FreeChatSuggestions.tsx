@@ -1,7 +1,11 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import { Text } from '@/components/ui';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { Text } from '@/components/ui/Text';
+import { colors } from '@/design/tokens/colors';
+import { spacing } from '@/design/tokens/spacing';
+import { radius } from '@/design/tokens/radius';
+import { typography } from '@/design/tokens/typography';
+import { haptic } from '@/lib/haptics';
 
 interface FreeChatSuggestionsProps {
   onSelect: (question: string) => void;
@@ -14,44 +18,51 @@ const SUGGESTIONS = [
   'Graisse biodégradable pour industrie agroalimentaire ?',
 ];
 
-export const FreeChatSuggestions: React.FC<FreeChatSuggestionsProps> = ({
-  onSelect,
-}) => {
+export function FreeChatSuggestions(
+  props: FreeChatSuggestionsProps,
+): React.JSX.Element {
+  const { onSelect } = props;
+
   return (
     <View style={styles.container}>
       {SUGGESTIONS.map((q) => (
         <TouchableOpacity
           key={q}
           style={styles.chip}
-          onPress={() => onSelect(q)}
+          onPress={() => {
+            haptic.light();
+            onSelect(q);
+          }}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={q}
         >
-          <Text variant="caption" color={COLORS.primary} style={styles.chipText}>
-            {q}
-          </Text>
+          <Text style={styles.chipText}>{q}</Text>
         </TouchableOpacity>
       ))}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    gap: SPACING.xs,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: spacing.section,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
   },
   chip: {
-    backgroundColor: COLORS.primary + '10',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
+    backgroundColor: colors.paper2,
+    paddingHorizontal: 14,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: COLORS.primary + '20',
+    borderColor: 'rgba(26,20,16,0.08)',
   },
   chipText: {
-    fontWeight: '600',
-    fontSize: 13,
-    textAlign: 'center',
+    fontFamily: typography.fonts.sansMedium,
+    fontSize: 12,
+    color: colors.red,
   },
 });

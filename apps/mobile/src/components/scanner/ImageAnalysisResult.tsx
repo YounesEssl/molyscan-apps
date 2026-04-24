@@ -66,11 +66,11 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       {/* Status */}
       <View style={styles.statusIcon}>
         {noProduct ? (
-          <DangerCircle size={48} color={colors.warning} />
+          <DangerCircle size={48} color={colors.warn} />
         ) : hasMatch ? (
-          <CheckCircle size={48} color={colors.matched} />
+          <CheckCircle size={48} color={colors.ok} />
         ) : (
-          <DangerCircle size={48} color={colors.error} />
+          <DangerCircle size={48} color={colors.red} />
         )}
       </View>
       <Text variant="heading" style={styles.statusTitle}>
@@ -83,21 +83,21 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
 
       {noProduct ? (
         <Card variant="outlined" style={styles.card}>
-          <Text variant="caption" color={colors.textSecondary} style={styles.analysisText}>
+          <Text variant="caption" color={colors.ink2} style={styles.analysisText}>
             {result.analysis || "Aucun produit lubrifiant n'a été identifié. Essayez de photographier l'étiquette ou l'emballage de plus près."}
           </Text>
         </Card>
       ) : (
         <Card variant="outlined" style={styles.card}>
-          <Text variant="label" color={colors.textSecondary}>
+          <Text variant="label" color={colors.ink2}>
             Produit identifié
           </Text>
           <Text variant="subheading">{result.identified.name}</Text>
-          <Text variant="caption" color={colors.textSecondary}>
+          <Text variant="caption" color={colors.ink2}>
             {result.identified.brand} · {result.identified.type}
           </Text>
           {result.identified.specs ? (
-            <Text variant="caption" color={colors.textMuted} style={styles.specs}>
+            <Text variant="caption" color={colors.ink3} style={styles.specs}>
               {result.identified.specs}
             </Text>
           ) : null}
@@ -114,19 +114,19 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
         >
           <View style={styles.eqHeader}>
             <View style={styles.eqInfo}>
-              <Text variant="label" color={i === 0 ? colors.red : colors.textSecondary}>
+              <Text variant="label" color={i === 0 ? colors.red : colors.ink2}>
                 {i === 0 ? 'Meilleur équivalent Molydal' : 'Alternative'}
               </Text>
-              <Text variant="subheading" color={i === 0 ? colors.red : colors.textPrimary}>
+              <Text variant="subheading" color={i === 0 ? colors.red : colors.ink}>
                 {eq.name}
               </Text>
-              <Text variant="caption" color={colors.textSecondary}>
+              <Text variant="caption" color={colors.ink2}>
                 {eq.family}
               </Text>
             </View>
             <ScoreIndicator score={eq.compatibility} size="sm" showLabel={false} />
           </View>
-          <Text variant="caption" color={colors.textSecondary} style={styles.reason}>
+          <Text variant="caption" color={colors.ink2} style={styles.reason}>
             {eq.reason}
           </Text>
         </Card>
@@ -135,10 +135,10 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       {/* Analysis */}
       {result.analysis ? (
         <Card variant="outlined" style={styles.card}>
-          <Text variant="label" color={colors.textSecondary}>
+          <Text variant="label" color={colors.ink2}>
             Analyse détaillée
           </Text>
-          <Text variant="caption" color={colors.textPrimary} style={styles.analysisText}>
+          <Text variant="caption" color={colors.ink} style={styles.analysisText}>
             {result.analysis}
           </Text>
         </Card>
@@ -159,7 +159,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
         <Button
           label="Scanner un autre produit"
           variant={noProduct ? 'primary' : 'secondary'}
-          icon={<Camera size={18} color={noProduct ? colors.textOnRed : colors.textPrimary} />}
+          icon={<Camera size={18} color={noProduct ? colors.textOnRed : colors.ink} />}
           onPress={onScanAgain}
           fullWidth
         />

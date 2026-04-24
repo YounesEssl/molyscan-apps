@@ -39,7 +39,7 @@ export const StatCard: React.FC<StatCardProps> = ({
       {trend && (
         <Text
           variant="caption"
-          color={trend.direction === 'up' ? colors.success : colors.error}
+          color={trend.direction === 'up' ? colors.ok : colors.red}
           style={styles.trend}
         >
           {trend.direction === 'up' ? '↑' : '↓'} {trend.value}%
@@ -52,10 +52,10 @@ export const StatCard: React.FC<StatCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     width: 160,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.paper2,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.ink4,
     padding: spacing.lg,
     gap: spacing.sm,
     ...shadows.md,

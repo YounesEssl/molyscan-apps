@@ -8,8 +8,11 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, RADIUS, SPACING } from '@/constants/theme';
+import { TAB_BAR } from '@/constants/layout';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -24,8 +27,14 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   onClose,
   children,
 }) => {
+  const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+
+  // Inner-content bottom padding so the last buttons clear the floating
+  // tab bar and home indicator, even when scrolled to the bottom.
+  const contentBottomPadding =
+    TAB_BAR.height + TAB_BAR.bottomOffset + insets.bottom + 8;
 
   useEffect(() => {
     if (visible) {
@@ -58,31 +67,46 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     }
   }, [visible, translateY, opacity]);
 
-  if (!visible) return null;
-
+  // Modal renders at the native root level — guarantees the sheet appears
+  // above the floating tab bar (which lives in the tabs layout).
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <Animated.View style={[styles.overlay, { opacity }]} />
-      </TouchableWithoutFeedback>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardView}
-        pointerEvents="box-none"
-      >
-        <Animated.View
-          style={[styles.sheet, { transform: [{ translateY }] }]}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={StyleSheet.absoluteFill}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <Animated.View style={[styles.overlay, { opacity }]} />
+        </TouchableWithoutFeedback>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboardView}
+          pointerEvents="box-none"
         >
-          <View style={styles.handle} />
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            bounces={false}
+          <Animated.View
+            style={[styles.sheet, { transform: [{ translateY }] }]}
           >
-            {children}
-          </ScrollView>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </View>
+            <View style={styles.handle} />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              // Horizontal padding lives on the CONTENT (not the sheet) so
+              // child shadows can render into that horizontal space without
+              // being clipped by the ScrollView's viewport bounds.
+              contentContainerStyle={{
+                paddingHorizontal: SPACING.lg,
+                paddingBottom: contentBottomPadding,
+              }}
+            >
+              {children}
+            </ScrollView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 };
 
@@ -99,8 +123,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderTopLeftRadius: RADIUS.xxl + 8,
     borderTopRightRadius: RADIUS.xxl + 8,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.xl + 12,
     paddingTop: SPACING.sm,
     maxHeight: SCREEN_HEIGHT * 0.85,
   },

@@ -188,6 +188,7 @@ model Scan {
   scannedAt DateTime @default(now())
   createdAt DateTime @default(now())
 
+  @@index([identifiedName, identifiedBrand])
   @@map("scans")
 }
 

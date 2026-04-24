@@ -29,7 +29,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const { t } = useTranslation();
   const status = STATUS_CONFIG[scan.status];
-  const accentColor = scan.status === 'matched' ? colors.matched : scan.status === 'partial' ? colors.partial : undefined;
+  const accentColor = scan.status === 'matched' ? colors.ok : scan.status === 'partial' ? colors.warn : undefined;
 
   if (!scan.scannedProduct) return null;
 
@@ -54,13 +54,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </View>
           )}
         </View>
-        <AltArrowRight size={20} color={colors.textMuted} />
+        <AltArrowRight size={20} color={colors.ink3} />
       </View>
       <View style={styles.footer}>
         <Text variant="caption">{formatRelativeDate(scan.scannedAt)}</Text>
         {scan.location && (
           <View style={styles.locationRow}>
-            <MapPoint size={12} color={colors.textMuted} />
+            <MapPoint size={12} color={colors.ink3} />
             <Text variant="caption" style={styles.locationText}>{typeof scan.location === 'string' ? scan.location : scan.location?.label ?? ''}</Text>
           </View>
         )}
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: colors.ink4,
     paddingTop: spacing.sm,
   },
   locationRow: {

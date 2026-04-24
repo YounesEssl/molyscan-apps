@@ -10,7 +10,11 @@ import {
 import { Eye } from 'react-native-solar-icons/icons/bold-duotone';
 import { EyeClosed } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from './Text';
-import { COLORS, RADIUS, SPACING, FONT_SIZE, SHADOW } from '@/constants/theme';
+import { colors } from '@/design/tokens/colors';
+import { shadows } from '@/design/tokens/shadows';
+import { radius } from '@/design/tokens/radius';
+import { spacing } from '@/design/tokens/spacing';
+import { typography } from '@/design/tokens/typography';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -20,16 +24,21 @@ interface InputProps extends TextInputProps {
   containerStyle?: ViewStyle;
 }
 
-export const Input: React.FC<InputProps> = ({
+export const Input = React.forwardRef<TextInput, InputProps>(({
   label,
   error,
   icon,
   isPassword,
   containerStyle,
+  accessibilityLabel,
+  accessibilityHint,
   ...props
-}) => {
+}, ref) => {
   const [secureEntry, setSecureEntry] = useState(isPassword ?? false);
   const [focused, setFocused] = useState(false);
+
+  const resolvedAccessibilityLabel = accessibilityLabel ?? label;
+  const resolvedAccessibilityHint = accessibilityHint ?? (error ? error : undefined);
 
   return (
     <View style={containerStyle}>
@@ -37,9 +46,9 @@ export const Input: React.FC<InputProps> = ({
       <View
         style={[
           styles.inputContainer,
-          SHADOW.sm as ViewStyle,
+          shadows.card as ViewStyle,
           focused && styles.focused,
-          error ? styles.error : undefined,
+          error ? styles.errorBorder : undefined,
         ]}
       >
         {icon && (
@@ -48,72 +57,84 @@ export const Input: React.FC<InputProps> = ({
           </View>
         )}
         <TextInput
+          ref={ref}
           style={styles.input}
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={colors.ink3}
           secureTextEntry={secureEntry}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          accessibilityLabel={resolvedAccessibilityLabel}
+          accessibilityHint={resolvedAccessibilityHint}
           {...props}
         />
         {isPassword && (
-          <TouchableOpacity onPress={() => setSecureEntry((v) => !v)}>
+          <TouchableOpacity
+            onPress={() => setSecureEntry((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={
+              secureEntry ? 'Afficher le mot de passe' : 'Masquer le mot de passe'
+            }
+          >
             {secureEntry ? (
-              <EyeClosed size={20} color={COLORS.textMuted} />
+              <EyeClosed size={20} color={colors.ink3} />
             ) : (
-              <Eye size={20} color={COLORS.textMuted} />
+              <Eye size={20} color={colors.ink3} />
             )}
           </TouchableOpacity>
         )}
       </View>
       {error && (
-        <Text variant="caption" color={COLORS.danger} style={styles.errorText}>
+        <Text variant="caption" color={colors.red} style={styles.errorText}>
           {error}
         </Text>
       )}
     </View>
   );
-};
+});
+
+Input.displayName = 'Input';
 
 const styles = StyleSheet.create({
   label: {
-    marginBottom: SPACING.sm,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+    fontFamily: typography.fonts.sansSemibold,
+    color: colors.ink2,
+    letterSpacing: 0.3,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.xl,
-    paddingHorizontal: SPACING.md,
+    borderWidth: 1,
+    borderColor: 'rgba(26,20,16,0.1)',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
     minHeight: 52,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.paper2,
   },
   focused: {
-    borderColor: COLORS.primary,
-    borderWidth: 2,
+    borderColor: 'rgba(212,37,28,0.4)',
+    borderWidth: 1.5,
   },
-  error: {
-    borderColor: COLORS.danger,
+  errorBorder: {
+    borderColor: colors.red,
   },
   iconBox: {
     width: 32,
     height: 32,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.background,
+    borderRadius: radius.sm,
+    backgroundColor: colors.paper1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.sm,
+    marginRight: spacing.sm,
   },
   input: {
     flex: 1,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    fontSize: typography.sizes.md,
+    fontFamily: typography.fonts.sans,
+    color: colors.ink,
     paddingVertical: 0,
-    fontWeight: '500',
   },
   errorText: {
-    marginTop: SPACING.xs,
+    marginTop: spacing.xs,
   },
 });

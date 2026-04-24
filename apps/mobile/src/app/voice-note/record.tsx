@@ -1,5 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from 'react-native';
 import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
 import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
 import { StopCircle } from 'react-native-solar-icons/icons/bold-duotone';
@@ -11,6 +21,8 @@ import { Header } from '@/components/layout/Header';
 import { Text, Button, Card } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { voiceNoteService } from '@/services/voice-note.service';
+import { haptic } from '@/lib/haptics';
+import { logger } from '@/lib/logger';
 
 // Mock CRM extraction from transcription
 function extractCrmFields(transcription: string): CrmFields {
@@ -45,13 +57,6 @@ interface CrmFields {
   tags: string[];
 }
 
-// Mock transcriptions for demo
-const MOCK_TRANSCRIPTIONS = [
-  "Visite chez Renault Trucks Lyon. Le chef d'atelier, M. Dupont, est intéressé par notre huile hydraulique Molyduval Hydran 46. Il utilise actuellement du Shell Tellus. Volume estimé 500L par mois. Rappeler mardi pour le devis.",
-  "Appel avec Marie Lambert de PSA Poissy. Demande de prix urgente pour graisse EP lithium, 50 cartouches. Confirmer disponibilité sous 24h.",
-  "Rencontre prospect Safran Paris. Besoin en huile compresseur, actuellement sous contrat Total. Renouvellement dans 3 mois. Envoyer catalogue et échantillon.",
-];
-
 export default function VoiceNoteRecordScreen(): React.JSX.Element {
   const router = useRouter();
   const { t } = useTranslation();
@@ -85,8 +90,12 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   const startRecording = async () => {
     try {
       const status = await AudioModule.requestRecordingPermissionsAsync();
-      if (!status.granted) return;
+      if (!status.granted) {
+        haptic.warning();
+        return;
+      }
 
+      haptic.medium();
       recorder.record();
       setIsRecording(true);
       setPhase('recording');
@@ -96,11 +105,13 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         setDuration((d) => d + 1);
       }, 1000);
     } catch (error) {
-      console.log('[VoiceNote] Recording start failed:', error);
+      haptic.error();
+      logger.error('VoiceNote recording start failed', error);
     }
   };
 
   const stopRecording = async () => {
+    haptic.medium();
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -114,14 +125,17 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       // Ignore errors on stop
     }
 
-    // Simulate transcription (2s delay + random mock)
-    setTimeout(() => {
-      const mockText = MOCK_TRANSCRIPTIONS[Math.floor(Math.random() * MOCK_TRANSCRIPTIONS.length)];
-      setTranscription(mockText);
-      const fields = extractCrmFields(mockText);
-      setCrmFields(fields);
-      setPhase('review');
-    }, 2000);
+    // Move straight to review with an empty transcription —
+    // the user can type the note manually until real transcription is wired.
+    setTranscription('');
+    setCrmFields({
+      clientName: '',
+      contactName: '',
+      product: '',
+      nextAction: '',
+      tags: [],
+    });
+    setPhase('review');
   };
 
   const handleSave = async () => {
@@ -133,10 +147,16 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       formData.append('clientName', crmFields.clientName || t('voiceNote.unknownClient'));
       crmFields.tags.forEach((tag) => formData.append('tags', tag));
       if (recorder.uri) {
-        formData.append('audio', { uri: recorder.uri, type: 'audio/m4a', name: 'recording.m4a' } as any);
+        formData.append('audio', {
+          uri: recorder.uri,
+          type: 'audio/m4a',
+          name: 'recording.m4a',
+        } as unknown as Blob);
       }
       await voiceNoteService.create(formData);
+      haptic.success();
     } catch (e) {
+      haptic.error();
       if (__DEV__) console.error('[VoiceNote] Save failed:', e);
     }
     setSaving(false);
@@ -144,9 +164,15 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   };
 
   return (
-    <ScreenWrapper scroll padded={false}>
+    <ScreenWrapper padded={false}>
       <Header title={t('voiceNote.newNoteTitle')} showBack />
 
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.content}>
         {/* Recording phase */}
         {(phase === 'idle' || phase === 'recording') && (
@@ -170,6 +196,13 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
               style={[styles.micButton, isRecording && styles.micButtonActive]}
               onPress={isRecording ? stopRecording : startRecording}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isRecording
+                  ? t('voiceNote.stopRecording', { defaultValue: 'Arrêter l\'enregistrement' })
+                  : t('voiceNote.startRecording', { defaultValue: 'Démarrer l\'enregistrement' })
+              }
+              accessibilityState={{ selected: isRecording }}
             >
               {isRecording ? (
                 <StopCircle size={40} color={COLORS.surface} />
@@ -211,7 +244,10 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
         {/* Review phase — transcription + CRM fields */}
         {phase === 'review' && (
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* Transcription */}
             <Card style={styles.reviewCard}>
               <Text variant="label">{t('voiceNote.transcription')}</Text>
@@ -221,6 +257,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                 onChangeText={setTranscription}
                 multiline
                 textAlignVertical="top"
+                accessibilityLabel={t('voiceNote.transcription')}
               />
             </Card>
 
@@ -236,6 +273,11 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, clientName: v }))}
                   placeholder={t('voiceNote.clientPlaceholder')}
                   placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="words"
+                  autoComplete="organization"
+                  textContentType="organizationName"
+                  returnKeyType="next"
+                  accessibilityLabel={t('voiceNote.client')}
                 />
               </View>
 
@@ -247,6 +289,11 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, contactName: v }))}
                   placeholder={t('voiceNote.contactPlaceholder')}
                   placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  textContentType="name"
+                  returnKeyType="next"
+                  accessibilityLabel={t('voiceNote.contact')}
                 />
               </View>
 
@@ -258,6 +305,9 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, product: v }))}
                   placeholder={t('voiceNote.productPlaceholder')}
                   placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="sentences"
+                  returnKeyType="next"
+                  accessibilityLabel={t('voiceNote.productField')}
                 />
               </View>
 
@@ -269,6 +319,9 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, nextAction: v }))}
                   placeholder={t('voiceNote.nextActionPlaceholder')}
                   placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="sentences"
+                  returnKeyType="done"
+                  accessibilityLabel={t('voiceNote.nextAction')}
                 />
               </View>
             </Card>
@@ -315,11 +368,14 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
           </ScrollView>
         )}
       </View>
+      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   content: {
     flex: 1,
     paddingHorizontal: SPACING.lg,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import { CheckCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { Like } from 'react-native-solar-icons/icons/bold-duotone';
@@ -8,6 +8,7 @@ import { BranchingPathsDown } from 'react-native-solar-icons/icons/bold-duotone'
 import { InfoCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { haptic } from '@/lib/haptics';
 import type { AppNotification } from '@/schemas/notification.schema';
 import { formatRelativeDate } from '@/utils/date';
 
@@ -43,14 +44,26 @@ interface NotificationItemProps {
   onPress: () => void;
 }
 
-export const NotificationItem: React.FC<NotificationItemProps> = ({ notification, onPress }) => {
+export const NotificationItem = React.memo(function NotificationItem({
+  notification,
+  onPress,
+}: NotificationItemProps): React.JSX.Element {
   const color = COLOR_MAP[notification.type] ?? COLORS.textMuted;
+
+  const handlePress = useCallback(() => {
+    haptic.light();
+    onPress();
+  }, [onPress]);
+
+  const accessibilityLabel = `${notification.read ? '' : 'Non lue. '}${notification.title}. ${notification.body}`;
 
   return (
     <TouchableOpacity
       style={[styles.container, !notification.read && styles.unread]}
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
     >
       <View style={[styles.iconBox, { backgroundColor: color + '15' }]}>
         {getNotificationIcon(notification.type, color, 20)}
@@ -69,7 +82,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({ notification
       {!notification.read && <View style={styles.dot} />}
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

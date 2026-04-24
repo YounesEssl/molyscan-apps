@@ -1,18 +1,18 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, type ViewStyle } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS } from '@/constants/theme';
-import { SPACING } from '@/constants/theme';
-
-const TAB_BAR_HEIGHT = 64;
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors } from '@/design/tokens/colors';
+import { spacing } from '@/design/tokens/spacing';
+import { useTabBarSpacing } from '@/hooks/useTabBarSpacing';
 
 interface ScreenWrapperProps {
   children: React.ReactNode;
   style?: ViewStyle;
   padded?: boolean;
   scroll?: boolean;
-  /** Add bottom padding to clear the absolute-positioned tab bar (default: false) */
+  /** When true, adds bottom padding so scroll content clears the floating tab bar. */
   tabSafe?: boolean;
+  bg?: string;
 }
 
 export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
@@ -21,9 +21,11 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
   padded = true,
   scroll = false,
   tabSafe = false,
+  bg,
 }) => {
-  const insets = useSafeAreaInsets();
-  const bottomPadding = tabSafe ? TAB_BAR_HEIGHT + insets.bottom : 0;
+  const { contentPaddingBottom } = useTabBarSpacing();
+  const bottomPadding = tabSafe ? contentPaddingBottom : 0;
+  const backgroundColor = bg ?? colors.paper1;
 
   const content = scroll ? (
     <ScrollView
@@ -39,18 +41,11 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
     </View>
   );
 
-  return <SafeAreaView style={styles.safe}>{content}</SafeAreaView>;
+  return <SafeAreaView style={[styles.safe, { backgroundColor }]}>{content}</SafeAreaView>;
 };
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  flex: {
-    flex: 1,
-  },
-  padded: {
-    paddingHorizontal: SPACING.lg,
-  },
+  safe: { flex: 1 },
+  flex: { flex: 1 },
+  padded: { paddingHorizontal: spacing.section },
 });

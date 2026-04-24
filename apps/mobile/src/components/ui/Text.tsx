@@ -8,64 +8,80 @@ import { colors } from '@/design/tokens/colors';
 import { typography } from '@/design/tokens/typography';
 
 interface TextProps extends RNTextProps {
-  variant?: 'title' | 'heading' | 'subheading' | 'body' | 'caption' | 'label';
+  variant?: 'display' | 'title' | 'heading' | 'subheading' | 'body' | 'caption' | 'label' | 'mono';
   color?: string;
+  italic?: boolean;
 }
 
 export const Text: React.FC<TextProps> = ({
   variant = 'body',
   color,
+  italic = false,
   style,
   ...props
 }) => {
+  const fontFamily = italic && variant === 'display'
+    ? typography.fonts.displayItalic
+    : styles[variant]?.fontFamily;
+
   return (
     <RNText
-      style={[styles[variant], color ? { color } : undefined, style]}
+      style={[styles[variant], color ? { color } : undefined, fontFamily ? { fontFamily } : undefined, style]}
       {...props}
     />
   );
 };
 
 const styles = StyleSheet.create({
-  title: {
+  display: {
     fontSize: typography.sizes.hero,
-    fontWeight: '800',
     fontFamily: typography.fonts.display,
-    color: colors.textPrimary,
-    letterSpacing: typography.letterSpacing.tight,
+    color: colors.ink,
+    letterSpacing: typography.letterSpacing.hero,
+    lineHeight: typography.sizes.hero * typography.lineHeights.tight,
+  },
+  title: {
+    fontSize: typography.sizes.xxxl,
+    fontFamily: typography.fonts.display,
+    color: colors.ink,
+    letterSpacing: typography.letterSpacing.title,
+    lineHeight: typography.sizes.xxxl * 1.15,
   },
   heading: {
     fontSize: typography.sizes.xxl,
-    fontWeight: '700',
     fontFamily: typography.fonts.display,
-    color: colors.textPrimary,
-    letterSpacing: typography.letterSpacing.tight,
+    color: colors.ink,
+    letterSpacing: typography.letterSpacing.title,
   },
   subheading: {
-    fontSize: typography.sizes.lg,
-    fontWeight: '600',
-    fontFamily: typography.fonts.displaySemibold,
-    color: colors.textPrimary,
+    fontSize: typography.sizes.xl,
+    fontFamily: typography.fonts.sansSemibold,
+    color: colors.ink,
+    letterSpacing: typography.letterSpacing.navLabel,
   },
   body: {
     fontSize: typography.sizes.md,
-    fontWeight: '400',
-    fontFamily: typography.fonts.body,
-    color: colors.textPrimary,
+    fontFamily: typography.fonts.sans,
+    color: colors.ink,
     lineHeight: typography.sizes.md * typography.lineHeights.normal,
   },
   caption: {
     fontSize: typography.sizes.sm,
-    fontWeight: '500',
-    fontFamily: typography.fonts.body,
-    color: colors.textSecondary,
+    fontFamily: typography.fonts.sans,
+    color: colors.ink2,
+    lineHeight: typography.sizes.sm * typography.lineHeights.normal,
   },
   label: {
     fontSize: typography.sizes.xs,
-    fontWeight: '700',
-    fontFamily: typography.fonts.displaySemibold,
-    color: colors.textSecondary,
+    fontFamily: typography.fonts.sansSemibold,
+    color: colors.ink2,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
-    letterSpacing: typography.letterSpacing.wider,
+  },
+  mono: {
+    fontSize: typography.sizes.sm,
+    fontFamily: typography.fonts.mono,
+    color: colors.ink,
+    letterSpacing: 0,
   },
 });

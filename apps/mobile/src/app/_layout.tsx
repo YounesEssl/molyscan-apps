@@ -1,10 +1,12 @@
 import '@/i18n';
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { OfflineBanner } from '@/components/layout/OfflineBanner';
+import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { useSync } from '@/hooks/useSync';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -95,9 +97,12 @@ function RootContent(): React.JSX.Element {
 export default function RootLayout(): React.JSX.Element {
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <RootContent />
-      </QueryClientProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <StatusBar style="dark" />
+          <RootContent />
+        </QueryClientProvider>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }

@@ -1,5 +1,9 @@
-import { Controller, Get, Post, Delete, Body, Param, Res, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
+import {
+  Controller, Get, Post, Delete, Body, Param, Res, UseGuards,
+  UseInterceptors, UploadedFile, BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiConsumes } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -8,13 +12,34 @@ import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateFreeConversationDto } from './dto/create-free-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { TranscriptionService } from '../voice-notes/transcription/transcription.service';
 
 @ApiTags('Chat')
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ChatController {
-  constructor(private chatService: ChatService) {}
+  constructor(
+    private chatService: ChatService,
+    private transcriptionService: TranscriptionService,
+  ) {}
+
+  // ── Voice-to-text ──────────────────────────────────────────────
+
+  @Post('transcribe')
+  @Throttle({ default: { ttl: 60000, limit: 20 } })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('audio'))
+  @ApiOperation({ summary: 'Transcribe audio to text (for chat composer dictation)' })
+  async transcribe(
+    @UploadedFile() audio?: Express.Multer.File,
+  ): Promise<{ transcription: string }> {
+    if (!audio?.buffer) {
+      throw new BadRequestException('Audio file required');
+    }
+    const transcription = await this.transcriptionService.transcribe(audio.buffer);
+    return { transcription: transcription ?? '' };
+  }
 
   // ── Conversations (all types) ──────────────────────────────────
 

@@ -22,9 +22,11 @@ interface RagOutput {
 
 const SYSTEM_PROMPT = `Tu es l'assistant IA de Molydal, expert en lubrifiants industriels.
 
-━━━ SOURCES D'INFORMATION ━━━
-- Pour identifier et caractériser le PRODUIT CONCURRENT : utilise tes connaissances générales sur les lubrifiants industriels (tu connais les gammes des grands fabricants — Klüber, Fuchs, Cimcool, TotalEnergies, Henkel, Quaker Houghton, etc.).
-- Pour recommander l'ÉQUIVALENT MOLYDAL : base-toi UNIQUEMENT sur les fiches techniques fournies dans le contexte. Ne recommande jamais un produit Molydal qui n'est pas dans le contexte.
+━━━ SOURCES D'INFORMATION (STRICTES) ━━━
+- **PRODUITS MOLYDAL** : UNIQUEMENT les fiches techniques fournies dans le contexte ci-dessous. Jamais d'invention, jamais de connaissance générale. Si un produit Molydal n'est pas dans le contexte, il n'existe pas pour toi.
+- **PRODUITS CONCURRENTS** : si tu as besoin d'identifier un produit concurrent ou d'obtenir ses caractéristiques (viscosité, additifs, certifications, application), utilise l'outil \`web_search\`. **Ne devine jamais**, ne t'appuie JAMAIS sur tes connaissances générales. Si le web search ne retourne rien d'exploitable, dis-le explicitement.
+- **RÈGLE ABSOLUE** : zéro hallucination. Toute info sur un lubrifiant concurrent doit venir d'une recherche web vérifiée ; toute info sur un produit Molydal doit venir du contexte RAG.
+- **N'UTILISE LE WEB SEARCH QUE POUR** : identifier/documenter un produit concurrent. Jamais pour répondre à d'autres questions (généralités lubrifiants, Molydal, conseil métier), réponds avec le contexte RAG seul.
 
 ━━━ RÈGLES DE SÉLECTION (respecte cet ordre de priorité) ━━━
 
@@ -63,6 +65,21 @@ const SYSTEM_PROMPT = `Tu es l'assistant IA de Molydal, expert en lubrifiants in
 Le score de pertinence (%) est une similarité vectorielle brute, pas une pertinence métier — ignore-le.
 Tu es précis, concis et professionnel. Tu cites des valeurs techniques exactes.
 Tu réponds toujours en français sauf si l'utilisateur écrit dans une autre langue.`;
+
+/**
+ * Anthropic's native web search tool. Claude decides autonomously when to
+ * invoke it — the system prompt restricts usage to identifying / documenting
+ * competitor products only.
+ *
+ * Cast: the tool is a server-side Anthropic capability. TS types in the
+ * current SDK (@anthropic-ai/sdk v0.90) don't yet include it but the wire
+ * format is correct.
+ */
+const WEB_SEARCH_TOOL = {
+  type: 'web_search_20250305',
+  name: 'web_search',
+  max_uses: 3,
+} as unknown as Anthropic.ToolUnion;
 
 @Injectable()
 export class RagService {
@@ -178,10 +195,15 @@ ${prompt}`,
       temperature: 0.3,
       system: `${SYSTEM_PROMPT}\n\n${productDescription}Contexte — Fiches techniques Molydal :\n${context}`,
       messages,
+      tools: [WEB_SEARCH_TOOL],
     });
 
-    const text =
-      response.content[0].type === 'text' ? response.content[0].text : '';
+    // When Claude uses the web_search tool, the final text is in the last
+    // `text` block of the response content.
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('\n');
     return { text, sources };
   }
 
@@ -192,16 +214,31 @@ ${prompt}`,
   async generateStreamingResponse(
     question: string,
     conversationHistory: Array<{ role: string; text: string }>,
+    productContext?: {
+      scannedName: string | null;
+      scannedBrand: string | null;
+      molydalName: string | null;
+      molydalReference: string | null;
+    },
   ): Promise<{
     stream: ReturnType<Anthropic['messages']['stream']>;
     sources: string[];
   }> {
+    // When the conversation is attached to a scan, bias retrieval toward the
+    // identified Molydal product by enriching the search query with its name.
+    const contextualQuestion = productContext?.molydalName
+      ? `${question} — à propos de ${productContext.molydalName} (équivalent ${productContext.scannedBrand ?? ''} ${productContext.scannedName ?? ''})`
+      : question;
+
     const reformulated = await this.reformulateQuery(
-      question,
+      contextualQuestion,
       conversationHistory,
     );
 
-    const chunks = await this.vectorStore.dualSearch(question, reformulated);
+    const chunks = await this.vectorStore.dualSearch(
+      contextualQuestion,
+      reformulated,
+    );
 
     const context =
       chunks.length > 0
@@ -215,8 +252,18 @@ ${prompt}`,
 
     const sources = [...new Set(chunks.map((c) => c.product_name))];
 
-    const productDescription =
-      reformulated !== question
+    const productBlock = productContext?.scannedName
+      ? `━━━ CONTEXTE DU SCAN ━━━
+Produit concurrent scanné : ${productContext.scannedBrand ?? '?'} ${productContext.scannedName}
+Équivalent Molydal identifié : ${productContext.molydalName ?? 'non déterminé'}${productContext.molydalReference ? ` (réf. ${productContext.molydalReference})` : ''}
+
+L'utilisateur te questionne spécifiquement sur ce match. Reste centré sur ces deux produits dans tes réponses.
+
+`
+      : '';
+
+    const reformulationBlock =
+      !productContext && reformulated !== question
         ? `Application identifiée du produit concurrent : ${reformulated}\n\n`
         : '';
 
@@ -233,8 +280,9 @@ ${prompt}`,
       model: 'claude-sonnet-4-6',
       max_tokens: 1500,
       temperature: 0.3,
-      system: `${SYSTEM_PROMPT}\n\n${productDescription}Contexte — Fiches techniques Molydal :\n${context}`,
+      system: `${SYSTEM_PROMPT}\n\n${productBlock}${reformulationBlock}Contexte — Fiches techniques Molydal :\n${context}`,
       messages,
+      tools: [WEB_SEARCH_TOOL],
     });
 
     return { stream, sources };

@@ -206,9 +206,22 @@ export class ChatService {
     // Update conversation title
     await this.updateConversationMeta(conversationId, text, conversation.title);
 
+    // For product-linked conversations, inject the scan context into the RAG
+    // system prompt so Claude knows which product pair it's discussing.
+    const productContext =
+      conversation.type === 'product'
+        ? {
+            scannedName: conversation.scannedName,
+            scannedBrand: conversation.scannedBrand,
+            molydalName: conversation.molydalName,
+            molydalReference: conversation.molydalReference,
+          }
+        : undefined;
+
     return this.ragService.generateStreamingResponse(
       text,
       history.map((m) => ({ role: m.role, text: m.text })),
+      productContext,
     );
   }
 

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
+import { logger } from '@/lib/logger';
 
 /**
  * expo-notifications throws at module-evaluation time inside Expo Go (SDK 53+).
@@ -30,7 +31,7 @@ export function usePushNotifications(): void {
 
   useEffect(() => {
     if (isExpoGo) {
-      console.log('[Push] Skipped — not supported in Expo Go');
+      logger.debug('Push skipped — not supported in Expo Go');
       return;
     }
 
@@ -81,9 +82,9 @@ export function usePushNotifications(): void {
             const { data: token } = await Notifications.getExpoPushTokenAsync({
               projectId: projectId as string,
             });
-            console.log('[Push] Token:', token);
+            logger.debug('Push token', token);
           } catch (e) {
-            console.log('[Push] Token error:', e);
+            logger.error('Push token fetch failed', e);
           }
         }
       }
@@ -92,7 +93,7 @@ export function usePushNotifications(): void {
 
       // Listeners
       notificationListener.current = Notifications.addNotificationReceivedListener((n) => {
-        console.log('[Push] Foreground:', n.request.content.title);
+        logger.debug('Push foreground', n.request.content.title);
       });
 
       responseListener.current = Notifications.addNotificationResponseReceivedListener((r) => {

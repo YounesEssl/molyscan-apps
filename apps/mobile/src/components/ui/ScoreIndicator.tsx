@@ -21,8 +21,8 @@ const SIZES = {
 };
 
 function getScoreColor(score: number): string {
-  if (score >= 80) return colors.matched;
-  if (score >= 50) return colors.warning;
+  if (score >= 80) return colors.ok;
+  if (score >= 50) return colors.warn;
   return colors.red;
 }
 
@@ -67,7 +67,7 @@ export const ScoreIndicator: React.FC<ScoreIndicatorProps> = ({
             cx={center}
             cy={center}
             r={config.radius}
-            stroke={colors.border}
+            stroke={colors.ink4}
             strokeWidth={config.stroke}
             fill="none"
             strokeLinecap="round"
@@ -101,7 +101,7 @@ export const ScoreIndicator: React.FC<ScoreIndicatorProps> = ({
         </View>
       </View>
       {showLabel && (
-        <Text variant="caption" color={colors.textMuted} style={styles.label}>
+        <Text variant="caption" color={colors.ink3} style={styles.label}>
           Score de confiance
         </Text>
       )}
@@ -125,6 +125,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: typography.sizes.xs,
-    fontFamily: typography.fonts.body,
+    fontFamily: typography.fonts.sans,
   },
 });

@@ -19,16 +19,16 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, description
   <View style={styles.container}>
     <View style={styles.iconCircle}>
       {typeof icon === 'string' ? (
-        <Text variant="body" color={colors.textMuted}>{icon}</Text>
+        <Text variant="body" color={colors.ink3}>{icon}</Text>
       ) : (
         icon
       )}
     </View>
-    <Text variant="subheading" color={colors.textPrimary}>
+    <Text variant="subheading" color={colors.ink}>
       {title}
     </Text>
     {(description || subtitle) && (
-      <Text variant="caption" color={colors.textMuted} style={styles.description}>
+      <Text variant="caption" color={colors.ink3} style={styles.description}>
         {description ?? subtitle}
       </Text>
     )}
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.paperWarm,
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.sm,

@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useScannerStore } from '@/stores/scanner.store';
 import { useLocation } from '@/hooks/useLocation';
 import { scanService } from '@/services/scan.service';
+import { logger } from '@/lib/logger';
 import type { BarcodeScanningResult, CameraView } from 'expo-camera';
 import type { ScanRecord, ScanMethod } from '@/schemas/scan.schema';
 
@@ -50,7 +51,7 @@ export function useBarcodeScan(): UseBarcodeScanReturn {
         setLastScanRecord(scanRecord);
         setIsScanning(false);
       } catch (error) {
-        if (__DEV__) console.error('[useBarcodeScan] matchBarcode failed:', error);
+        logger.error('useBarcodeScan matchBarcode failed', error);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     },
@@ -67,7 +68,7 @@ export function useBarcodeScan(): UseBarcodeScanReturn {
         try {
           await cameraRef.current?.takePictureAsync();
         } catch {
-          // Ignore camera errors on simulator
+          // silent: optional camera capture, it's ok to fail (simulator)
         }
 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

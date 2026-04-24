@@ -1,49 +1,60 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
-  StyleSheet,
-  View,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  Alert,
+  StyleSheet,
+  View,
+  type ListRenderItem,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Header } from '@/components/layout/Header';
-import { Text } from '@/components/ui';
-import { ChatBubbleFree } from '@/components/chat/ChatBubbleFree';
-import { ChatInputWithUpload } from '@/components/chat/ChatInputWithUpload';
-import { FreeChatSuggestions } from '@/components/chat/FreeChatSuggestions';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { chatFreeService, type ChatMessage } from '@/services/chatFree.service';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Aura } from '@/components/ui/Aura';
+import { AssistantHeader } from '@/components/chat/AssistantHeader';
+import { AssistantAvatar } from '@/components/chat/AssistantAvatar';
+import { ChatMessage } from '@/components/chat/ChatMessage';
+import { ChatComposer } from '@/components/chat/ChatComposer';
+import { ChatEmptyState } from '@/components/chat/ChatEmptyState';
+import { ChatTypingIndicator } from '@/components/chat/ChatTypingIndicator';
+import { colors } from '@/design/tokens/colors';
+import { spacing } from '@/design/tokens/spacing';
+import {
+  chatFreeService,
+  type ChatMessage as ChatMessageModel,
+} from '@/services/chatFree.service';
 
 export default function ChatDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const listRef = useRef<FlatList<ChatMessageModel>>(null);
+
+  const [messages, setMessages] = useState<ChatMessageModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState('Assistant IA');
-  const listRef = useRef<FlatList>(null);
+  const [inputText, setInputText] = useState('');
 
   useEffect(() => {
     if (!id) return;
-    chatFreeService.getMessages(id).then((msgs) => {
-      setMessages(msgs);
-    }).catch(() => {});
+    chatFreeService
+      .getMessages(id)
+      .then(setMessages)
+      .catch(() => {});
   }, [id]);
 
   const scrollToEnd = useCallback(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
   }, []);
 
-  const handleSend = async (text: string) => {
-    if (!text.trim() || isLoading || !id) return;
+  const handleSend = async (text: string): Promise<void> => {
+    const trimmed = text.trim();
+    if (!trimmed || isLoading || !id) return;
+    setInputText('');
 
-    const userMsg: ChatMessage = {
+    const userMsg: ChatMessageModel = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: text.trim(),
+      content: trimmed,
     };
     const assistantId = `assistant-${Date.now()}`;
 
@@ -55,15 +66,13 @@ export default function ChatDetailScreen(): React.JSX.Element {
     setIsLoading(true);
     scrollToEnd();
 
-    // Update title from first message
     if (messages.length === 0) {
-      const newTitle = text.length > 40 ? text.slice(0, 40) + '...' : text;
-      setTitle(newTitle);
+      setTitle(trimmed.length > 40 ? `${trimmed.slice(0, 40)}...` : trimmed);
     }
 
     let fullContent = '';
 
-    await chatFreeService.sendMessageStreaming(id, text.trim(), {
+    await chatFreeService.sendMessageStreaming(id, trimmed, {
       onToken: (token) => {
         fullContent += token;
         setMessages((prev) =>
@@ -75,9 +84,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
       },
       onSources: (sources) => {
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, sources } : m,
-          ),
+          prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)),
         );
       },
       onDone: () => {
@@ -101,146 +108,84 @@ export default function ChatDetailScreen(): React.JSX.Element {
     });
   };
 
-  const isEmpty = messages.length === 0;
+  const showTyping = isLoading && !messages.some((m) => m.isStreaming);
+
+  const renderItem = useCallback<ListRenderItem<ChatMessageModel>>(
+    ({ item }) => <ChatMessage message={item} />,
+    [],
+  );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Header title={title} showBack />
+    <View style={styles.container}>
+      <Aura
+        width={300}
+        height={300}
+        color={colors.purple}
+        opacity={0.08}
+        style={{ top: -80, right: -80 }}
+      />
 
-      {/* AI badge */}
-      <View style={styles.aiBadge}>
-        <Stars size={12} color={COLORS.accent} />
-        <Text variant="caption" color={COLORS.accent} style={styles.aiBadgeText}>
-          Powered by AI
-        </Text>
-      </View>
+      <SafeAreaView style={styles.safeTop} edges={['top']}>
+        <AssistantHeader title={title} onBack={() => router.back()} />
+        <AssistantAvatar />
+      </SafeAreaView>
 
+      {/*
+        KeyboardAvoidingView with flex:1 and the composer as a direct child
+        (not absolute-positioned) means the keyboard will push the composer
+        up correctly on both iOS and Android.
+      */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
         <FlatList
           ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ChatBubbleFree message={item} />}
+          renderItem={renderItem}
           contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
           onContentSizeChange={() =>
             listRef.current?.scrollToEnd({ animated: false })
           }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIcon}>
-                <Stars size={36} color={COLORS.accent} />
-              </View>
-              <Text variant="subheading" style={styles.emptyTitle}>
-                Comment puis-je vous aider ?
-              </Text>
-              <Text
-                variant="caption"
-                color={COLORS.textSecondary}
-                style={styles.emptySubtitle}
-              >
-                Posez une question sur les lubrifiants, graisses ou huiles Molydal
-              </Text>
-              <FreeChatSuggestions onSelect={handleSend} />
-            </View>
+            <ChatEmptyState onSuggestionSelect={handleSend} />
           }
-          ListFooterComponent={
-            isLoading && !messages.some((m) => m.isStreaming) ? (
-              <View style={styles.typingRow}>
-                <View style={styles.typingAvatar}>
-                  <Stars size={14} color={COLORS.accent} />
-                </View>
-                <View style={styles.typingBubble}>
-                  <ActivityIndicator size="small" color={COLORS.accent} />
-                  <Text variant="caption" color={COLORS.textMuted}>
-                    Réflexion en cours...
-                  </Text>
-                </View>
-              </View>
-            ) : null
-          }
+          ListFooterComponent={showTyping ? <ChatTypingIndicator /> : null}
+          removeClippedSubviews={Platform.OS === 'android'}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={8}
         />
-        <ChatInputWithUpload onSend={handleSend} disabled={isLoading} />
+
+        <View style={{ paddingBottom: insets.bottom }}>
+          <ChatComposer
+            value={inputText}
+            onChangeText={setInputText}
+            onSubmit={() => handleSend(inputText)}
+            disabled={isLoading}
+          />
+        </View>
       </KeyboardAvoidingView>
-      <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.paper1,
+  },
+  safeTop: {
+    zIndex: 10,
   },
   flex: { flex: 1 },
-  aiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: SPACING.xs,
-    backgroundColor: COLORS.accent + '10',
-  },
-  aiBadgeText: {
-    fontWeight: '600',
-    fontSize: 12,
-  },
   list: {
-    paddingVertical: SPACING.md,
+    paddingHorizontal: spacing.section,
+    paddingTop: spacing.sm,
+    paddingBottom: 8,
     flexGrow: 1,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 40,
-    gap: SPACING.sm,
-  },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: COLORS.accent + '12',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
-  },
-  emptyTitle: {
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    textAlign: 'center',
-    maxWidth: 260,
-    marginBottom: SPACING.md,
-  },
-  typingRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: SPACING.xs,
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-  },
-  typingAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.accent + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.surface,
-    padding: SPACING.md,
-    borderRadius: RADIUS.xl,
-    borderBottomLeftRadius: 4,
-  },
-  bottomSafe: {
-    backgroundColor: COLORS.surface,
   },
 });

@@ -127,7 +127,7 @@ export const chatFreeService = {
                 callbacks.onSources(parsed.sources);
               }
             } catch {
-              // skip malformed JSON
+              // silent: malformed SSE chunk, it's ok to fail
             }
           }
         };

@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   syncedBanner: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.ok,
   },
   text: {
     fontWeight: '600',
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: 3,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.paper2,
     borderRadius: 2,
   },
 });

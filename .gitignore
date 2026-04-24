@@ -46,3 +46,11 @@ apps/api/dist/
 # generated native folders
 /ios
 /android
+
+# IDE / AI-assistant tooling (local only)
+.claude/
+.gemini/
+.vscode/
+.mcp.json
+.playwright-mcp/
+ref_v3_full.png

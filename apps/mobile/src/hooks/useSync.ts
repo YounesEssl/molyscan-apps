@@ -3,6 +3,7 @@ import { useOfflineStore } from '@/stores/offline.store';
 import { useNotificationStore } from '@/stores/notification.store';
 import type { OfflineActionRow } from '@/lib/database';
 import { markScanAsSynced, getUnsyncedScans } from '@/lib/database';
+import { logger } from '@/lib/logger';
 import i18n from '@/i18n';
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -84,8 +85,8 @@ export function useSync(): UseSyncReturn {
         notifications: [notif, ...store.notifications],
         unreadCount: store.unreadCount + 1,
       });
-    } catch {
-      // Sync failed silently — will retry on next reconnection
+    } catch (error) {
+      logger.error('Sync failed, will retry on next reconnection', error);
     } finally {
       setSyncing(false);
       setSyncProgress(null);

@@ -1,5 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
+  TextInput,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Shop } from 'react-native-solar-icons/icons/bold-duotone';
@@ -12,6 +22,7 @@ import { COLORS, SPACING } from '@/constants/theme';
 import { scanService } from '@/services/scan.service';
 import { workflowService } from '@/services/workflow.service';
 import { useWorkflowStore } from '@/stores/workflow.store';
+import { haptic } from '@/lib/haptics';
 import type { ScanRecord } from '@/schemas/scan.schema';
 
 export default function PriceRequestScreen(): React.JSX.Element {
@@ -20,6 +31,9 @@ export default function PriceRequestScreen(): React.JSX.Element {
   const { scanId } = useLocalSearchParams<{ scanId: string }>();
   const addWorkflow = useWorkflowStore((s) => s.addWorkflow);
   const [scan, setScan] = useState<ScanRecord | null>(null);
+
+  const quantityRef = useRef<TextInput>(null);
+  const priceRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (scanId) {
@@ -32,8 +46,9 @@ export default function PriceRequestScreen(): React.JSX.Element {
   const [price, setPrice] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     if (!clientName.trim() || !quantity.trim()) {
+      haptic.warning();
       Alert.alert(t('common.error'), t('workflow.validationError'));
       return;
     }
@@ -50,37 +65,100 @@ export default function PriceRequestScreen(): React.JSX.Element {
       });
       addWorkflow(wf);
       setLoading(false);
+      haptic.success();
       Alert.alert(t('common.success'), t('workflow.submitSuccess'), [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch {
       setLoading(false);
+      haptic.error();
       Alert.alert(t('common.error'), t('workflow.submitError'));
     }
   };
 
   return (
-    <ScreenWrapper scroll>
+    <ScreenWrapper padded={false}>
       <Header title={t('workflow.priceRequest')} showBack />
-      <View style={styles.content}>
-        {scan?.molydalMatch && (
-          <Card style={styles.productInfo}>
-            <Text variant="body" style={styles.bold}>{scan.molydalMatch.name}</Text>
-            <Text variant="caption" color={COLORS.textSecondary}>
-              Réf. {scan.molydalMatch.reference} — {scan.molydalMatch.category}
-            </Text>
-          </Card>
-        )}
-        <Input label={t('workflow.clientName')} icon={<Shop size={18} color={COLORS.textMuted} />} placeholder={t('workflow.clientPlaceholder')} value={clientName} onChangeText={setClientName} />
-        <Input label={t('workflow.quantity')} icon={<TestTube size={18} color={COLORS.textMuted} />} placeholder={t('workflow.quantityPlaceholder')} keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
-        <Input label={t('workflow.desiredPrice')} icon={<Tag size={18} color={COLORS.textMuted} />} placeholder={t('workflow.optional')} keyboardType="decimal-pad" value={price} onChangeText={setPrice} />
-        <Button title={t('workflow.submitRequest')} variant="primary" size="lg" loading={loading} onPress={handleSubmit} style={styles.submit} />
-      </View>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={styles.flex}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.content}>
+                {scan?.molydalMatch && (
+                  <Card style={styles.productInfo}>
+                    <Text variant="body" style={styles.bold}>{scan.molydalMatch.name}</Text>
+                    <Text variant="caption" color={COLORS.textSecondary}>
+                      Réf. {scan.molydalMatch.reference} — {scan.molydalMatch.category}
+                    </Text>
+                  </Card>
+                )}
+                <Input
+                  label={t('workflow.clientName')}
+                  icon={<Shop size={18} color={COLORS.textMuted} />}
+                  placeholder={t('workflow.clientPlaceholder')}
+                  value={clientName}
+                  onChangeText={setClientName}
+                  autoCapitalize="words"
+                  autoComplete="organization"
+                  textContentType="organizationName"
+                  returnKeyType="next"
+                  onSubmitEditing={() => quantityRef.current?.focus()}
+                  blurOnSubmit={false}
+                />
+                <Input
+                  ref={quantityRef}
+                  label={t('workflow.quantity')}
+                  icon={<TestTube size={18} color={COLORS.textMuted} />}
+                  placeholder={t('workflow.quantityPlaceholder')}
+                  keyboardType="numeric"
+                  value={quantity}
+                  onChangeText={setQuantity}
+                  returnKeyType="next"
+                  onSubmitEditing={() => priceRef.current?.focus()}
+                  blurOnSubmit={false}
+                />
+                <Input
+                  ref={priceRef}
+                  label={t('workflow.desiredPrice')}
+                  icon={<Tag size={18} color={COLORS.textMuted} />}
+                  placeholder={t('workflow.optional')}
+                  keyboardType="decimal-pad"
+                  value={price}
+                  onChangeText={setPrice}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
+                />
+                <Button
+                  title={t('workflow.submitRequest')}
+                  variant="primary"
+                  size="lg"
+                  loading={loading}
+                  onPress={handleSubmit}
+                  style={styles.submit}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: SPACING.xl,
+  },
   content: {
     gap: SPACING.md,
   },
