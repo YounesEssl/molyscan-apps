@@ -8,13 +8,14 @@ import {
   Text as RNText,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AddCircle } from 'react-native-solar-icons/icons/bold-duotone';
+import { AddCircle, CloseCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
 import { Stop } from 'react-native-solar-icons/icons/bold';
 import { colors } from '@/design/tokens/colors';
 import { typography } from '@/design/tokens/typography';
 import { haptic } from '@/lib/haptics';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import type { Attachment } from '@/hooks/useFileAttachment';
 
 interface ChatComposerProps {
   value: string;
@@ -23,6 +24,9 @@ interface ChatComposerProps {
   disabled?: boolean;
   onAddPress?: () => void;
   placeholder?: string;
+  attachment?: Attachment | null;
+  attachmentUploading?: boolean;
+  onRemoveAttachment?: () => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -31,13 +35,6 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-/**
- * Inline composer — NO absolute positioning. Parent screen wraps this
- * in a KeyboardAvoidingView so it rises with the keyboard naturally.
- *
- * Mic button: press to start dictation, press again to stop → API transcribes
- * and fills the input with the spoken text.
- */
 export function ChatComposer({
   value,
   onChangeText,
@@ -45,9 +42,10 @@ export function ChatComposer({
   disabled = false,
   onAddPress,
   placeholder = 'Ask your question…',
+  attachment,
+  attachmentUploading,
+  onRemoveAttachment,
 }: ChatComposerProps): React.JSX.Element {
-  // Append dictation to the current input (or replace if empty) so users
-  // can mix typing and voice.
   const handleTranscription = useCallback(
     (text: string) => {
       onChangeText(value ? `${value.trimEnd()} ${text}` : text);
@@ -61,13 +59,36 @@ export function ChatComposer({
 
   return (
     <View style={styles.wrapper}>
+      {/* Attachment chip */}
+      {(attachment || attachmentUploading) ? (
+        <View style={styles.attachmentChip}>
+          {attachmentUploading ? (
+            <ActivityIndicator size="small" color={colors.purple} />
+          ) : (
+            <>
+              <RNText style={styles.attachmentIcon}>📄</RNText>
+              <RNText style={styles.attachmentName} numberOfLines={1}>
+                {attachment?.name}
+              </RNText>
+              <TouchableOpacity
+                onPress={onRemoveAttachment}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Remove attachment"
+              >
+                <CloseCircle size={16} color={colors.ink2} />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      ) : null}
+
       <View style={styles.composer}>
         <TouchableOpacity
           style={styles.plusBtn}
           activeOpacity={0.7}
           onPress={onAddPress}
           accessibilityRole="button"
-          accessibilityLabel="Add"
+          accessibilityLabel="Attach a file"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <AddCircle size={16} color={colors.ink} />
@@ -103,13 +124,8 @@ export function ChatComposer({
           activeOpacity={0.8}
           disabled={disabled || isTranscribing}
           accessibilityRole="button"
-          accessibilityLabel={
-            isRecording ? 'Stop dictation' : 'Dictate a message'
-          }
-          accessibilityState={{
-            selected: isRecording,
-            busy: isTranscribing,
-          }}
+          accessibilityLabel={isRecording ? 'Stop dictation' : 'Dictate a message'}
+          accessibilityState={{ selected: isRecording, busy: isTranscribing }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <LinearGradient
@@ -142,6 +158,30 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
     backgroundColor: colors.paper1,
+    gap: 8,
+  },
+  attachmentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.paper2,
+    borderWidth: 1,
+    borderColor: colors.ink4,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    maxWidth: '80%',
+  },
+  attachmentIcon: {
+    fontSize: 13,
+  },
+  attachmentName: {
+    flex: 1,
+    fontFamily: typography.fonts.sansMedium,
+    fontSize: 12,
+    color: colors.ink,
+    letterSpacing: -0.1,
   },
   composer: {
     height: 52,
@@ -187,7 +227,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.red,
-    // Subtle halo so it reads as "live recording"
     shadowColor: colors.red,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,

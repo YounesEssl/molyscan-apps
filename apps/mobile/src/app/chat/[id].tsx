@@ -22,6 +22,7 @@ import {
   chatFreeService,
   type ChatMessage as ChatMessageModel,
 } from '@/services/chatFree.service';
+import { useFileAttachment } from '@/hooks/useFileAttachment';
 
 export default function ChatDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -33,12 +34,16 @@ export default function ChatDetailScreen(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState('AI Assistant');
   const [inputText, setInputText] = useState('');
+  const fileAttachment = useFileAttachment();
 
   useEffect(() => {
     if (!id) return;
     chatFreeService
       .getMessages(id)
-      .then(setMessages)
+      .then((msgs) => {
+        setMessages(msgs);
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 50);
+      })
       .catch(() => {});
   }, [id]);
 
@@ -48,13 +53,15 @@ export default function ChatDetailScreen(): React.JSX.Element {
 
   const handleSend = async (text: string): Promise<void> => {
     const trimmed = text.trim();
-    if (!trimmed || isLoading || !id) return;
+    const hasAttachment = !!fileAttachment.attachment;
+    if ((!trimmed && !hasAttachment) || isLoading || !id) return;
     setInputText('');
 
+    const displayContent = trimmed || (hasAttachment ? `📄 ${fileAttachment.attachment!.name}` : '');
     const userMsg: ChatMessageModel = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: trimmed,
+      content: displayContent,
     };
     const assistantId = `assistant-${Date.now()}`;
 
@@ -67,12 +74,17 @@ export default function ChatDetailScreen(): React.JSX.Element {
     scrollToEnd();
 
     if (messages.length === 0) {
-      setTitle(trimmed.length > 40 ? `${trimmed.slice(0, 40)}...` : trimmed);
+      const titleSource = trimmed || displayContent;
+      setTitle(titleSource.length > 40 ? `${titleSource.slice(0, 40)}...` : titleSource);
     }
 
     let fullContent = '';
 
-    await chatFreeService.sendMessageStreaming(id, trimmed, {
+    const attachmentId = fileAttachment.attachment?.id;
+    fileAttachment.clear();
+
+    const messageText = trimmed || 'Analyse ce document.';
+    await chatFreeService.sendMessageStreaming(id, messageText, {
       onToken: (token) => {
         fullContent += token;
         setMessages((prev) =>
@@ -105,7 +117,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
         );
         setIsLoading(false);
       },
-    });
+    }, attachmentId);
   };
 
   const showTyping = isLoading && !messages.some((m) => m.isStreaming);
@@ -166,6 +178,10 @@ export default function ChatDetailScreen(): React.JSX.Element {
             onChangeText={setInputText}
             onSubmit={() => handleSend(inputText)}
             disabled={isLoading}
+            onAddPress={() => void fileAttachment.pick()}
+            attachment={fileAttachment.attachment}
+            attachmentUploading={fileAttachment.uploading}
+            onRemoveAttachment={fileAttachment.clear}
           />
         </View>
       </KeyboardAvoidingView>

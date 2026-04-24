@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from './rag/rag.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import type { AttachmentEntry } from './attachment.store';
 
 @Injectable()
 export class ChatService {
@@ -182,6 +183,7 @@ export class ChatService {
     conversationId: string,
     userId: string,
     text: string,
+    attachment?: AttachmentEntry,
   ): Promise<{
     stream: ReturnType<Anthropic['messages']['stream']>;
     sources: string[];
@@ -222,6 +224,7 @@ export class ChatService {
       text,
       history.map((m) => ({ role: m.role, text: m.text })),
       productContext,
+      attachment,
     );
   }
 

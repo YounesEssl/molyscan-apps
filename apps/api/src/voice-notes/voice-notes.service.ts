@@ -45,7 +45,7 @@ export class VoiceNotesService {
       }
 
       // Transcribe audio
-      transcription = await this.transcriptionService.transcribe(audioFile.buffer);
+      transcription = await this.transcriptionService.transcribe(audioFile.buffer, audioFile.originalname);
     }
 
     const note = await this.prisma.voiceNote.create({

@@ -4,10 +4,11 @@ import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { RagModule } from './rag/rag.module';
 import { TranscriptionService } from '../voice-notes/transcription/transcription.service';
+import { AttachmentStore } from './attachment.store';
 
 @Module({
   imports: [RagModule],
   controllers: [ChatController],
-  providers: [ChatService, TranscriptionService],
+  providers: [ChatService, TranscriptionService, AttachmentStore],
 })
 export class ChatModule {}

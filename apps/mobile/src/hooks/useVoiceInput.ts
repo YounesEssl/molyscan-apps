@@ -5,7 +5,8 @@ import {
   useAudioRecorder,
   RecordingPresets,
 } from 'expo-audio';
-import { api } from '@/lib/axios';
+import { storage } from '@/lib/storage';
+import { API_CONFIG } from '@/constants/api';
 import { logger } from '@/lib/logger';
 import { haptic } from '@/lib/haptics';
 
@@ -57,6 +58,14 @@ export function useVoiceInput({
         return;
       }
 
+      // iOS requires recording mode to be explicitly enabled; also initialises
+      // the output file path so recorder.uri is available after stop (Android).
+      await AudioModule.setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+      await recorder.prepareToRecordAsync();
+
       haptic.medium();
       recorder.record();
       setState('recording');
@@ -82,6 +91,7 @@ export function useVoiceInput({
 
     try {
       await recorder.stop();
+      await AudioModule.setAudioModeAsync({ allowsRecording: false, playsInSilentMode: false });
       const uri = recorder.uri;
       if (!uri) {
         throw new Error('No recording URI');
@@ -101,16 +111,36 @@ export function useVoiceInput({
         name: 'speech.m4a',
       } as unknown as Blob);
 
-      const response = await api.post<{ transcription: string }>(
-        '/chat/transcribe',
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 30000,
-        },
-      );
+      // XMLHttpRequest is used directly: React Native's native XHR correctly sets
+      // multipart/form-data + boundary for FormData bodies. Both fetch() (intercepted
+      // by the whatwg-fetch polyfill) and axios (default Content-Type: application/json)
+      // fail for URI-based file uploads in React Native.
+      const token = await storage.getToken();
+      const transcription = await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_CONFIG.baseURL}/chat/transcribe`);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.timeout = 30000;
 
-      const text = response.data.transcription?.trim() ?? '';
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              // TransformInterceptor wraps all API responses in { data: T }
+              const envelope = JSON.parse(xhr.responseText) as { data: { transcription: string } };
+              resolve((envelope.data?.transcription ?? '').trim());
+            } catch {
+              reject(new Error('Failed to parse transcription response'));
+            }
+          } else {
+            reject(new Error(`HTTP ${xhr.status}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network request failed'));
+        xhr.ontimeout = () => reject(new Error('Transcription timed out'));
+        xhr.send(formData);
+      });
+
+      const text = transcription;
       if (text) {
         haptic.success();
         onTranscription(text);
@@ -148,6 +178,7 @@ export function useVoiceInput({
     } catch {
       // silent: cancel path, recorder may already be stopped
     }
+    await AudioModule.setAudioModeAsync({ allowsRecording: false, playsInSilentMode: false }).catch(() => {});
     setState('idle');
     setDuration(0);
   }, [state, recorder]);

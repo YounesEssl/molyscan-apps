@@ -92,6 +92,7 @@ export const chatFreeService = {
     conversationId: string,
     text: string,
     callbacks: StreamCallbacks,
+    attachmentId?: string,
   ): Promise<void> {
     try {
       const token = await storage.getToken();
@@ -142,7 +143,7 @@ export const chatFreeService = {
           reject(new Error('Network error'));
         };
 
-        xhr.send(JSON.stringify({ text }));
+        xhr.send(JSON.stringify({ text, ...(attachmentId ? { attachmentId } : {}) }));
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Network error';

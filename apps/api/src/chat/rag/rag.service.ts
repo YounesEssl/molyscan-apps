@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { VectorStoreService } from './vector-store.service';
+import type { AttachmentEntry } from '../attachment.store';
 
 interface RagInput {
   question: string;
@@ -220,6 +221,7 @@ ${prompt}`,
       molydalName: string | null;
       molydalReference: string | null;
     },
+    attachment?: AttachmentEntry,
   ): Promise<{
     stream: ReturnType<Anthropic['messages']['stream']>;
     sources: string[];
@@ -268,12 +270,28 @@ The user is asking you specifically about this match. Stay focused on these two 
         : '';
 
     const validHistory = conversationHistory.filter((m) => m.text.trim());
+
+    const lastUserContent: Anthropic.ContentBlockParam[] = attachment
+      ? [
+          {
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: 'application/pdf',
+              data: attachment.base64,
+            },
+            title: attachment.filename,
+          } satisfies Anthropic.DocumentBlockParam,
+          { type: 'text', text: question },
+        ]
+      : [{ type: 'text', text: question }];
+
     const messages: Anthropic.MessageParam[] = [
       ...validHistory.map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.text,
       })),
-      { role: 'user' as const, content: question },
+      { role: 'user' as const, content: lastUserContent },
     ];
 
     const stream = this.anthropic.messages.stream({

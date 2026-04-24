@@ -1,54 +1,58 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { execFile } from 'child_process';
-import { writeFile, unlink } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { randomUUID } from 'crypto';
+import OpenAI, { toFile } from 'openai';
+import { extname } from 'path';
 
 @Injectable()
 export class TranscriptionService {
   private readonly logger = new Logger(TranscriptionService.name);
-  private readonly modelPath: string;
+  private readonly openai: OpenAI;
 
   constructor(private configService: ConfigService) {
-    this.modelPath = this.configService.get<string>(
-      'WHISPER_MODEL_PATH',
-      './models/whisper-small',
-    );
+    this.openai = new OpenAI({
+      apiKey: this.configService.getOrThrow<string>('OPENAI_API_KEY'),
+    });
   }
 
-  async transcribe(audioBuffer: Buffer): Promise<string | null> {
-    const tmpPath = join(tmpdir(), `${randomUUID()}.wav`);
+  // Whisper hallucinates these strings on silent / near-silent audio.
+  private static readonly HALLUCINATIONS = [
+    'amara.org',
+    'sous-titres',
+    'subtitles',
+    'merci d\'avoir regardé',
+    'transcribed by',
+    'st\' 501',
+  ];
+
+  async transcribe(audioBuffer: Buffer, originalname = 'audio.m4a'): Promise<string | null> {
+    if (audioBuffer.length < 1024) {
+      this.logger.warn('Audio buffer too small, skipping transcription');
+      return null;
+    }
 
     try {
-      await writeFile(tmpPath, audioBuffer);
+      const ext = extname(originalname) || '.m4a';
+      const mimeType = ext === '.m4a' ? 'audio/mp4' : `audio/${ext.slice(1)}`;
 
-      const result = await new Promise<string>((resolve, reject) => {
-        execFile(
-          'whisper',
-          [tmpPath, '--model', this.modelPath, '--language', 'fr', '--output_format', 'txt'],
-          { timeout: 60000 },
-          (error, stdout, stderr) => {
-            if (error) {
-              reject(error);
-              return;
-            }
-            resolve(stdout.trim());
-          },
-        );
+      const file = await toFile(audioBuffer, `audio${ext}`, { type: mimeType });
+
+      const result = await this.openai.audio.transcriptions.create({
+        file,
+        model: 'whisper-1',
+        language: 'fr',
+        prompt: 'Note vocale, message oral spontané.',
       });
 
-      return result || null;
+      const text = result.text?.trim() ?? '';
+      const lower = text.toLowerCase();
+      const isHallucination = TranscriptionService.HALLUCINATIONS.some((h) =>
+        lower.includes(h),
+      );
+
+      return isHallucination ? null : text || null;
     } catch (error) {
       this.logger.warn(`Whisper transcription failed: ${error}. Returning null.`);
       return null;
-    } finally {
-      try {
-        await unlink(tmpPath);
-      } catch {
-        // ignore cleanup errors
-      }
     }
   }
 }
