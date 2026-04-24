@@ -134,9 +134,9 @@ export class ChatController {
       res.write('data: [DONE]\n\n');
       res.end();
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Erreur interne';
+      const msg = error instanceof Error ? error.message : 'Internal error';
       res.write(
-        `data: ${JSON.stringify({ type: 'text', content: `Erreur : ${msg}` })}\n\n`,
+        `data: ${JSON.stringify({ type: 'text', content: `Error: ${msg}` })}\n\n`,
       );
       res.end();
     }

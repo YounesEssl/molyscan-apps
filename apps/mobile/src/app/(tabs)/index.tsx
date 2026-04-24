@@ -47,9 +47,9 @@ export default function DashboardScreen(): React.JSX.Element {
   const stats: StatItem[] = [
     { label: 'Scans', value: String(scans.length) },
     ...(scans.length > 0
-      ? [{ label: 'Taux match', value: `${matchRate}%`, accent: true }]
+      ? [{ label: 'Match rate', value: `${matchRate}%`, accent: true }]
       : []),
-    { label: 'Demandes', value: String(workflows.length) },
+    { label: 'Requests', value: String(workflows.length) },
   ];
 
   return (

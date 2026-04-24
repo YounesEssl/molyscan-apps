@@ -28,7 +28,7 @@ export function ProductMainCard({
   confidence,
   matchTitle,
   matchDescription,
-  category = 'Molydal · Graisses & huiles',
+  category = 'Molydal · Greases & oils',
 }: ProductMainCardProps): React.JSX.Element {
   const hasMatchText = Boolean(matchTitle || matchDescription);
 
@@ -40,7 +40,7 @@ export function ProductMainCard({
         </Pill>
 
         <RNText style={styles.productName}>{productName}</RNText>
-        <RNText style={styles.replaces}>Remplace {competitorName}</RNText>
+        <RNText style={styles.replaces}>Replaces {competitorName}</RNText>
 
         <View
           style={[

@@ -44,7 +44,7 @@ export function ChatComposer({
   onSubmit,
   disabled = false,
   onAddPress,
-  placeholder = 'Posez votre question…',
+  placeholder = 'Ask your question…',
 }: ChatComposerProps): React.JSX.Element {
   // Append dictation to the current input (or replace if empty) so users
   // can mix typing and voice.
@@ -67,7 +67,7 @@ export function ChatComposer({
           activeOpacity={0.7}
           onPress={onAddPress}
           accessibilityRole="button"
-          accessibilityLabel="Ajouter"
+          accessibilityLabel="Add"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <AddCircle size={16} color={colors.ink} />
@@ -77,13 +77,13 @@ export function ChatComposer({
           <View style={styles.recordingIndicator}>
             <View style={styles.recordingDot} />
             <RNText style={styles.recordingText}>
-              Enregistrement · {formatDuration(voice.duration)}
+              Recording · {formatDuration(voice.duration)}
             </RNText>
           </View>
         ) : (
           <TextInput
             style={styles.input}
-            placeholder={isTranscribing ? 'Transcription…' : placeholder}
+            placeholder={isTranscribing ? 'Transcribing…' : placeholder}
             placeholderTextColor={colors.ink2}
             value={value}
             onChangeText={onChangeText}
@@ -104,7 +104,7 @@ export function ChatComposer({
           disabled={disabled || isTranscribing}
           accessibilityRole="button"
           accessibilityLabel={
-            isRecording ? 'Arrêter la dictée' : 'Dicter un message'
+            isRecording ? 'Stop dictation' : 'Dictate a message'
           }
           accessibilityState={{
             selected: isRecording,

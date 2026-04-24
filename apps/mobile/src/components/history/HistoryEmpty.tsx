@@ -13,9 +13,9 @@ export function HistoryEmpty(): React.JSX.Element {
         <CloudWaterdrop size={32} color={colors.ink3} />
       </View>
       <Text variant="body" color={colors.ink2}>
-        Aucun scan enregistré
+        No scans yet
       </Text>
-      <Text variant="caption">Photographiez un produit pour commencer</Text>
+      <Text variant="caption">Take a photo of a product to get started</Text>
     </View>
   );
 }

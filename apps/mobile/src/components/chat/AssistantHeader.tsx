@@ -26,7 +26,7 @@ export function AssistantHeader({
         onPress={onBack}
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel="Retour"
+        accessibilityLabel="Back"
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <AltArrowLeft size={18} color={colors.ink} />

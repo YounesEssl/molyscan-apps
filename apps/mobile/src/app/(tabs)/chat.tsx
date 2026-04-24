@@ -64,17 +64,17 @@ export default function ChatHubScreen(): React.JSX.Element {
       const conv = await chatFreeService.createConversation();
       router.push(`/chat/${conv.id}`);
     } catch {
-      Alert.alert('Erreur', 'Impossible de créer la conversation');
+      Alert.alert('Error', 'Unable to create the conversation');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = (conv: ChatConversation): void => {
-    Alert.alert('Supprimer', `Supprimer « ${conv.title} » ?`, [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert('Delete', `Delete "${conv.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Supprimer',
+        text: 'Delete',
         style: 'destructive',
         onPress: async () => {
           await chatFreeService.deleteConversation(conv.id);
@@ -130,8 +130,8 @@ export default function ChatHubScreen(): React.JSX.Element {
           <View style={styles.empty}>
             <EmptyState
               icon={<Stars size={36} color={colors.ink3} />}
-              title="Aucune conversation"
-              subtitle="Appuyez sur « Nouveau » pour poser votre première question"
+              title="No conversations"
+              subtitle="Tap &quot;New&quot; to ask your first question"
             />
           </View>
         }

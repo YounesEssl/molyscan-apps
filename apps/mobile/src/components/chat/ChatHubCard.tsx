@@ -25,13 +25,13 @@ interface ChatHubCardProps {
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "À l'instant";
+  if (mins < 1) return 'Just now';
   if (mins < 60) return `${mins}min`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}j`;
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
+  if (days < 7) return `${days}d`;
+  return new Date(dateStr).toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'short',
   });
@@ -62,7 +62,7 @@ export const ChatHubCard = React.memo(function ChatHubCard({
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={`Conversation ${conversation.title}`}
-      accessibilityHint="Appui long pour supprimer"
+      accessibilityHint="Long-press to delete"
     >
       <LinearGradient
         colors={[colors.purpleVivid, colors.purple]}
@@ -101,7 +101,7 @@ export const ChatHubCard = React.memo(function ChatHubCard({
             numberOfLines={1}
             style={styles.preview}
           >
-            {conversation.lastMessage.role === 'user' ? 'Vous : ' : 'IA : '}
+            {conversation.lastMessage.role === 'user' ? 'You: ' : 'AI: '}
             {conversation.lastMessage.text}
           </Text>
         ) : (
@@ -110,7 +110,7 @@ export const ChatHubCard = React.memo(function ChatHubCard({
             color={colors.ink3}
             style={styles.preview}
           >
-            Conversation vide — commencez à discuter
+            Empty conversation — start chatting
           </Text>
         )}
       </View>

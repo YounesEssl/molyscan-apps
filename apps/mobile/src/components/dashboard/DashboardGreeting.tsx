@@ -15,12 +15,12 @@ export function DashboardGreeting({
   return (
     <View style={styles.greeting}>
       <Text style={styles.greetingSub}>
-        {firstName ? `Bonjour ${firstName},` : 'Bonjour,'}
+        {firstName ? `Hi ${firstName},` : 'Hello,'}
       </Text>
       <RNText style={styles.greetingTitle}>
-        {'Prêt à '}
-        <RNText style={styles.greetingItalic}>scanner</RNText>
-        {' ?'}
+        {'Ready to '}
+        <RNText style={styles.greetingItalic}>scan</RNText>
+        {'?'}
       </RNText>
     </View>
   );

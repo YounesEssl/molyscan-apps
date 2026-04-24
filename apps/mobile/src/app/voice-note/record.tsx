@@ -199,8 +199,8 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
               accessibilityRole="button"
               accessibilityLabel={
                 isRecording
-                  ? t('voiceNote.stopRecording', { defaultValue: 'Arrêter l\'enregistrement' })
-                  : t('voiceNote.startRecording', { defaultValue: 'Démarrer l\'enregistrement' })
+                  ? t('voiceNote.stopRecording', { defaultValue: 'Stop recording' })
+                  : t('voiceNote.startRecording', { defaultValue: 'Start recording' })
               }
               accessibilityState={{ selected: isRecording }}
             >

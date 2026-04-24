@@ -23,7 +23,7 @@ export function HistorySearchBar({
   value,
   onChangeText,
   onFilterPress,
-  placeholder = 'Référence, client, date…',
+  placeholder = 'Reference, client, date…',
 }: HistorySearchBarProps): React.JSX.Element {
   return (
     <View style={styles.wrap}>

@@ -21,7 +21,7 @@ export interface AnalysisResult {
 const EMPTY_RESULT: AnalysisResult = {
   identified: { name: '', brand: '', type: '', specs: '' },
   equivalents: [],
-  analysis: "L'analyse a échoué.",
+  analysis: 'Analysis failed.',
   sources: [],
 };
 
@@ -84,8 +84,8 @@ export function useImageAnalysis(): UseImageAnalysis {
     if (status !== 'granted') {
       logger.warn('[gallery] permission denied');
       Alert.alert(
-        'Permission requise',
-        "Veuillez autoriser l'accès à votre galerie dans les paramètres.",
+        'Permission required',
+        'Please allow access to your photo library in settings.',
       );
       return;
     }

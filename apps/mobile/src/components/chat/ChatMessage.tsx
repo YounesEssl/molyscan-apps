@@ -17,7 +17,7 @@ export const ChatMessage = React.memo(function ChatMessage({
       <View
         style={[styles.row, styles.rowRight]}
         accessibilityRole="text"
-        accessibilityLabel={`Message envoyé : ${message.content}`}
+        accessibilityLabel={`Sent message: ${message.content}`}
       >
         <LinearGradient
           colors={[colors.redVivid, colors.red]}
@@ -34,7 +34,7 @@ export const ChatMessage = React.memo(function ChatMessage({
     <View
       style={[styles.row, styles.rowLeft]}
       accessibilityRole="text"
-      accessibilityLabel={`Réponse de l'assistant : ${message.content}`}
+      accessibilityLabel={`Assistant reply: ${message.content}`}
     >
       <View style={styles.assistant}>
         <RNText style={styles.assistantText}>

@@ -19,7 +19,7 @@ interface ProductDetailHeaderProps {
 }
 
 export function ProductDetailHeader({
-  title = 'Produit',
+  title = 'Product',
   onBack,
   onMenu,
 }: ProductDetailHeaderProps): React.JSX.Element {
@@ -33,7 +33,7 @@ export function ProductDetailHeader({
         }}
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel="Revenir en arrière"
+        accessibilityLabel="Go back"
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <AltArrowLeft size={18} color={colors.ink} />
@@ -47,7 +47,7 @@ export function ProductDetailHeader({
         }}
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel="Ouvrir le menu du produit"
+        accessibilityLabel="Open product menu"
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <MenuDots size={18} color={colors.ink} />

@@ -37,7 +37,7 @@ export function AIProductEntry({
         disabled={disabled}
         activeOpacity={0.85}
         accessibilityRole="button"
-        accessibilityLabel={`Demander à l'IA à propos de ${productName}`}
+        accessibilityLabel={`Ask the AI about ${productName}`}
         accessibilityState={{ disabled }}
       >
         <LinearGradient
@@ -55,8 +55,8 @@ export function AIProductEntry({
           <Stars size={20} color="#fff" />
         </LinearGradient>
         <View style={styles.text}>
-          <RNText style={styles.title}>Demander à l'IA</RNText>
-          <RNText style={styles.sub}>Contextualisé sur {productName}</RNText>
+          <RNText style={styles.title}>Ask the AI</RNText>
+          <RNText style={styles.sub}>Contextualized on {productName}</RNText>
         </View>
         <AltArrowRight size={16} color={colors.ink3} />
       </TouchableOpacity>

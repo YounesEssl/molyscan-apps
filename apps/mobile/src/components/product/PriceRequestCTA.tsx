@@ -19,7 +19,7 @@ interface PriceRequestCTAProps {
 
 export function PriceRequestCTA({
   onPress,
-  label = 'Demander un prix client',
+  label = 'Request a client price',
 }: PriceRequestCTAProps): React.JSX.Element {
   return (
     <View style={styles.section}>

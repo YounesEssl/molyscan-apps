@@ -9,7 +9,7 @@ interface HistoryHeaderProps {
 }
 
 export function HistoryHeader({
-  title = 'Historique',
+  title = 'History',
 }: HistoryHeaderProps): React.JSX.Element {
   return (
     <View style={styles.header}>

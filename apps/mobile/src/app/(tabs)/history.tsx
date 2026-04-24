@@ -24,10 +24,10 @@ import type { ScanRecord, ScanStatus } from '@/schemas/scan.schema';
 type Filter = ScanStatus | 'all';
 
 const FILTERS: HistoryFilterOption<Filter>[] = [
-  { id: 'all', label: 'Tous' },
-  { id: 'matched', label: 'Matché' },
-  { id: 'partial', label: 'Partiel' },
-  { id: 'no_match', label: 'Sans équiv.' },
+  { id: 'all', label: 'All' },
+  { id: 'matched', label: 'Matched' },
+  { id: 'partial', label: 'Partial' },
+  { id: 'no_match', label: 'No match' },
 ];
 
 interface DateGroup {
@@ -45,11 +45,11 @@ function groupByDate(scans: ScanRecord[]): DateGroup[] {
     const d = new Date(scan.scannedAt || Date.now());
     let label: string;
     if (d.toDateString() === today.toDateString()) {
-      label = "Aujourd'hui";
+      label = 'Today';
     } else if (d.toDateString() === yesterday.toDateString()) {
-      label = 'Hier';
+      label = 'Yesterday';
     } else {
-      label = d.toLocaleDateString('fr-FR', {
+      label = d.toLocaleDateString('en-US', {
         weekday: 'long',
         day: 'numeric',
         month: 'long',

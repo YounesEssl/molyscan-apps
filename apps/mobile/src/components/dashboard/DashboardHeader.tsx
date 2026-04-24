@@ -27,7 +27,7 @@ export function DashboardHeader({
         activeOpacity={0.8}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         accessibilityRole="button"
-        accessibilityLabel="Ouvrir les notifications"
+        accessibilityLabel="Open notifications"
       >
         <Bell size={19} color={colors.ink} />
         {hasNotifications ? <View style={styles.bellDot} /> : null}

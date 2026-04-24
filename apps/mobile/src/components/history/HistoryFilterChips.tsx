@@ -30,6 +30,10 @@ export function HistoryFilterChips<T extends string>({
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.row}
+      // flexGrow: 0 + alignSelf prevent the horizontal ScrollView from
+      // stretching to fill its column-flex parent on Android, which would
+      // cause chips inside to stretch to massive heights.
+      style={styles.scrollView}
     >
       {options.map((f) => {
         const active = value === f.id;
@@ -65,8 +69,13 @@ const textBase = {
 };
 
 const styles = StyleSheet.create({
+  scrollView: {
+    flexGrow: 0,
+    alignSelf: 'flex-start',
+  },
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     paddingHorizontal: spacing.section,
     paddingVertical: 14,

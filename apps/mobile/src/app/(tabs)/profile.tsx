@@ -40,8 +40,8 @@ export default function ProfileScreen(): React.JSX.Element {
 
   const stats: ProfileStatItem[] = [
     { label: 'Scans', value: String(scans.length) },
-    { label: 'Matchs', value: String(matchedCount) },
-    { label: 'Taux', value: `${matchRate}%` },
+    { label: 'Matches', value: String(matchedCount) },
+    { label: 'Rate', value: `${matchRate}%` },
   ];
 
   const handleLogout = async (): Promise<void> => {

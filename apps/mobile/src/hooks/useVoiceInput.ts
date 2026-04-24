@@ -51,8 +51,8 @@ export function useVoiceInput({
       if (!status.granted) {
         haptic.warning();
         Alert.alert(
-          'Permission requise',
-          "Autorisez l'accès au micro dans les paramètres.",
+          'Permission required',
+          'Please allow microphone access in settings.',
         );
         return;
       }
@@ -116,12 +116,12 @@ export function useVoiceInput({
         onTranscription(text);
       } else {
         haptic.warning();
-        Alert.alert('Aucun texte détecté', 'Réessayez en parlant plus clairement.');
+        Alert.alert('No text detected', 'Try speaking more clearly.');
       }
     } catch (error) {
       haptic.error();
       logger.error('Voice input transcribe failed', error);
-      Alert.alert('Erreur', 'La transcription a échoué.');
+      Alert.alert('Error', 'Transcription failed.');
     } finally {
       setState('idle');
       setDuration(0);

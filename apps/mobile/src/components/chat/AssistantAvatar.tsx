@@ -12,8 +12,8 @@ interface AssistantAvatarProps {
 }
 
 export function AssistantAvatar({
-  name = 'Assistant Molydal',
-  subtitle = 'Contextualisé sur le catalogue',
+  name = 'Molydal Assistant',
+  subtitle = 'Contextualized on the catalog',
 }: AssistantAvatarProps): React.JSX.Element {
   return (
     <View style={styles.row}>

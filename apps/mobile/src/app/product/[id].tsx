@@ -69,7 +69,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const confidence =
     bestEquiv?.compatibility ?? scan?.molydalMatch?.confidence ?? 0;
   const productName = bestEquiv?.name ?? scan?.molydalMatch?.name ?? '';
-  const competitorName = scan?.scannedProduct?.name ?? 'Produit concurrent';
+  const competitorName = scan?.scannedProduct?.name ?? 'Competitor product';
   const hasEquivalent = productName.length > 0;
 
   const handleAskAI = async (): Promise<void> => {
@@ -80,7 +80,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
         scannedName: scan.scannedProduct.name,
         scannedBrand: scan.scannedProduct.brand,
         molydalName:
-          bestEquiv?.name || scan.molydalMatch?.name || 'À déterminer',
+          bestEquiv?.name || scan.molydalMatch?.name || 'To be determined',
       });
       router.push(`/chat/${conv.id}`);
     } catch {
@@ -99,7 +99,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
         <ProductDetailHeader onBack={() => router.back()} />
         <View style={styles.centered}>
           <Text variant="body" color={colors.ink3}>
-            Chargement...
+            Loading...
           </Text>
         </View>
       </SafeAreaView>
@@ -131,11 +131,11 @@ export default function ProductDetailScreen(): React.JSX.Element {
         ) : (
           <View style={styles.emptyState}>
             <Text variant="heading" style={styles.emptyTitle}>
-              Aucun équivalent trouvé
+              No equivalent found
             </Text>
             <Text variant="body" color={colors.ink3} style={styles.emptyBody}>
-              Nous n'avons pas encore identifié de produit Molydal équivalent
-              pour {competitorName}.
+              We haven't identified a Molydal equivalent product for{' '}
+              {competitorName} yet.
             </Text>
           </View>
         )}

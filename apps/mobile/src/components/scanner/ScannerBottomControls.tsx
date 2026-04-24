@@ -37,7 +37,7 @@ export function ScannerBottomControls({
           disabled={isAnalyzing}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Choisir une photo depuis la galerie"
+          accessibilityLabel="Choose a photo from the library"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Gallery size={18} color={colors.ink} />
@@ -52,7 +52,7 @@ export function ScannerBottomControls({
           disabled={isAnalyzing}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel="Capturer une photo"
+          accessibilityLabel="Take a photo"
           accessibilityState={{ busy: isAnalyzing, disabled: isAnalyzing }}
         >
           <LinearGradient

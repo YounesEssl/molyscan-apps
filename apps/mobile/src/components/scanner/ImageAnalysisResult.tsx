@@ -45,7 +45,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       const conv = await chatFreeService.createProductConversation({
         scannedName: result.identified.name,
         scannedBrand: result.identified.brand,
-        molydalName: bestEquiv?.name || 'À déterminer',
+        molydalName: bestEquiv?.name || 'To be determined',
       });
       onScanAgain(); // close the bottom sheet
       router.push(`/chat/${conv.id}`);
@@ -75,22 +75,22 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       </View>
       <Text variant="heading" style={styles.statusTitle}>
         {noProduct
-          ? 'Aucun produit détecté'
+          ? 'No product detected'
           : hasMatch
-            ? 'Équivalent trouvé'
-            : 'Aucun équivalent'}
+            ? 'Equivalent found'
+            : 'No equivalent'}
       </Text>
 
       {noProduct ? (
         <Card variant="outlined" style={styles.card}>
           <Text variant="caption" color={colors.ink2} style={styles.analysisText}>
-            {result.analysis || "Aucun produit lubrifiant n'a été identifié. Essayez de photographier l'étiquette ou l'emballage de plus près."}
+            {result.analysis || 'No lubricant product was identified. Try taking a closer photo of the label or packaging.'}
           </Text>
         </Card>
       ) : (
         <Card variant="outlined" style={styles.card}>
           <Text variant="label" color={colors.ink2}>
-            Produit identifié
+            Identified product
           </Text>
           <Text variant="subheading">{result.identified.name}</Text>
           <Text variant="caption" color={colors.ink2}>
@@ -115,7 +115,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
           <View style={styles.eqHeader}>
             <View style={styles.eqInfo}>
               <Text variant="label" color={i === 0 ? colors.red : colors.ink2}>
-                {i === 0 ? 'Meilleur équivalent Molydal' : 'Alternative'}
+                {i === 0 ? 'Best Molydal equivalent' : 'Alternative'}
               </Text>
               <Text variant="subheading" color={i === 0 ? colors.red : colors.ink}>
                 {eq.name}
@@ -136,7 +136,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       {result.analysis ? (
         <Card variant="outlined" style={styles.card}>
           <Text variant="label" color={colors.ink2}>
-            Analyse détaillée
+            Detailed analysis
           </Text>
           <Text variant="caption" color={colors.ink} style={styles.analysisText}>
             {result.analysis}
@@ -148,7 +148,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       <View style={styles.actions}>
         {!noProduct && (
           <Button
-            label={creatingChat ? 'Ouverture...' : 'Poser une question à l\'IA'}
+            label={creatingChat ? 'Opening...' : 'Ask the AI'}
             variant="primary"
             icon={<ChatRoundDots size={18} color={colors.textOnRed} />}
             onPress={handleAskAI}
@@ -157,7 +157,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
           />
         )}
         <Button
-          label="Scanner un autre produit"
+          label="Scan another product"
           variant={noProduct ? 'primary' : 'secondary'}
           icon={<Camera size={18} color={noProduct ? colors.textOnRed : colors.ink} />}
           onPress={onScanAgain}

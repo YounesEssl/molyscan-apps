@@ -37,10 +37,10 @@ export class PdfGenerator {
         doc.fontSize(10).fillColor('#1B3A5C')
           .text(`${product?.name || 'N/A'} (${product?.brand || ''})`, { continued: true })
           .fillColor('#64748B')
-          .text(` → ${equiv?.molydalProduct?.name || 'Aucun équivalent'}`);
+          .text(` → ${equiv?.molydalProduct?.name || 'No equivalent'}`);
 
         doc.fontSize(8).fillColor('#94A3B8')
-          .text(`  Barcode: ${scan.barcode || 'N/A'} | Statut: ${scan.status} | Date: ${scan.scannedAt.toISOString().split('T')[0]}`);
+          .text(`  Barcode: ${scan.barcode || 'N/A'} | Status: ${scan.status} | Date: ${scan.scannedAt.toISOString().split('T')[0]}`);
         doc.moveDown(0.5);
 
         if (doc.y > 700) doc.addPage();

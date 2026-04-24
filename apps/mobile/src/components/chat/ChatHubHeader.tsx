@@ -21,7 +21,7 @@ interface ChatHubHeaderProps {
 export function ChatHubHeader({
   onNewPress,
   disabled = false,
-  title = 'Assistant IA',
+  title = 'AI Assistant',
 }: ChatHubHeaderProps): React.JSX.Element {
   return (
     <View style={styles.header}>
@@ -41,7 +41,7 @@ export function ChatHubHeader({
             style={styles.newBtnGradient}
           >
             <AddCircle size={16} color="#fff" />
-            <RNText style={styles.newBtnText}>Nouveau</RNText>
+            <RNText style={styles.newBtnText}>New</RNText>
           </LinearGradient>
         </TouchableOpacity>
       </View>

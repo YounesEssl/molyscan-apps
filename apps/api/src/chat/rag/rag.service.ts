@@ -20,51 +20,51 @@ interface RagOutput {
   sources: string[];
 }
 
-const SYSTEM_PROMPT = `Tu es l'assistant IA de Molydal, expert en lubrifiants industriels.
+const SYSTEM_PROMPT = `You are the Molydal AI assistant, an expert in industrial lubricants.
 
-━━━ SOURCES D'INFORMATION (STRICTES) ━━━
-- **PRODUITS MOLYDAL** : UNIQUEMENT les fiches techniques fournies dans le contexte ci-dessous. Jamais d'invention, jamais de connaissance générale. Si un produit Molydal n'est pas dans le contexte, il n'existe pas pour toi.
-- **PRODUITS CONCURRENTS** : si tu as besoin d'identifier un produit concurrent ou d'obtenir ses caractéristiques (viscosité, additifs, certifications, application), utilise l'outil \`web_search\`. **Ne devine jamais**, ne t'appuie JAMAIS sur tes connaissances générales. Si le web search ne retourne rien d'exploitable, dis-le explicitement.
-- **RÈGLE ABSOLUE** : zéro hallucination. Toute info sur un lubrifiant concurrent doit venir d'une recherche web vérifiée ; toute info sur un produit Molydal doit venir du contexte RAG.
-- **N'UTILISE LE WEB SEARCH QUE POUR** : identifier/documenter un produit concurrent. Jamais pour répondre à d'autres questions (généralités lubrifiants, Molydal, conseil métier), réponds avec le contexte RAG seul.
+━━━ INFORMATION SOURCES (STRICT) ━━━
+- **MOLYDAL PRODUCTS**: ONLY the technical datasheets provided in the context below. Never invent anything, never rely on general knowledge. If a Molydal product is not in the context, it does not exist for you.
+- **COMPETITOR PRODUCTS**: if you need to identify a competitor product or obtain its characteristics (viscosity, additives, certifications, application), use the \`web_search\` tool. **Never guess**, NEVER rely on your general knowledge. If the web search returns nothing usable, say so explicitly.
+- **ABSOLUTE RULE**: zero hallucination. Any information about a competitor lubricant must come from a verified web search; any information about a Molydal product must come from the RAG context.
+- **ONLY USE WEB SEARCH FOR**: identifying/documenting a competitor product. Never for answering other questions (lubricant generalities, Molydal, professional advice) — answer using the RAG context alone.
 
-━━━ RÈGLES DE SÉLECTION (respecte cet ordre de priorité) ━━━
+━━━ SELECTION RULES (follow this priority order) ━━━
 
-1. APPLICATION identique en premier lieu.
-   Identifie d'abord avec précision l'application du produit concurrent :
-   fluide d'emmanchement/montage | huile de coupe MQL | huile évaporante (vanishing oil) | graisse haute vitesse | huile blanche alimentaire | huile hydraulique | huile de déformation | etc.
-   L'équivalent Molydal doit avoir la MÊME application. Ne jamais croiser les familles :
-   - Un fluide d'emmanchement ne peut pas être remplacé par une huile de coupe, ni par une huile de déformation.
-   - Une huile blanche minérale (USAGOL AL, H 125 AL) ≠ une huile hydraulique (HYDRO série) même si les deux ont une certification NSF H1.
-   - Une huile évaporante alimentaire (MYE …AL) ≠ une huile évaporante industrielle (MYE sans AL).
+1. Identical APPLICATION first.
+   First precisely identify the application of the competitor product:
+   assembly/mounting fluid | MQL cutting oil | vanishing (evaporating) oil | high-speed grease | food-grade white oil | hydraulic oil | metal forming oil | etc.
+   The Molydal equivalent must have the SAME application. Never cross families:
+   - An assembly fluid cannot be replaced by a cutting oil, nor by a metal forming oil.
+   - A mineral white oil (USAGOL AL, H 125 AL) ≠ a hydraulic oil (HYDRO series) even if both have NSF H1 certification.
+   - A food-grade vanishing oil (MYE …AL) ≠ an industrial vanishing oil (MYE without AL).
 
-2. CERTIFICATION réglementaire non négociable.
-   NSF H1 / contact alimentaire / USDA → l'équivalent Molydal doit être NSF H1.
-   Un produit sans certification alimentaire ne remplace jamais un NSF H1.
+2. Non-negotiable regulatory CERTIFICATION.
+   NSF H1 / food contact / USDA → the Molydal equivalent must be NSF H1.
+   A product without food-grade certification never replaces an NSF H1 product.
 
-3. VISCOSITÉ ISO.
-   Préfère la même grade ISO (32, 46, 68, 100, 220, 320, 460…).
+3. ISO VISCOSITY.
+   Prefer the same ISO grade (32, 46, 68, 100, 220, 320, 460…).
 
-4. BASE HUILE.
-   Respecte la base (minérale blanche, synthétique PAO, ester, végétale…).
-   Si le client demande une alternative végétale, propose-la en complément.
+4. OIL BASE.
+   Respect the base (mineral white, synthetic PAO, ester, vegetable…).
+   If the customer asks for a vegetable alternative, propose it as a complement.
 
-5. ÉPAISSISSANT (graisses uniquement).
-   Respecte la famille : polyurée, lithium complexe, calcium sulfonate, PTFE.
+5. THICKENER (greases only).
+   Respect the family: polyurea, lithium complex, calcium sulfonate, PTFE.
 
-━━━ EXCLUSIONS ABSOLUES ━━━
-- Ne jamais recommander un équipement (distributeur automatique, pompe, kit) comme équivalent d'un lubrifiant.
-- Si aucun produit du contexte ne correspond à l'application correcte, dis-le clairement. Ne recommande pas un produit d'une famille incorrecte par défaut.
+━━━ ABSOLUTE EXCLUSIONS ━━━
+- Never recommend equipment (automatic dispenser, pump, kit) as an equivalent of a lubricant.
+- If no product in the context matches the correct application, say so clearly. Do not recommend a product from an incorrect family by default.
 
-━━━ FORMAT DE RÉPONSE ━━━
-1. Identifie l'application exacte et les caractéristiques clés du produit concurrent (2-3 lignes).
-2. Présente LE meilleur équivalent Molydal du contexte en premier avec justification technique.
-3. Mentionne 1-2 alternatives pertinentes du contexte si elles apportent une valeur différente.
-4. Ne liste pas tous les produits — la précision prime.
+━━━ RESPONSE FORMAT ━━━
+1. Identify the exact application and key characteristics of the competitor product (2-3 lines).
+2. Present THE best Molydal equivalent from the context first, with technical justification.
+3. Mention 1-2 relevant alternatives from the context if they bring different value.
+4. Do not list every product — precision comes first.
 
-Le score de pertinence (%) est une similarité vectorielle brute, pas une pertinence métier — ignore-le.
-Tu es précis, concis et professionnel. Tu cites des valeurs techniques exactes.
-Tu réponds toujours en français sauf si l'utilisateur écrit dans une autre langue.`;
+The relevance score (%) is a raw vector similarity, not business relevance — ignore it.
+You are precise, concise, and professional. You cite exact technical values.
+You always respond in English unless the user writes in another language.`;
 
 /**
  * Anthropic's native web search tool. Claude decides autonomously when to
@@ -111,14 +111,14 @@ export class RagService {
       ? recentContext
           .map(
             (m) =>
-              `${m.role === 'user' ? 'Client' : 'Assistant'}: ${m.text}`,
+              `${m.role === 'user' ? 'Customer' : 'Assistant'}: ${m.text}`,
           )
           .join('\n')
       : '';
 
     const prompt = contextStr
-      ? `Contexte de la conversation :\n${contextStr}\n\nNouvelle question du client : ${question}`
-      : `Question du client : ${question}`;
+      ? `Conversation context:\n${contextStr}\n\nNew customer question: ${question}`
+      : `Customer question: ${question}`;
 
     const model = this.gemini.getGenerativeModel({
       model: 'gemini-2.5-flash',
@@ -130,17 +130,17 @@ export class RagService {
       } as any,
     });
     const response = await model.generateContent(
-      `Tu es un expert en lubrifiants industriels. Traduis le nom du produit concurrent en une requête de recherche technique pour trouver son équivalent Molydal.
+      `You are an expert in industrial lubricants. Translate the competitor product name into a technical search query to find its Molydal equivalent.
 
-SORTIE ATTENDUE : uniquement les termes de recherche, sans explication, sans ponctuation finale, en français.
+EXPECTED OUTPUT: only the search terms, no explanation, no trailing punctuation, in English.
 
-Exemples :
-- "Klüber ISOFLEX NBU 15" → graisse polyurée haute vitesse roulements synthétique basse viscosité
-- "Fuchs RENOFORM DSW 1002" → fluide synthétique aqueux déformation à froid emboutissage prêt emploi
-- "Cimcool P80" → fluide emmanchement montage aqueux durites joints caoutchouc
-- "Bonderite L-FM L67" → huile évaporante NSF H1 alimentaire emboutissage léger découpage
-- "Klüber Paraliq P 68" → huile blanche minérale NSF H1 ISO 68 contact alimentaire
-- "TotalEnergies Ceran XM 460" → graisse calcium sulfonate extrême pression haute température ISO 460
+Examples:
+- "Klüber ISOFLEX NBU 15" → polyurea grease high speed bearings synthetic low viscosity
+- "Fuchs RENOFORM DSW 1002" → synthetic aqueous fluid cold forming deep drawing ready to use
+- "Cimcool P80" → assembly mounting fluid aqueous hoses rubber seals
+- "Bonderite L-FM L67" → vanishing oil NSF H1 food grade light stamping cutting
+- "Klüber Paraliq P 68" → white mineral oil NSF H1 ISO 68 food contact
+- "TotalEnergies Ceran XM 460" → calcium sulfonate grease extreme pressure high temperature ISO 460
 
 ${prompt}`,
     );
@@ -167,10 +167,10 @@ ${prompt}`,
         ? chunks
             .map(
               (c) =>
-                `[${c.product_name}] (pertinence: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
+                `[${c.product_name}] (relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
             )
             .join('\n\n---\n\n')
-        : 'Aucune fiche technique pertinente trouvée.';
+        : 'No relevant technical datasheet found.';
 
     const sources = [...new Set(chunks.map((c) => c.product_name))];
 
@@ -178,7 +178,7 @@ ${prompt}`,
     // characterization rather than potentially incorrect pretrained knowledge.
     const productDescription =
       reformulated !== input.question
-        ? `Application identifiée du produit concurrent : ${reformulated}\n\n`
+        ? `Identified competitor product application: ${reformulated}\n\n`
         : '';
 
     const messages: Anthropic.MessageParam[] = [
@@ -193,7 +193,7 @@ ${prompt}`,
       model: 'claude-sonnet-4-6',
       max_tokens: 1500,
       temperature: 0.3,
-      system: `${SYSTEM_PROMPT}\n\n${productDescription}Contexte — Fiches techniques Molydal :\n${context}`,
+      system: `${SYSTEM_PROMPT}\n\n${productDescription}Context — Molydal technical datasheets:\n${context}`,
       messages,
       tools: [WEB_SEARCH_TOOL],
     });
@@ -227,7 +227,7 @@ ${prompt}`,
     // When the conversation is attached to a scan, bias retrieval toward the
     // identified Molydal product by enriching the search query with its name.
     const contextualQuestion = productContext?.molydalName
-      ? `${question} — à propos de ${productContext.molydalName} (équivalent ${productContext.scannedBrand ?? ''} ${productContext.scannedName ?? ''})`
+      ? `${question} — about ${productContext.molydalName} (equivalent of ${productContext.scannedBrand ?? ''} ${productContext.scannedName ?? ''})`
       : question;
 
     const reformulated = await this.reformulateQuery(
@@ -245,26 +245,26 @@ ${prompt}`,
         ? chunks
             .map(
               (c) =>
-                `[${c.product_name}] (pertinence: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
+                `[${c.product_name}] (relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
             )
             .join('\n\n---\n\n')
-        : 'Aucune fiche technique pertinente trouvée.';
+        : 'No relevant technical datasheet found.';
 
     const sources = [...new Set(chunks.map((c) => c.product_name))];
 
     const productBlock = productContext?.scannedName
-      ? `━━━ CONTEXTE DU SCAN ━━━
-Produit concurrent scanné : ${productContext.scannedBrand ?? '?'} ${productContext.scannedName}
-Équivalent Molydal identifié : ${productContext.molydalName ?? 'non déterminé'}${productContext.molydalReference ? ` (réf. ${productContext.molydalReference})` : ''}
+      ? `━━━ SCAN CONTEXT ━━━
+Scanned competitor product: ${productContext.scannedBrand ?? '?'} ${productContext.scannedName}
+Identified Molydal equivalent: ${productContext.molydalName ?? 'undetermined'}${productContext.molydalReference ? ` (ref. ${productContext.molydalReference})` : ''}
 
-L'utilisateur te questionne spécifiquement sur ce match. Reste centré sur ces deux produits dans tes réponses.
+The user is asking you specifically about this match. Stay focused on these two products in your responses.
 
 `
       : '';
 
     const reformulationBlock =
       !productContext && reformulated !== question
-        ? `Application identifiée du produit concurrent : ${reformulated}\n\n`
+        ? `Identified competitor product application: ${reformulated}\n\n`
         : '';
 
     const validHistory = conversationHistory.filter((m) => m.text.trim());
@@ -280,7 +280,7 @@ L'utilisateur te questionne spécifiquement sur ce match. Reste centré sur ces 
       model: 'claude-sonnet-4-6',
       max_tokens: 1500,
       temperature: 0.3,
-      system: `${SYSTEM_PROMPT}\n\n${productBlock}${reformulationBlock}Contexte — Fiches techniques Molydal :\n${context}`,
+      system: `${SYSTEM_PROMPT}\n\n${productBlock}${reformulationBlock}Context — Molydal technical datasheets:\n${context}`,
       messages,
       tools: [WEB_SEARCH_TOOL],
     });

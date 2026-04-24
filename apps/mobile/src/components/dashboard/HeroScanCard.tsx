@@ -37,7 +37,7 @@ export function HeroScanCard({ onPress }: HeroScanCardProps): React.JSX.Element 
         activeOpacity={0.92}
         style={styles.clipWrap}
         accessibilityRole="button"
-        accessibilityLabel="Scanner un produit concurrent"
+        accessibilityLabel="Scan a competitor product"
       >
         <LinearGradient
           colors={['#fff6e8', '#ffe8dc', '#ffd7c4']}
@@ -63,14 +63,14 @@ export function HeroScanCard({ onPress }: HeroScanCardProps): React.JSX.Element 
         <View style={styles.heroInner}>
           <View style={styles.accentPill}>
             <Bolt size={11} color={colors.red} />
-            <RNText style={styles.accentPillText}>Action principale</RNText>
+            <RNText style={styles.accentPillText}>Main action</RNText>
           </View>
 
           <RNText style={styles.heroTitle}>
-            {'Scanner un produit\n'}
-            <RNText style={styles.heroTitleItalic}>concurrent</RNText>
+            {'Scan a competitor\n'}
+            <RNText style={styles.heroTitleItalic}>product</RNText>
           </RNText>
-          <Text style={styles.heroSubtitle}>Photo · Vocal</Text>
+          <Text style={styles.heroSubtitle}>Photo · Voice</Text>
 
           <View style={styles.heroBottom}>
             <View style={styles.heroIcons}>

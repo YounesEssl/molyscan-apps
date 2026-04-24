@@ -4,15 +4,15 @@ import { getLocales } from 'expo-localization';
 import fr from './locales/fr';
 import en from './locales/en';
 
-const deviceLanguage = getLocales()[0]?.languageCode ?? 'fr';
+const deviceLanguage = getLocales()[0]?.languageCode ?? 'en';
 
 i18n.use(initReactI18next).init({
   resources: {
     fr: { translation: fr },
     en: { translation: en },
   },
-  lng: deviceLanguage === 'en' ? 'en' : 'fr',
-  fallbackLng: 'fr',
+  lng: 'en',
+  fallbackLng: 'en',
   interpolation: {
     escapeValue: false,
   },

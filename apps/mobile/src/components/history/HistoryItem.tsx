@@ -21,24 +21,24 @@ const STATUS: Record<
   { label: string; bg: string; text: string }
 > = {
   matched: {
-    label: 'Matché',
+    label: 'Matched',
     bg: colors.okBg,
     text: colors.ok,
   },
   partial: {
-    label: 'Partiel',
+    label: 'Partial',
     bg: colors.warnBg,
     text: colors.warn,
   },
   no_match: {
-    label: 'Sans équiv.',
+    label: 'No match',
     bg: 'rgba(26,20,16,0.05)',
     text: colors.ink2,
   },
 };
 
 function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('fr-FR', {
+  return new Date(dateStr).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -50,16 +50,16 @@ export const HistoryItem = React.memo(function HistoryItem({
 }: HistoryItemProps): React.JSX.Element {
   const confidence = scan.molydalMatch?.confidence ?? 0;
   const status = STATUS[scan.status];
-  const brand = scan.scannedProduct?.brand ?? 'Concurrent';
-  const equiv = scan.molydalMatch?.name ?? 'Aucun équivalent';
+  const brand = scan.scannedProduct?.brand ?? 'Competitor';
+  const equiv = scan.molydalMatch?.name ?? 'No equivalent';
 
   const handlePress = useCallback(() => {
     haptic.light();
     onPress();
   }, [onPress]);
 
-  const accessibilityLabel = `Scan ${brand}, équivalent ${equiv}${
-    confidence > 0 ? `, confiance ${confidence} pour cent` : ''
+  const accessibilityLabel = `Scan ${brand}, equivalent ${equiv}${
+    confidence > 0 ? `, confidence ${confidence} percent` : ''
   }`;
 
   return (

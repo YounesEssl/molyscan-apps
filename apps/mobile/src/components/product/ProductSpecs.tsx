@@ -16,7 +16,7 @@ interface ProductSpecsProps {
 
 export function ProductSpecs({
   specs,
-  title = 'Spécifications',
+  title = 'Specifications',
 }: ProductSpecsProps): React.JSX.Element | null {
   if (specs.length === 0) return null;
 

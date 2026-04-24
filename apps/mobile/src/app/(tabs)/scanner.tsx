@@ -30,7 +30,7 @@ export default function ScannerScreen(): React.JSX.Element {
   if (permLoading) {
     return (
       <ScreenWrapper style={styles.centered}>
-        <Text variant="body">Chargement...</Text>
+        <Text variant="body">Loading...</Text>
       </ScreenWrapper>
     );
   }
@@ -55,7 +55,7 @@ export default function ScannerScreen(): React.JSX.Element {
         setTimeout(() => reject(new Error('Capture timeout')), 10000),
       );
       const photo = await Promise.race([photoPromise, timeoutPromise]);
-      if (!photo?.base64) throw new Error('Capture échouée');
+      if (!photo?.base64) throw new Error('Capture failed');
       analysis.setCapturedPhotoUri(photo.uri);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await analysis.analyzeBase64(photo.base64);

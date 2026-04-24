@@ -38,8 +38,8 @@ interface ProfileSettingsProps {
 
 const ITEMS: Omit<SettingsItem, 'onPress' | 'danger'>[] = [
   { key: 'notifications', label: 'Notifications', sub: 'Push, email, SMS', icon: Bell },
-  { key: 'language', label: 'Langue', sub: 'Français', icon: Settings },
-  { key: 'privacy', label: 'Confidentialité', sub: 'RGPD, données', icon: Eye },
+  { key: 'language', label: 'Language', sub: 'English', icon: Settings },
+  { key: 'privacy', label: 'Privacy', sub: 'GDPR, data', icon: Eye },
 ];
 
 export function ProfileSettings({
@@ -48,7 +48,7 @@ export function ProfileSettings({
 }: ProfileSettingsProps): React.JSX.Element {
   return (
     <View style={styles.section}>
-      <RNText style={styles.sectionTitle}>Paramètres</RNText>
+      <RNText style={styles.sectionTitle}>Settings</RNText>
       <View style={[styles.list, shadows.card as ViewStyle]}>
         {ITEMS.map((item) => (
           <SettingsRow
@@ -60,7 +60,7 @@ export function ProfileSettings({
           />
         ))}
         <SettingsRow
-          label="Se déconnecter"
+          label="Sign out"
           icon={Logout2}
           danger
           onPress={onLogout}

@@ -23,8 +23,8 @@ interface AIEntryCardProps {
 
 export function AIEntryCard({
   onPress,
-  title = 'Assistant IA',
-  subtitle = 'Vos questions techniques, réponses expertes',
+  title = 'AI Assistant',
+  subtitle = 'Your technical questions, expert answers',
 }: AIEntryCardProps): React.JSX.Element {
   return (
     <TouchableOpacity

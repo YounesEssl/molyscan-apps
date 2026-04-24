@@ -138,14 +138,14 @@ export const chatFreeService = {
         };
 
         xhr.onerror = () => {
-          callbacks.onError(`Erreur réseau (${xhr.status})`);
+          callbacks.onError(`Network error (${xhr.status})`);
           reject(new Error('Network error'));
         };
 
         xhr.send(JSON.stringify({ text }));
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Erreur réseau';
+      const msg = error instanceof Error ? error.message : 'Network error';
       callbacks.onError(msg);
     }
   },

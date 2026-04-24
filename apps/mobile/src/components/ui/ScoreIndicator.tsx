@@ -102,7 +102,7 @@ export const ScoreIndicator: React.FC<ScoreIndicatorProps> = ({
       </View>
       {showLabel && (
         <Text variant="caption" color={colors.ink3} style={styles.label}>
-          Score de confiance
+          Confidence score
         </Text>
       )}
     </View>

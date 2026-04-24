@@ -22,7 +22,7 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
               updatedAt: new Date().toISOString(),
               steps: [
                 ...wf.steps,
-                { status, date: new Date().toISOString(), actor: 'Vous', comment },
+                { status, date: new Date().toISOString(), actor: 'You', comment },
               ],
             }
           : wf,

@@ -31,7 +31,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
 
   const [messages, setMessages] = useState<ChatMessageModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [title, setTitle] = useState('Assistant IA');
+  const [title, setTitle] = useState('AI Assistant');
   const [inputText, setInputText] = useState('');
 
   useEffect(() => {
@@ -99,7 +99,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
-              ? { ...m, content: `Erreur : ${error}`, isStreaming: false }
+              ? { ...m, content: `Error: ${error}`, isStreaming: false }
               : m,
           ),
         );

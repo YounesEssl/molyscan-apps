@@ -21,11 +21,11 @@ interface PendingWorkflowsSectionProps {
 }
 
 const STATUS_LABEL: Record<PriceWorkflow['status'], string> = {
-  draft: 'Brouillon',
-  submitted: 'Attente',
-  under_review: 'Révision',
+  draft: 'Draft',
+  submitted: 'Pending',
+  under_review: 'Review',
   approved: 'OK',
-  rejected: 'Refusé',
+  rejected: 'Rejected',
 };
 
 export function PendingWorkflowsSection({
@@ -37,9 +37,9 @@ export function PendingWorkflowsSection({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Demandes en cours</Text>
+        <Text style={styles.sectionTitle}>Pending requests</Text>
         <Pill variant="accent" size="sm">
-          {workflows.length} à valider
+          {workflows.length} to review
         </Pill>
       </View>
       {workflows.slice(0, 2).map((w) => (
@@ -67,14 +67,14 @@ function WorkflowRow({
       }}
       activeOpacity={0.8}
       accessibilityRole="button"
-      accessibilityLabel={`Ouvrir la demande ${workflow.productName || 'produit'} pour ${workflow.clientName || 'client'}`}
+      accessibilityLabel={`Open request ${workflow.productName || 'product'} for ${workflow.clientName || 'client'}`}
     >
       <View style={styles.iconBox}>
         <Stars size={20} color={colors.red} />
       </View>
       <View style={styles.text}>
         <Text style={styles.name} numberOfLines={1}>
-          {workflow.productName || 'Produit'}
+          {workflow.productName || 'Product'}
         </Text>
         <Text style={styles.sub}>{workflow.clientName || 'Client'}</Text>
       </View>

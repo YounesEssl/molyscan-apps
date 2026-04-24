@@ -55,7 +55,7 @@ export const NotificationItem = React.memo(function NotificationItem({
     onPress();
   }, [onPress]);
 
-  const accessibilityLabel = `${notification.read ? '' : 'Non lue. '}${notification.title}. ${notification.body}`;
+  const accessibilityLabel = `${notification.read ? '' : 'Unread. '}${notification.title}. ${notification.body}`;
 
   return (
     <TouchableOpacity

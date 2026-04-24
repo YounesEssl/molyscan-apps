@@ -40,17 +40,17 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     if (this.state.hasError) {
       return (
         <View style={styles.container}>
-          <Text style={styles.title}>Quelque chose s'est mal passé</Text>
+          <Text style={styles.title}>Something went wrong</Text>
           <Text style={styles.body}>
-            {this.state.error?.message ?? 'Erreur inconnue'}
+            {this.state.error?.message ?? 'Unknown error'}
           </Text>
           <TouchableOpacity
             style={styles.button}
             onPress={this.handleRetry}
             accessibilityRole="button"
-            accessibilityLabel="Réessayer"
+            accessibilityLabel="Retry"
           >
-            <Text style={styles.buttonText}>Réessayer</Text>
+            <Text style={styles.buttonText}>Retry</Text>
           </TouchableOpacity>
         </View>
       );

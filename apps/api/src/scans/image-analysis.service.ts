@@ -97,7 +97,7 @@ export class ImageAnalysisService {
         id: scan.id,
         identified: identification,
         equivalents: [],
-        analysis: "Aucun produit lubrifiant n'a été identifié sur cette image. Essayez de photographier l'étiquette ou l'emballage du produit de plus près.",
+        analysis: "No lubricant product was identified in this image. Try photographing the label or packaging more closely.",
         sources: [],
       };
     }
@@ -161,9 +161,9 @@ export class ImageAnalysisService {
 
     // Step 2: RAG search — build a Molydal-oriented search query
     const t2 = Date.now();
-    const searchQuery = `graisse huile lubrifiant Molydal équivalent ${identification.type} ${identification.specs} ${identification.name}`;
+    const searchQuery = `grease oil lubricant Molydal equivalent ${identification.type} ${identification.specs} ${identification.name}`;
     const reformulated = await this.ragService.reformulateQuery(
-      `Trouve l'équivalent Molydal du ${identification.name} de ${identification.brand}. C'est un(e) ${identification.type}. Caractéristiques : ${identification.specs}`,
+      `Find the Molydal equivalent of ${identification.name} by ${identification.brand}. It is a ${identification.type}. Characteristics: ${identification.specs}`,
       [],
     );
     this.logger.log(`✅ Step 2a — Reformulation (Gemini): ${Date.now() - t2}ms`);
@@ -176,9 +176,9 @@ export class ImageAnalysisService {
 
     const context = chunks.length > 0
       ? chunks
-          .map((c) => `[${c.product_name}] (pertinence: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`)
+          .map((c) => `[${c.product_name}] (relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`)
           .join('\n\n---\n\n')
-      : 'Aucune fiche technique pertinente trouvée.';
+      : 'No relevant technical datasheet found.';
 
     const sources = [...new Set(chunks.map((c) => c.product_name))];
     this.logger.log(`   Sources: ${sources.join(', ')}`);
@@ -234,17 +234,17 @@ export class ImageAnalysisService {
     else if (imageBase64.startsWith('R0lG')) mimeType = 'image/gif';
     else if (imageBase64.startsWith('UklG')) mimeType = 'image/webp';
 
-    const prompt = `Identifie le produit lubrifiant/graisse/huile sur cette image.
+    const prompt = `Identify the lubricant/grease/oil product in this image.
 
-Si tu vois un produit lubrifiant, graisse, huile ou produit de maintenance industrielle, retourne :
+If you see a lubricant, grease, oil, or industrial maintenance product, return:
 {
-  "name": "nom complet du produit",
-  "brand": "marque (Shell, Mobil, Klüber, Total, SKF, Fuchs, etc.)",
-  "type": "type de produit (graisse, huile, spray, etc.)",
-  "specs": "caractéristiques techniques visibles (viscosité, NLGI, température, base, épaississant, certifications, etc.)"
+  "name": "full product name",
+  "brand": "brand (Shell, Mobil, Klüber, Total, SKF, Fuchs, etc.)",
+  "type": "product type (grease, oil, spray, etc.)",
+  "specs": "visible technical characteristics (viscosity, NLGI, temperature, base, thickener, certifications, etc.)"
 }
 
-Si l'image ne contient PAS de produit lubrifiant identifiable, retourne :
+If the image does NOT contain an identifiable lubricant product, return:
 {
   "name": null,
   "brand": null,
@@ -252,7 +252,7 @@ Si l'image ne contient PAS de produit lubrifiant identifiable, retourne :
   "specs": null
 }
 
-Retourne UNIQUEMENT le JSON, sans markdown.${userMessage ? `\n\nContexte de l'utilisateur : ${userMessage}` : ''}`;
+Return ONLY the JSON, without markdown.${userMessage ? `\n\nUser context: ${userMessage}` : ''}`;
 
     // Greedy decoding — temperature 0, topP 0.1, topK 1 — eliminates the main
     // source of variability in scan results (same image → same identification).
@@ -277,7 +277,7 @@ Retourne UNIQUEMENT le JSON, sans markdown.${userMessage ? `\n\nContexte de l'ut
       }
       return JSON.parse(jsonStr);
     } catch {
-      return { name: text.slice(0, 100), brand: 'Inconnu', type: 'lubrifiant', specs: '' };
+      return { name: text.slice(0, 100), brand: 'Unknown', type: 'lubricant', specs: '' };
     }
   }
 
@@ -289,21 +289,21 @@ Retourne UNIQUEMENT le JSON, sans markdown.${userMessage ? `\n\nContexte de l'ut
   ): Promise<Omit<ImageAnalysisResult, 'id'>> {
     const productList = sources.length > 0
       ? sources.map((s) => `- ${s}`).join('\n')
-      : '(aucun produit trouvé)';
+      : '(no product found)';
 
     const response = await this.anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 600,
       temperature: 0,
-      system: `Expert Molydal. Trouve l'équivalent du ${identified.name} (${identified.brand}, ${identified.type}, ${identified.specs}).
-Produits disponibles : ${productList}
-Fiches techniques :
+      system: `Molydal expert. Find the equivalent of ${identified.name} (${identified.brand}, ${identified.type}, ${identified.specs}).
+Available products: ${productList}
+Technical datasheets:
 ${ragContext}
 
-Retourne UNIQUEMENT un JSON sans markdown :
-{"equivalents":[{"name":"...","family":"...","compatibility":0-100,"reason":"1 phrase"}],"analysis":"1 paragraphe comparatif"}
-Max 3 équivalents triés par compatibilité. N'invente aucun produit.`,
-      messages: [{ role: 'user', content: userMessage || 'Équivalent Molydal ?' }],
+Return ONLY a JSON without markdown:
+{"equivalents":[{"name":"...","family":"...","compatibility":0-100,"reason":"1 sentence"}],"analysis":"1 comparative paragraph"}
+Max 3 equivalents sorted by compatibility. Do not invent any product. Respond in English.`,
+      messages: [{ role: 'user', content: userMessage || 'Molydal equivalent?' }],
     });
 
     const text = response.content[0].type === 'text' ? response.content[0].text : '{}';

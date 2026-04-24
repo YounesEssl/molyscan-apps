@@ -21,11 +21,11 @@ import { typography } from '@/design/tokens/typography';
 import { haptic } from '@/lib/haptics';
 
 const TAB_LABELS: Record<string, string> = {
-  index:   'Accueil',
-  history: 'Historique',
+  index:   'Home',
+  history: 'History',
   scanner: '',
-  chat:    'Assistant',
-  profile: 'Profil',
+  chat:    'AI Assistant',
+  profile: 'Profile',
 };
 
 const TAB_ICONS: Record<string, React.FC<{ color: string }>> = {
@@ -81,7 +81,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
                 activeOpacity={0.85}
                 style={styles.scanBtn}
                 accessibilityRole="button"
-                accessibilityLabel="Scanner un produit"
+                accessibilityLabel="Scan a product"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <LinearGradient

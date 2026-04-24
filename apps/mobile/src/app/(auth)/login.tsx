@@ -86,7 +86,7 @@ export default function LoginScreen(): React.JSX.Element {
   const handleLogin = async (): Promise<void> => {
     if (!email.trim() || !password) {
       haptic.warning();
-      Alert.alert('Erreur', 'Email et mot de passe requis');
+      Alert.alert('Error', 'Email and password required');
       return;
     }
     setLoading(true);
@@ -100,8 +100,8 @@ export default function LoginScreen(): React.JSX.Element {
         (e as { response?: { data?: { message?: string } }; message?: string })
           ?.response?.data?.message ||
         (e as { message?: string })?.message ||
-        'Erreur de connexion';
-      Alert.alert('Erreur', msg);
+        'Sign-in error';
+      Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }
@@ -164,14 +164,14 @@ export default function LoginScreen(): React.JSX.Element {
                     numberOfLines={3}
                     minimumFontScale={0.6}
                   >
-                    {"L'équivalent\n"}
+                    {'The\n'}
                     <RNText style={styles.headlineItalicRed}>{'Molydal'}</RNText>
-                    {',\ninstantanément.'}
+                    {'\nequivalent, instantly.'}
                   </RNText>
                 </View>
                 <Text style={styles.subtitle}>
-                  Scannez n'importe quel lubrifiant concurrent, recevez
-                  l'équivalent Molydal en moins de 2 secondes.
+                  Scan any competitor lubricant and get the Molydal equivalent
+                  in under 2 seconds.
                 </Text>
               </Animated.View>
 
@@ -193,7 +193,7 @@ export default function LoginScreen(): React.JSX.Element {
                 />
                 <Input
                   ref={passwordRef}
-                  label="Mot de passe"
+                  label="Password"
                   placeholder="••••••••"
                   value={password}
                   onChangeText={setPassword}
@@ -214,7 +214,7 @@ export default function LoginScreen(): React.JSX.Element {
                   disabled={loading}
                   activeOpacity={0.85}
                   accessibilityRole="button"
-                  accessibilityLabel="Se connecter"
+                  accessibilityLabel="Sign in"
                   accessibilityState={{ disabled: loading, busy: loading }}
                 >
                   <LinearGradient
@@ -223,7 +223,7 @@ export default function LoginScreen(): React.JSX.Element {
                     end={{ x: 1, y: 1 }}
                     style={styles.primaryBtn}
                   >
-                    <RNText style={styles.primaryBtnText}>Se connecter</RNText>
+                    <RNText style={styles.primaryBtnText}>Sign in</RNText>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>

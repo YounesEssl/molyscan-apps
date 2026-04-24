@@ -21,7 +21,7 @@ export function ChatTypingIndicator(): React.JSX.Element {
       <View style={styles.bubble}>
         <ActivityIndicator size="small" color={colors.purple} />
         <Text variant="caption" color={colors.ink2}>
-          Réflexion en cours...
+          Thinking...
         </Text>
       </View>
     </View>

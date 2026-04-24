@@ -22,9 +22,9 @@ interface RecentScansSectionProps {
 }
 
 const STATUS_LABEL: Record<ScanStatus, string> = {
-  matched: '● Matché',
-  partial: '● Partiel',
-  no_match: '○ Sans',
+  matched: '● Matched',
+  partial: '● Partial',
+  no_match: '○ None',
 };
 
 const STATUS_VARIANT: Record<
@@ -44,9 +44,9 @@ export function RecentScansSection({
   return (
     <>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Récents</Text>
+        <Text style={styles.sectionTitle}>Recent</Text>
         <TouchableOpacity onPress={onSeeAllPress} activeOpacity={0.7}>
-          <Text style={styles.seeAll}>Tout voir</Text>
+          <Text style={styles.seeAll}>See all</Text>
         </TouchableOpacity>
       </View>
       <ScrollView
@@ -60,7 +60,7 @@ export function RecentScansSection({
         {scans.length === 0 ? (
           <View style={styles.empty}>
             <RNText style={styles.emptyText}>
-              Aucun scan pour l'instant
+              No scans yet
             </RNText>
           </View>
         ) : null}
@@ -99,7 +99,7 @@ function RecentScanCard({
       </View>
       <RNText style={styles.competitor}>{scan.scannedProduct?.brand ?? ''}</RNText>
       <RNText style={styles.equivalent} numberOfLines={2}>
-        {scan.molydalMatch?.name ?? 'Aucun équivalent'}
+        {scan.molydalMatch?.name ?? 'No equivalent'}
       </RNText>
       <RNText style={styles.place}>{scan.location?.label ?? ''}</RNText>
     </TouchableOpacity>

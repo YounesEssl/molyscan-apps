@@ -24,9 +24,9 @@ export function ChatEmptyState({
       >
         <Stars size={28} color="#fff" />
       </LinearGradient>
-      <RNText style={styles.title}>Comment puis-je vous aider ?</RNText>
+      <RNText style={styles.title}>How can I help?</RNText>
       <RNText style={styles.subtitle}>
-        Posez une question sur les lubrifiants, graisses ou huiles Molydal
+        Ask a question about Molydal lubricants, greases or oils
       </RNText>
       <FreeChatSuggestions onSelect={onSuggestionSelect} />
     </View>

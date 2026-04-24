@@ -12,10 +12,10 @@ interface FreeChatSuggestionsProps {
 }
 
 const SUGGESTIONS = [
-  'Quelle graisse pour des roulements haute température ?',
-  'Quel lubrifiant alimentaire NSF H1 pour engrenages ?',
-  'Produit pour chaîne de convoyeur en environnement humide ?',
-  'Graisse biodégradable pour industrie agroalimentaire ?',
+  'Which grease for high-temperature bearings?',
+  'Which NSF H1 food-grade lubricant for gears?',
+  'Product for conveyor chains in humid environments?',
+  'Biodegradable grease for food processing industry?',
 ];
 
 export function FreeChatSuggestions(

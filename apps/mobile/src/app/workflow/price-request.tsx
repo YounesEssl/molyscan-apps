@@ -96,7 +96,7 @@ export default function PriceRequestScreen(): React.JSX.Element {
                   <Card style={styles.productInfo}>
                     <Text variant="body" style={styles.bold}>{scan.molydalMatch.name}</Text>
                     <Text variant="caption" color={COLORS.textSecondary}>
-                      Réf. {scan.molydalMatch.reference} — {scan.molydalMatch.category}
+                      Ref. {scan.molydalMatch.reference} — {scan.molydalMatch.category}
                     </Text>
                   </Card>
                 )}

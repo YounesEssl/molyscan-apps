@@ -29,7 +29,7 @@ export function ScannerTopControls({
           }}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Fermer le scanner"
+          accessibilityLabel="Close scanner"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <AltArrowLeft size={20} color={colors.ink} />
@@ -43,7 +43,7 @@ export function ScannerTopControls({
           }}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel={flashEnabled ? 'Désactiver le flash' : 'Activer le flash'}
+          accessibilityLabel={flashEnabled ? 'Turn off flash' : 'Turn on flash'}
           accessibilityState={{ selected: flashEnabled }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
