@@ -10,7 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { AddCircle, CloseCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
-import { Stop } from 'react-native-solar-icons/icons/bold';
+import { Stop, ArrowUp } from 'react-native-solar-icons/icons/bold';
 import { colors } from '@/design/tokens/colors';
 import { typography } from '@/design/tokens/typography';
 import { haptic } from '@/lib/haptics';
@@ -56,6 +56,7 @@ export function ChatComposer({
   const voice = useVoiceInput({ onTranscription: handleTranscription });
   const isRecording = voice.state === 'recording';
   const isTranscribing = voice.state === 'transcribing';
+  const hasContent = value.trim().length > 0 || !!attachment;
 
   return (
     <View style={styles.wrapper}>
@@ -119,6 +120,26 @@ export function ChatComposer({
           />
         )}
 
+        {hasContent && !isRecording && (
+          <TouchableOpacity
+            onPress={() => { haptic.medium(); onSubmit(); }}
+            activeOpacity={0.8}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <LinearGradient
+              colors={[colors.redVivid, colors.red]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.actionBtn}
+            >
+              <ArrowUp size={18} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           onPress={() => void voice.toggle()}
           activeOpacity={0.8}
@@ -136,7 +157,7 @@ export function ChatComposer({
             }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.micBtn}
+            style={styles.actionBtn}
           >
             {isTranscribing ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -239,14 +260,13 @@ const styles = StyleSheet.create({
     color: colors.red,
     letterSpacing: -0.1,
   },
-  micBtn: {
+  actionBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    shadowColor: '#5b2dff',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 6,

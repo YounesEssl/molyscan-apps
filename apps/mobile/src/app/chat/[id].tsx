@@ -142,15 +142,11 @@ export default function ChatDetailScreen(): React.JSX.Element {
         <AssistantAvatar />
       </SafeAreaView>
 
-      {/*
-        KeyboardAvoidingView with flex:1 and the composer as a direct child
-        (not absolute-positioned) means the keyboard will push the composer
-        up correctly on both iOS and Android.
-      */}
+      {/* On Android, softwareKeyboardLayoutMode="pan" handles keyboard avoidance
+          natively — KeyboardAvoidingView overcorrects and fails to restore position. */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <FlatList
           ref={listRef}
