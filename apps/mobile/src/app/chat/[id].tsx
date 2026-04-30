@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -34,6 +35,8 @@ export default function ChatDetailScreen(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState('AI Assistant');
   const [inputText, setInputText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const fileAttachment = useFileAttachment();
 
   useEffect(() => {
@@ -120,6 +123,37 @@ export default function ChatDetailScreen(): React.JSX.Element {
     }, attachmentId);
   };
 
+  const handleSubmitForAnalysis = useCallback(() => {
+    if (!id || submitting || submitted) return;
+
+    Alert.alert(
+      'Envoyer pour analyse',
+      "Cette conversation sera transmise à l'équipe pour analyse. Continuer ?",
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Envoyer',
+          style: 'default',
+          onPress: async () => {
+            setSubmitting(true);
+            try {
+              await chatFreeService.submitConversation(id);
+              setSubmitted(true);
+              Alert.alert('Envoyé', 'Conversation transmise pour analyse.');
+            } catch {
+              Alert.alert(
+                'Erreur',
+                "Impossible d'envoyer la conversation. Réessayez plus tard.",
+              );
+            } finally {
+              setSubmitting(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [id, submitting, submitted]);
+
   const showTyping = isLoading && !messages.some((m) => m.isStreaming);
 
   const renderItem = useCallback<ListRenderItem<ChatMessageModel>>(
@@ -138,7 +172,13 @@ export default function ChatDetailScreen(): React.JSX.Element {
       />
 
       <SafeAreaView style={styles.safeTop} edges={['top']}>
-        <AssistantHeader title={title} onBack={() => router.back()} />
+        <AssistantHeader
+          title={title}
+          onBack={() => router.back()}
+          onSubmitForAnalysis={handleSubmitForAnalysis}
+          submitting={submitting}
+          submitted={submitted}
+        />
         <AssistantAvatar />
       </SafeAreaView>
 

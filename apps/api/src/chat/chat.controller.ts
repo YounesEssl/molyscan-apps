@@ -95,6 +95,16 @@ export class ChatController {
     return this.chatService.deleteConversation(id, user.sub);
   }
 
+  @Post('conversations/:id/submit')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: 'Flag a conversation for analysis (stored in DB for review)' })
+  submitConversation(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.chatService.submitConversationForAnalysis(id, user.sub);
+  }
+
   // ── Messages ───────────────────────────────────────────────────
 
   @Get('conversations/:id/messages')

@@ -26,7 +26,7 @@
     },
     "android": {
       "package": "com.molyscan.app",
-      "versionCode": 10,
+      "versionCode": 11,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],

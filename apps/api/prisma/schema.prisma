@@ -82,13 +82,14 @@ model User {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  scans          Scan[]
-  workflows      PriceWorkflow[]
-  conversations  AIConversation[]
-  notifications  Notification[]
-  voiceNotes     VoiceNote[]
-  exports        ExportRecord[]
-  refreshTokens  RefreshToken[]
+  scans                   Scan[]
+  workflows               PriceWorkflow[]
+  conversations           AIConversation[]
+  notifications           Notification[]
+  voiceNotes              VoiceNote[]
+  exports                 ExportRecord[]
+  refreshTokens           RefreshToken[]
+  conversationSubmissions ConversationSubmission[]
 
   @@map("users")
 }
@@ -243,14 +244,30 @@ model AIConversation {
   molydalReference String?
   userId           String
 
-  scan     Scan?       @relation(fields: [scanId], references: [id])
-  user     User        @relation(fields: [userId], references: [id])
-  messages AIMessage[]
+  scan        Scan?                    @relation(fields: [scanId], references: [id])
+  user        User                     @relation(fields: [userId], references: [id])
+  messages    AIMessage[]
+  submissions ConversationSubmission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("ai_conversations")
+}
+
+model ConversationSubmission {
+  id             String @id @default(uuid())
+  conversationId String
+  userId         String
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([conversationId])
+  @@map("conversation_submissions")
 }
 
 model AIMessage {

@@ -76,6 +76,12 @@ export const chatFreeService = {
     await api.delete(`/chat/conversations/${id}`);
   },
 
+  /** Submit a conversation for analysis (flags it for the team to review) */
+  async submitConversation(id: string): Promise<{ id: string; conversationId: string; createdAt: string }> {
+    const res = await api.post(`/chat/conversations/${id}/submit`);
+    return res.data;
+  },
+
   /** Get messages for a conversation */
   async getMessages(conversationId: string): Promise<ChatMessage[]> {
     const res = await api.get(`/chat/conversations/${conversationId}/messages`);

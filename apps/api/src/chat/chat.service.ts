@@ -114,6 +114,23 @@ export class ChatService {
     return { deleted: true };
   }
 
+  async submitConversationForAnalysis(id: string, userId: string) {
+    const conv = await this.prisma.aIConversation.findFirst({
+      where: { id, userId },
+    });
+    if (!conv) throw new NotFoundException('Conversation not found');
+
+    const submission = await this.prisma.conversationSubmission.create({
+      data: { conversationId: id, userId },
+    });
+
+    return {
+      id: submission.id,
+      conversationId: submission.conversationId,
+      createdAt: submission.createdAt.toISOString(),
+    };
+  }
+
   // ── Messages ───────────────────────────────────────────────────
 
   async getMessages(conversationId: string, userId: string) {
