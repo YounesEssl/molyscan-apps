@@ -48,13 +48,17 @@ cd "$APP_DIR/apps/api"
 npm install --silent
 ok "Dépendances installées"
 
-step "Build NestJS"
-npx nest build
-ok "Build OK"
-
 step "Migrations Prisma"
 npx prisma migrate deploy
 ok "Migrations appliquées"
+
+step "Generate Prisma Client"
+npx prisma generate
+ok "Client Prisma généré"
+
+step "Build NestJS"
+npx nest build
+ok "Build OK"
 
 step "Redémarrage PM2"
 pm2 restart molyscan-api
