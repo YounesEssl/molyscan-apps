@@ -43,14 +43,57 @@ apps/api/dist/
 # typescript
 *.tsbuildinfo
 
-# generated native folders
+# generated native folders (Expo prebuild output)
 /ios
 /android
+apps/mobile/ios/
+apps/mobile/android/
+
+# iOS build artifacts
+**/Pods/
+**/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Android build artifacts
+**/.gradle/
+**/local.properties
+*.apk
+*.aab
+*.keystore
+captures/
+
+# Build outputs
+build/
+**/build/
+
+# Bug reports
+bugreport*.zip
+bugreport-*.txt
+
+# Logs
+*.log
+logs/
+
+# Test / coverage
+coverage/
+*.lcov
+.nyc_output/
 
 # IDE / AI-assistant tooling (local only)
 .claude/
 .gemini/
 .vscode/
+.idea/
+*.swp
+*.swo
 .mcp.json
 .playwright-mcp/
 ref_v3_full.png
+
+# OS
+Thumbs.db

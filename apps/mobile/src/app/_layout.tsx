@@ -1,4 +1,5 @@
 import '@/i18n';
+import { loadStoredLanguage } from '@/i18n';
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +20,9 @@ function AppHooks(): null {
   useNetworkStatus();
   useSync();
   usePushNotifications();
+  useEffect(() => {
+    loadStoredLanguage();
+  }, []);
   return null;
 }
 

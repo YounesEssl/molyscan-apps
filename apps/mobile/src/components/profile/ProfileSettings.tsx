@@ -6,6 +6,7 @@ import {
   Text as RNText,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Bell } from 'react-native-solar-icons/icons/bold-duotone';
 import { Settings } from 'react-native-solar-icons/icons/bold-duotone';
 import { Eye } from 'react-native-solar-icons/icons/bold-duotone';
@@ -17,6 +18,7 @@ import { radius } from '@/design/tokens/radius';
 import { spacing } from '@/design/tokens/spacing';
 import { typography } from '@/design/tokens/typography';
 import { haptic } from '@/lib/haptics';
+import { setLanguage, type SupportedLanguage } from '@/i18n';
 
 interface IconComponent {
   (props: { size?: number; color?: string }): React.JSX.Element;
@@ -36,27 +38,44 @@ interface ProfileSettingsProps {
   onItemPress?: (key: string) => void;
 }
 
-const ITEMS: Omit<SettingsItem, 'onPress' | 'danger'>[] = [
-  { key: 'notifications', label: 'Notifications', sub: 'Push, email, SMS', icon: Bell },
-  { key: 'language', label: 'Language', sub: 'English', icon: Settings },
-  { key: 'privacy', label: 'Privacy', sub: 'GDPR, data', icon: Eye },
-];
+const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
+  en: 'English',
+  fr: 'Français',
+};
 
 export function ProfileSettings({
   onLogout,
   onItemPress,
 }: ProfileSettingsProps): React.JSX.Element {
+  const { i18n } = useTranslation();
+  const currentLang: SupportedLanguage = i18n.language === 'fr' ? 'fr' : 'en';
+
+  const handleLanguagePress = async (): Promise<void> => {
+    const next: SupportedLanguage = currentLang === 'en' ? 'fr' : 'en';
+    await setLanguage(next);
+  };
+
+  const items: Omit<SettingsItem, 'onPress' | 'danger'>[] = [
+    { key: 'notifications', label: 'Notifications', sub: 'Push, email, SMS', icon: Bell },
+    { key: 'language', label: 'Language', sub: LANGUAGE_LABELS[currentLang], icon: Settings },
+    { key: 'privacy', label: 'Privacy', sub: 'GDPR, data', icon: Eye },
+  ];
+
   return (
     <View style={styles.section}>
       <RNText style={styles.sectionTitle}>Settings</RNText>
       <View style={[styles.list, shadows.card as ViewStyle]}>
-        {ITEMS.map((item) => (
+        {items.map((item) => (
           <SettingsRow
             key={item.key}
             label={item.label}
             sub={item.sub}
             icon={item.icon}
-            onPress={() => onItemPress?.(item.key)}
+            onPress={
+              item.key === 'language'
+                ? handleLanguagePress
+                : () => onItemPress?.(item.key)
+            }
           />
         ))}
         <SettingsRow
