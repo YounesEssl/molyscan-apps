@@ -8,6 +8,7 @@ import { ImageAnalysisService } from './image-analysis.service';
 import { CreateScanDto } from './dto/create-scan.dto';
 import { AnalyzeImageDto } from './dto/analyze-image.dto';
 import { ScanFiltersDto } from './dto/scan-filters.dto';
+import { EquivalentFeedbackDto } from './dto/equivalent-feedback.dto';
 
 @ApiTags('Scans')
 @Controller('scans')
@@ -54,5 +55,15 @@ export class ScansController {
   @ApiOperation({ summary: 'Get scan details' })
   findById(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.scansService.findById(id, user.sub);
+  }
+
+  @Post(':id/equivalent-feedback')
+  @ApiOperation({ summary: 'Submit user feedback on a proposed Molydal equivalent' })
+  submitEquivalentFeedback(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: EquivalentFeedbackDto,
+  ) {
+    return this.scansService.submitEquivalentFeedback(id, user.sub, dto);
   }
 }

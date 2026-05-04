@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from '../products/products.service';
 import { CreateScanDto } from './dto/create-scan.dto';
 import { ScanFiltersDto } from './dto/scan-filters.dto';
-import { ScanMethod, ScanStatus } from '@prisma/client';
+import { EquivalentFeedbackDto } from './dto/equivalent-feedback.dto';
+import { EquivalentFeedbackVote, ScanMethod, ScanStatus } from '@prisma/client';
 
 @Injectable()
 export class ScansService {
@@ -130,6 +131,42 @@ export class ScansService {
       results.push(await this.create(userId, dto));
     }
     return results;
+  }
+
+  async submitEquivalentFeedback(
+    scanId: string,
+    userId: string,
+    dto: EquivalentFeedbackDto,
+  ) {
+    const scan = await this.prisma.scan.findFirst({
+      where: { id: scanId, userId },
+      select: { id: true },
+    });
+    if (!scan) throw new NotFoundException('Scan not found');
+
+    if (dto.vote === 'down' && (!dto.suggestedName || !dto.suggestedName.trim())) {
+      throw new BadRequestException('suggestedName is required when vote is "down"');
+    }
+
+    const feedback = await this.prisma.scanEquivalentFeedback.create({
+      data: {
+        scanId,
+        userId,
+        equivalentName: dto.equivalentName.trim(),
+        vote: dto.vote as EquivalentFeedbackVote,
+        suggestedName:
+          dto.vote === 'down' ? dto.suggestedName!.trim() : null,
+      },
+    });
+
+    return {
+      id: feedback.id,
+      scanId: feedback.scanId,
+      equivalentName: feedback.equivalentName,
+      vote: feedback.vote,
+      suggestedName: feedback.suggestedName,
+      createdAt: feedback.createdAt.toISOString(),
+    };
   }
 
   private formatScanRecord(scan: any) {

@@ -38,4 +38,15 @@ export const scanService = {
     const response = await api.post(ENDPOINTS.scans.create, { barcode, scanMethod });
     return response.data;
   },
+
+  async submitEquivalentFeedback(
+    scanId: string,
+    payload: {
+      equivalentName: string;
+      vote: 'up' | 'down';
+      suggestedName?: string;
+    },
+  ): Promise<void> {
+    await api.post(ENDPOINTS.scans.equivalentFeedback(scanId), payload);
+  },
 };

@@ -7,6 +7,8 @@ import { logger } from '@/lib/logger';
 import { useLocation } from '@/hooks/useLocation';
 
 export interface AnalysisResult {
+  /** Persisted scan id — used for equivalent feedback submission */
+  id?: string;
   identified: { name: string; brand: string; type: string; specs: string };
   equivalents: Array<{
     name: string;

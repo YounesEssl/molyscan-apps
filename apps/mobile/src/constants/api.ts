@@ -19,6 +19,7 @@ export const ENDPOINTS = {
     list: '/scans',
     create: '/scans',
     detail: (id: string) => `/scans/${id}`,
+    equivalentFeedback: (id: string) => `/scans/${id}/equivalent-feedback`,
   },
   chat: {
     conversations: '/chat/conversations',

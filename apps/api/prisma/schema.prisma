@@ -90,6 +90,7 @@ model User {
   exports                 ExportRecord[]
   refreshTokens           RefreshToken[]
   conversationSubmissions ConversationSubmission[]
+  equivalentFeedbacks     ScanEquivalentFeedback[]
 
   @@map("users")
 }
@@ -182,15 +183,39 @@ model Scan {
   user              User               @relation(fields: [userId], references: [id])
   competitorProduct CompetitorProduct?  @relation(fields: [competitorProductId], references: [id])
 
-  workflows     PriceWorkflow[]
-  conversations AIConversation[]
-  voiceNotes    VoiceNote[]
+  workflows           PriceWorkflow[]
+  conversations       AIConversation[]
+  voiceNotes          VoiceNote[]
+  equivalentFeedbacks ScanEquivalentFeedback[]
 
   scannedAt DateTime @default(now())
   createdAt DateTime @default(now())
 
   @@index([identifiedName, identifiedBrand])
   @@map("scans")
+}
+
+enum EquivalentFeedbackVote {
+  up
+  down
+}
+
+model ScanEquivalentFeedback {
+  id              String                 @id @default(uuid())
+  scanId          String
+  userId          String
+  equivalentName  String
+  vote            EquivalentFeedbackVote
+  suggestedName   String?
+
+  scan Scan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([scanId])
+  @@index([createdAt])
+  @@map("scan_equivalent_feedbacks")
 }
 
 model PriceWorkflow {
