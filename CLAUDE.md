@@ -79,10 +79,13 @@ docs/         → Documentation (déploiement, tests)
 
 **Routing** : Expo Router (file-based) dans `src/app/`
 - `(auth)/` — login / register
-- `(tabs)/` — Accueil, Scanner, Historique, Chat IA, Profil
+- `(tabs)/` — Home, History, Scanner, AI Assistant, Profile
 - `product/[id]` — fiche produit (stack)
 - `chat/[id]` — conversation IA (stack)
-- `workflow/` — demande de prix
+- `workflow/[id]` + `workflow/price-request` — demande de prix
+- `voice-note/` — record + index notes vocales
+- `export/` — exports PDF / CSV / XLSX
+- `notifications` — centre de notifications
 
 **State** : Zustand (`src/stores/`) pour l'état client. React Query pour le serveur (`src/lib/queryClient.ts`).
 
@@ -101,6 +104,7 @@ Modules NestJS :
 | Module | Responsabilité |
 |--------|---------------|
 | `auth` | JWT login/register/refresh, bcrypt |
+| `users` | Profil utilisateur, gestion compte |
 | `chat` | Conversations IA libres et produit, SSE streaming |
 | `chat/rag` | Pipeline RAG : reformulation Gemini → Supabase vector search → Claude |
 | `scans` | Scan produits, analyse image Gemini Vision |
@@ -108,6 +112,8 @@ Modules NestJS :
 | `workflows` | Demandes de prix multi-étapes |
 | `exports` | PDF / CSV / XLSX |
 | `voice-notes` | Notes vocales, transcription Whisper |
+| `ocr` | Extraction texte depuis images (étiquettes produits) |
+| `storage` | Upload S3/MinIO, URLs signées |
 | `notifications` | Push Expo |
 
 ### Pipeline RAG (chat IA)
@@ -134,11 +140,12 @@ Règles de sélection (ordre de priorité) :
 
 ## Conventions
 
-- UI en français (labels tabs : "Accueil", "Scanner", "Historique", "Profil")
-- Design tokens dans `src/design/tokens/` (colors, spacing, radius, shadows)
+- UI en anglais (labels tabs : "Home", "History", "AI Assistant", "Profile") — i18n via `react-i18next` (`src/i18n/`)
+- Design tokens dans `src/design/tokens/` (colors, spacing, radius, shadows, typography)
 - `src/constants/colors.ts` ré-exporte depuis tokens pour compatibilité
-- Composants UI dans `src/components/ui/` (Button, Text, Card, Badge, Input, Avatar, BottomSheet)
-- Composants domaine par feature : `scanner/`, `product/`, `history/`, `dashboard/`
+- Composants UI dans `src/components/ui/` : Button, Text, Card, Badge, Input, Avatar, BottomSheet, IconButton, Pill, ProgressBar, Ring, ScoreIndicator, SearchBar, StatusIndicator, Toggle, Wordmark, Aura, EmptyState
+- Composants domaine par feature : `scanner/`, `product/`, `history/`, `dashboard/`, `chat/`, `workflow/`, `notifications/`, `profile/`, `layout/`
+- Icônes : `react-native-solar-icons` (bold + bold-duotone) et `lucide-react-native` en complément
 - `ScreenWrapper` = SafeAreaView + scroll optionnel + padding
 - Nouvelle Architecture Expo activée (`newArchEnabled: true`)
 - Couleurs Molydal : primary `#1B3A5C` (bleu marine), accent `#E87722` (orange)
