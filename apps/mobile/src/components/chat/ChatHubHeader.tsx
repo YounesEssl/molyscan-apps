@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Text as RNText,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AddCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { colors } from '@/design/tokens/colors';
@@ -21,11 +22,12 @@ interface ChatHubHeaderProps {
 export function ChatHubHeader({
   onNewPress,
   disabled = false,
-  title = 'AI Assistant',
+  title,
 }: ChatHubHeaderProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.header}>
-      <RNText style={styles.title}>{title}</RNText>
+      <RNText style={styles.title}>{title ?? t('chat.hubTitle')}</RNText>
 
       <View style={styles.newButtonShadow}>
         <TouchableOpacity
@@ -41,7 +43,7 @@ export function ChatHubHeader({
             style={styles.newBtnGradient}
           >
             <AddCircle size={16} color="#fff" />
-            <RNText style={styles.newBtnText}>New</RNText>
+            <RNText style={styles.newBtnText}>{t('chat.newButton')}</RNText>
           </LinearGradient>
         </TouchableOpacity>
       </View>

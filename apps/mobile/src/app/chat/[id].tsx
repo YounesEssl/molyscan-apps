@@ -8,6 +8,7 @@ import {
   View,
   type ListRenderItem,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Aura } from '@/components/ui/Aura';
@@ -28,12 +29,13 @@ import { useFileAttachment } from '@/hooks/useFileAttachment';
 export default function ChatDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessageModel>>(null);
 
   const [messages, setMessages] = useState<ChatMessageModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [title, setTitle] = useState('AI Assistant');
+  const [title, setTitle] = useState(t('chat.detailDefaultTitle'));
   const [inputText, setInputText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -86,7 +88,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
     const attachmentId = fileAttachment.attachment?.id;
     fileAttachment.clear();
 
-    const messageText = trimmed || 'Analyse ce document.';
+    const messageText = trimmed || t('chat.analyzeDocument');
     await chatFreeService.sendMessageStreaming(id, messageText, {
       onToken: (token) => {
         fullContent += token;
@@ -114,7 +116,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
-              ? { ...m, content: `Error: ${error}`, isStreaming: false }
+              ? { ...m, content: t('chat.streamingError', { message: error }), isStreaming: false }
               : m,
           ),
         );
@@ -127,23 +129,23 @@ export default function ChatDetailScreen(): React.JSX.Element {
     if (!id || submitting || submitted) return;
 
     Alert.alert(
-      'Envoyer pour analyse',
-      "Cette conversation sera transmise à l'équipe pour analyse. Continuer ?",
+      t('chat.submitConfirmTitle'),
+      t('chat.submitConfirmBody'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('chat.submitConfirmCancel'), style: 'cancel' },
         {
-          text: 'Envoyer',
+          text: t('chat.submitConfirmSend'),
           style: 'default',
           onPress: async () => {
             setSubmitting(true);
             try {
               await chatFreeService.submitConversation(id);
               setSubmitted(true);
-              Alert.alert('Envoyé', 'Conversation transmise pour analyse.');
+              Alert.alert(t('chat.submitDoneTitle'), t('chat.submitDoneBody'));
             } catch {
               Alert.alert(
-                'Erreur',
-                "Impossible d'envoyer la conversation. Réessayez plus tard.",
+                t('chat.submitErrorTitle'),
+                t('chat.submitErrorBody'),
               );
             } finally {
               setSubmitting(false);
@@ -152,7 +154,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
         },
       ],
     );
-  }, [id, submitting, submitted]);
+  }, [id, submitting, submitted, t]);
 
   const showTyping = isLoading && !messages.some((m) => m.isStreaming);
 

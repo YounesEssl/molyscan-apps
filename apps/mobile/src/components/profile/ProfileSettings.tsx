@@ -47,7 +47,7 @@ export function ProfileSettings({
   onLogout,
   onItemPress,
 }: ProfileSettingsProps): React.JSX.Element {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const currentLang: SupportedLanguage = i18n.language === 'fr' ? 'fr' : 'en';
 
   const handleLanguagePress = async (): Promise<void> => {
@@ -56,14 +56,29 @@ export function ProfileSettings({
   };
 
   const items: Omit<SettingsItem, 'onPress' | 'danger'>[] = [
-    { key: 'notifications', label: 'Notifications', sub: 'Push, email, SMS', icon: Bell },
-    { key: 'language', label: 'Language', sub: LANGUAGE_LABELS[currentLang], icon: Settings },
-    { key: 'privacy', label: 'Privacy', sub: 'GDPR, data', icon: Eye },
+    {
+      key: 'notifications',
+      label: t('profile.settingsNotifications'),
+      sub: t('profile.settingsNotificationsSub'),
+      icon: Bell,
+    },
+    {
+      key: 'language',
+      label: t('profile.settingsLanguage'),
+      sub: LANGUAGE_LABELS[currentLang],
+      icon: Settings,
+    },
+    {
+      key: 'privacy',
+      label: t('profile.settingsPrivacy'),
+      sub: t('profile.settingsPrivacySub'),
+      icon: Eye,
+    },
   ];
 
   return (
     <View style={styles.section}>
-      <RNText style={styles.sectionTitle}>Settings</RNText>
+      <RNText style={styles.sectionTitle}>{t('profile.settingsSection')}</RNText>
       <View style={[styles.list, shadows.card as ViewStyle]}>
         {items.map((item) => (
           <SettingsRow
@@ -79,7 +94,7 @@ export function ProfileSettings({
           />
         ))}
         <SettingsRow
-          label="Sign out"
+          label={t('profile.signOut')}
           icon={Logout2}
           danger
           onPress={onLogout}

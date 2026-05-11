@@ -7,6 +7,7 @@ import {
   Platform,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Tabs, useRouter } from 'expo-router';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,14 +21,6 @@ import { colors } from '@/design/tokens/colors';
 import { typography } from '@/design/tokens/typography';
 import { haptic } from '@/lib/haptics';
 
-const TAB_LABELS: Record<string, string> = {
-  index:   'Home',
-  history: 'History',
-  scanner: '',
-  chat:    'AI Assistant',
-  profile: 'Profile',
-};
-
 const TAB_ICONS: Record<string, React.FC<{ color: string }>> = {
   index:   ({ color }) => <Home2     size={22} color={color} />,
   history: ({ color }) => <ClockCircle size={22} color={color} />,
@@ -38,7 +31,16 @@ const TAB_ICONS: Record<string, React.FC<{ color: string }>> = {
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useTranslation();
   const bottom = 24 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0);
+
+  const labels: Record<string, string> = {
+    index: t('tabs.home'),
+    history: t('tabs.history'),
+    scanner: '',
+    chat: t('tabs.assistant'),
+    profile: t('tabs.profile'),
+  };
 
   return (
     <View
@@ -81,7 +83,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
                 activeOpacity={0.85}
                 style={styles.scanBtn}
                 accessibilityRole="button"
-                accessibilityLabel="Scan a product"
+                accessibilityLabel={t('tabs.scanLabel')}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <LinearGradient
@@ -97,7 +99,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
         }
 
         const IconComp = TAB_ICONS[route.name];
-        const label = TAB_LABELS[route.name] ?? route.name;
+        const label = labels[route.name] ?? route.name;
         const color = isFocused ? colors.ink : colors.ink3;
 
         return (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text as RNText } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors } from '@/design/tokens/colors';
 import { spacing } from '@/design/tokens/spacing';
 import { typography } from '@/design/tokens/typography';
@@ -16,13 +17,14 @@ interface ProductSpecsProps {
 
 export function ProductSpecs({
   specs,
-  title = 'Specifications',
+  title,
 }: ProductSpecsProps): React.JSX.Element | null {
+  const { t } = useTranslation();
   if (specs.length === 0) return null;
 
   return (
     <View style={styles.section}>
-      <RNText style={styles.sectionTitle}>{title}</RNText>
+      <RNText style={styles.sectionTitle}>{title ?? t('product.specsTitle')}</RNText>
       <View style={styles.grid}>
         {specs.map((s) => (
           <View key={s.label} style={styles.card}>

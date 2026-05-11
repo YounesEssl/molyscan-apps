@@ -6,6 +6,7 @@ import {
   Text as RNText,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
 import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
@@ -26,6 +27,7 @@ export function AIProductEntry({
   onPress,
   disabled = false,
 }: AIProductEntryProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.section}>
       <TouchableOpacity
@@ -37,7 +39,7 @@ export function AIProductEntry({
         disabled={disabled}
         activeOpacity={0.85}
         accessibilityRole="button"
-        accessibilityLabel={`Ask the AI about ${productName}`}
+        accessibilityLabel={t('product.a11yAskAI', { name: productName })}
         accessibilityState={{ disabled }}
       >
         <LinearGradient
@@ -55,8 +57,8 @@ export function AIProductEntry({
           <Stars size={20} color="#fff" />
         </LinearGradient>
         <View style={styles.text}>
-          <RNText style={styles.title}>Ask the AI</RNText>
-          <RNText style={styles.sub}>Contextualized on {productName}</RNText>
+          <RNText style={styles.title}>{t('product.askAITitle')}</RNText>
+          <RNText style={styles.sub}>{t('product.askAISub', { name: productName })}</RNText>
         </View>
         <AltArrowRight size={16} color={colors.ink3} />
       </TouchableOpacity>

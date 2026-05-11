@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { CheckCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { DangerCircle } from 'react-native-solar-icons/icons/bold-duotone';
@@ -52,6 +53,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
   onScanAgain,
 }) => {
   const router = useRouter();
+  const { t } = useTranslation();
   const [creatingChat, setCreatingChat] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState>({});
   const [pendingDownEq, setPendingDownEq] = useState<string | null>(null);
@@ -119,7 +121,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       const conv = await chatFreeService.createProductConversation({
         scannedName: result.identified.name,
         scannedBrand: result.identified.brand,
-        molydalName: bestEquiv?.name || 'To be determined',
+        molydalName: bestEquiv?.name || t('product.toBeDetermined'),
       });
       onScanAgain(); // close the bottom sheet
       router.push(`/chat/${conv.id}`);
@@ -149,22 +151,22 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       </View>
       <Text variant="heading" style={styles.statusTitle}>
         {noProduct
-          ? 'No product detected'
+          ? t('scanner.statusNoProduct')
           : hasMatch
-            ? 'Equivalent found'
-            : 'No equivalent'}
+            ? t('scanner.statusEquivalent')
+            : t('scanner.statusNoEquivalent')}
       </Text>
 
       {noProduct ? (
         <Card variant="outlined" style={styles.card}>
           <Text variant="caption" color={colors.ink2} style={styles.analysisText}>
-            {result.analysis || 'No lubricant product was identified. Try taking a closer photo of the label or packaging.'}
+            {result.analysis || t('scanner.noLubricantIdentified')}
           </Text>
         </Card>
       ) : (
         <Card variant="outlined" style={styles.card}>
           <Text variant="label" color={colors.ink2}>
-            Identified product
+            {t('scanner.identifiedProduct')}
           </Text>
           <Text variant="subheading">{result.identified.name}</Text>
           <Text variant="caption" color={colors.ink2}>
@@ -191,7 +193,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
             <View style={styles.eqHeader}>
               <View style={styles.eqInfo}>
                 <Text variant="label" color={i === 0 ? colors.red : colors.ink2}>
-                  {i === 0 ? 'Best Molydal equivalent' : 'Alternative'}
+                  {i === 0 ? t('scanner.bestEquivalent') : t('scanner.alternative')}
                 </Text>
                 <Text variant="subheading" color={i === 0 ? colors.red : colors.ink}>
                   {eq.name}
@@ -210,7 +212,9 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
               <View style={styles.feedbackRow}>
                 {fb?.submitted ? (
                   <Text variant="caption" color={colors.ink3}>
-                    {fb.vote === 'up' ? 'Thanks for confirming.' : 'Thanks, your suggestion was recorded.'}
+                    {fb.vote === 'up'
+                      ? t('scanner.feedbackThanksUp')
+                      : t('scanner.feedbackThanksDown')}
                   </Text>
                 ) : (
                   <>
@@ -221,7 +225,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
                         fb?.vote === 'up' && styles.voteBtnActiveUp,
                       ]}
                       accessibilityRole="button"
-                      accessibilityLabel="Approve this equivalent"
+                      accessibilityLabel={t('scanner.feedbackApprove')}
                     >
                       <Like size={18} color={fb?.vote === 'up' ? colors.ok : colors.ink2} />
                     </TouchableOpacity>
@@ -232,7 +236,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
                         fb?.vote === 'down' && styles.voteBtnActiveDown,
                       ]}
                       accessibilityRole="button"
-                      accessibilityLabel="Reject this equivalent"
+                      accessibilityLabel={t('scanner.feedbackReject')}
                     >
                       <Dislike size={18} color={fb?.vote === 'down' ? colors.red : colors.ink2} />
                     </TouchableOpacity>
@@ -248,7 +252,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       {result.analysis ? (
         <Card variant="outlined" style={styles.card}>
           <Text variant="label" color={colors.ink2}>
-            Detailed analysis
+            {t('scanner.detailedAnalysis')}
           </Text>
           <Text variant="caption" color={colors.ink} style={styles.analysisText}>
             {result.analysis}
@@ -260,7 +264,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       <View style={styles.actions}>
         {!noProduct && (
           <Button
-            label={creatingChat ? 'Opening...' : 'Ask the AI'}
+            label={creatingChat ? t('scanner.askAIOpening') : t('scanner.askAI')}
             variant="primary"
             icon={<ChatRoundDots size={18} color={colors.textOnRed} />}
             onPress={handleAskAI}
@@ -269,7 +273,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
           />
         )}
         <Button
-          label="Scan another product"
+          label={t('scanner.scanAnotherProduct')}
           variant={noProduct ? 'primary' : 'secondary'}
           icon={<Camera size={18} color={noProduct ? colors.textOnRed : colors.ink} />}
           onPress={onScanAgain}
@@ -290,18 +294,14 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
           style={styles.modalBackdrop}
         >
           <View style={styles.modalCard}>
-            <Text variant="subheading">Suggest a better equivalent</Text>
+            <Text variant="subheading">{t('scanner.suggestTitle')}</Text>
             <Text variant="caption" color={colors.ink2} style={styles.modalSubtitle}>
-              Which Molydal product should have been proposed instead of{' '}
-              <Text variant="caption" color={colors.ink}>
-                {pendingDownEq}
-              </Text>
-              ?
+              {t('scanner.suggestPrompt', { name: pendingDownEq ?? '' })}
             </Text>
             <TextInput
               value={suggestedName}
               onChangeText={setSuggestedName}
-              placeholder="e.g. NS 100 AL"
+              placeholder={t('scanner.suggestPlaceholder')}
               placeholderTextColor={colors.ink3}
               style={styles.modalInput}
               autoFocus
@@ -310,7 +310,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
             />
             <View style={styles.modalActions}>
               <Button
-                label="Cancel"
+                label={t('scanner.suggestCancel')}
                 variant="secondary"
                 onPress={() => {
                   if (!submittingFeedback) setPendingDownEq(null);
@@ -318,7 +318,11 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
                 disabled={submittingFeedback}
               />
               <Button
-                label={submittingFeedback ? 'Sending…' : 'Send'}
+                label={
+                  submittingFeedback
+                    ? t('scanner.suggestSending')
+                    : t('scanner.suggestSend')
+                }
                 variant="primary"
                 onPress={handleSubmitDownVote}
                 disabled={submittingFeedback || suggestedName.trim().length === 0}

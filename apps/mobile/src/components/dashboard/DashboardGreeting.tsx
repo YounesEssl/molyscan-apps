@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text as RNText } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/Text';
 import { colors } from '@/design/tokens/colors';
 import { spacing } from '@/design/tokens/spacing';
@@ -12,15 +13,18 @@ interface DashboardGreetingProps {
 export function DashboardGreeting({
   firstName,
 }: DashboardGreetingProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.greeting}>
       <Text style={styles.greetingSub}>
-        {firstName ? `Hi ${firstName},` : 'Hello,'}
+        {firstName
+          ? t('dashboard.greetingNamed', { name: firstName })
+          : t('dashboard.greeting')}
       </Text>
       <RNText style={styles.greetingTitle}>
-        {'Ready to '}
-        <RNText style={styles.greetingItalic}>scan</RNText>
-        {'?'}
+        {t('dashboard.readyTitlePart1')}
+        <RNText style={styles.greetingItalic}>{t('dashboard.readyTitlePart2')}</RNText>
+        {t('dashboard.readyTitlePart3')}
       </RNText>
     </View>
   );

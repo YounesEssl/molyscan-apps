@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from '@/components/ui/Text';
 import { Pill } from '@/components/ui/Pill';
@@ -20,26 +21,27 @@ interface PendingWorkflowsSectionProps {
   onPress: (id: string) => void;
 }
 
-const STATUS_LABEL: Record<PriceWorkflow['status'], string> = {
-  draft: 'Draft',
-  submitted: 'Pending',
-  under_review: 'Review',
-  approved: 'OK',
-  rejected: 'Rejected',
+const STATUS_KEY: Record<PriceWorkflow['status'], string> = {
+  draft: 'workflow.statusShortDraft',
+  submitted: 'workflow.statusShortPending',
+  under_review: 'workflow.statusShortReview',
+  approved: 'workflow.statusShortApproved',
+  rejected: 'workflow.statusShortRejected',
 };
 
 export function PendingWorkflowsSection({
   workflows,
   onPress,
 }: PendingWorkflowsSectionProps): React.JSX.Element | null {
+  const { t } = useTranslation();
   if (workflows.length === 0) return null;
 
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Pending requests</Text>
+        <Text style={styles.sectionTitle}>{t('dashboard.pendingRequests')}</Text>
         <Pill variant="accent" size="sm">
-          {workflows.length} to review
+          {t('dashboard.toReview', { count: workflows.length })}
         </Pill>
       </View>
       {workflows.slice(0, 2).map((w) => (
@@ -58,6 +60,9 @@ function WorkflowRow({
   workflow,
   onPress,
 }: WorkflowRowProps): React.JSX.Element {
+  const { t } = useTranslation();
+  const productName = workflow.productName || t('dashboard.defaultProduct');
+  const clientName = workflow.clientName || t('dashboard.defaultClient');
   return (
     <TouchableOpacity
       style={styles.card}
@@ -67,19 +72,19 @@ function WorkflowRow({
       }}
       activeOpacity={0.8}
       accessibilityRole="button"
-      accessibilityLabel={`Open request ${workflow.productName || 'product'} for ${workflow.clientName || 'client'}`}
+      accessibilityLabel={t('dashboard.a11yOpenWorkflow', { product: productName, client: clientName })}
     >
       <View style={styles.iconBox}>
         <Stars size={20} color={colors.red} />
       </View>
       <View style={styles.text}>
         <Text style={styles.name} numberOfLines={1}>
-          {workflow.productName || 'Product'}
+          {productName}
         </Text>
-        <Text style={styles.sub}>{workflow.clientName || 'Client'}</Text>
+        <Text style={styles.sub}>{clientName}</Text>
       </View>
       <Pill variant="default" size="sm">
-        {STATUS_LABEL[workflow.status]}
+        {t(STATUS_KEY[workflow.status])}
       </Pill>
     </TouchableOpacity>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Aura } from '@/components/ui/Aura';
@@ -20,6 +21,7 @@ import type { ScanRecord } from '@/schemas/scan.schema';
 
 export default function DashboardScreen(): React.JSX.Element {
   const router = useRouter();
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const workflows = useWorkflowStore((s) => s.workflows);
   const setWorkflows = useWorkflowStore((s) => s.setWorkflows);
@@ -45,11 +47,11 @@ export default function DashboardScreen(): React.JSX.Element {
   );
 
   const stats: StatItem[] = [
-    { label: 'Scans', value: String(scans.length) },
+    { label: t('dashboard.scans'), value: String(scans.length) },
     ...(scans.length > 0
-      ? [{ label: 'Match rate', value: `${matchRate}%`, accent: true }]
+      ? [{ label: t('dashboard.matchRate'), value: `${matchRate}%`, accent: true }]
       : []),
-    { label: 'Requests', value: String(workflows.length) },
+    { label: t('dashboard.requests'), value: String(workflows.length) },
   ];
 
   return (

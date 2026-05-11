@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Text as RNText,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/design/tokens/colors';
 import { radius } from '@/design/tokens/radius';
@@ -19,8 +20,10 @@ interface PriceRequestCTAProps {
 
 export function PriceRequestCTA({
   onPress,
-  label = 'Request a client price',
+  label,
 }: PriceRequestCTAProps): React.JSX.Element {
+  const { t } = useTranslation();
+  const resolvedLabel = label ?? t('product.requestClientPrice');
   return (
     <View style={styles.section}>
       <View style={styles.shadowWrap}>
@@ -32,7 +35,7 @@ export function PriceRequestCTA({
           }}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel={label}
+          accessibilityLabel={resolvedLabel}
         >
           <LinearGradient
             colors={[colors.redVivid, colors.red]}
@@ -40,7 +43,7 @@ export function PriceRequestCTA({
             end={{ x: 1, y: 1 }}
             style={styles.cta}
           >
-            <RNText style={styles.text}>{label}</RNText>
+            <RNText style={styles.text}>{resolvedLabel}</RNText>
           </LinearGradient>
         </TouchableOpacity>
       </View>

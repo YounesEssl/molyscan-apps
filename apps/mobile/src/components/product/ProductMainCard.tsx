@@ -5,6 +5,7 @@ import {
   Text as RNText,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ring } from '@/components/ui/Ring';
 import { Pill } from '@/components/ui/Pill';
 import { colors } from '@/design/tokens/colors';
@@ -28,19 +29,21 @@ export function ProductMainCard({
   confidence,
   matchTitle,
   matchDescription,
-  category = 'Molydal · Greases & oils',
+  category,
 }: ProductMainCardProps): React.JSX.Element {
+  const { t } = useTranslation();
   const hasMatchText = Boolean(matchTitle || matchDescription);
+  const resolvedCategory = category ?? t('product.categoryDefault');
 
   return (
     <View style={[styles.cardShadow, shadows.card as ViewStyle]}>
       <View style={styles.card}>
         <Pill variant="accent" size="sm">
-          {category}
+          {resolvedCategory}
         </Pill>
 
         <RNText style={styles.productName}>{productName}</RNText>
-        <RNText style={styles.replaces}>Replaces {competitorName}</RNText>
+        <RNText style={styles.replaces}>{t('product.replaces', { name: competitorName })}</RNText>
 
         <View
           style={[

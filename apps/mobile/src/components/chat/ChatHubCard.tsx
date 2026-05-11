@@ -5,6 +5,8 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/i18n';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from '@/components/ui/Text';
@@ -22,16 +24,17 @@ interface ChatHubCardProps {
   onLongPress?: () => void;
 }
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, t: (k: string, opts?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}min`;
+  if (mins < 1) return t('common.justNow');
+  if (mins < 60) return t('common.minutesAgo', { count: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
+  if (hours < 24) return t('common.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  if (days < 7) return t('common.daysAgo', { count: days });
+  const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
+  return new Date(dateStr).toLocaleDateString(locale, {
     day: 'numeric',
     month: 'short',
   });
@@ -42,6 +45,7 @@ export const ChatHubCard = React.memo(function ChatHubCard({
   onPress,
   onLongPress,
 }: ChatHubCardProps): React.JSX.Element {
+  const { t } = useTranslation();
   const handlePress = useCallback(() => {
     haptic.light();
     onPress();
@@ -61,8 +65,8 @@ export const ChatHubCard = React.memo(function ChatHubCard({
       onLongPress={handleLongPress}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={`Conversation ${conversation.title}`}
-      accessibilityHint="Long-press to delete"
+      accessibilityLabel={t('chat.cardA11y', { title: conversation.title })}
+      accessibilityHint={t('chat.cardA11yHint')}
     >
       <LinearGradient
         colors={[colors.purpleVivid, colors.purple]}
@@ -86,7 +90,7 @@ export const ChatHubCard = React.memo(function ChatHubCard({
             color={colors.ink3}
             style={styles.time}
           >
-            {timeAgo(conversation.updatedAt)}
+            {timeAgo(conversation.updatedAt, t)}
           </Text>
         </View>
         {conversation.type === 'product' && conversation.product ? (
@@ -101,7 +105,9 @@ export const ChatHubCard = React.memo(function ChatHubCard({
             numberOfLines={1}
             style={styles.preview}
           >
-            {conversation.lastMessage.role === 'user' ? 'You: ' : 'AI: '}
+            {conversation.lastMessage.role === 'user'
+              ? t('chat.convYouPrefix')
+              : t('chat.convAIPrefix')}
             {conversation.lastMessage.text}
           </Text>
         ) : (
@@ -110,7 +116,7 @@ export const ChatHubCard = React.memo(function ChatHubCard({
             color={colors.ink3}
             style={styles.preview}
           >
-            Empty conversation — start chatting
+            {t('chat.emptyConversationPreview')}
           </Text>
         )}
       </View>

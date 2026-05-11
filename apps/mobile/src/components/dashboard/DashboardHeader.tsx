@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Bell } from 'react-native-solar-icons/icons/bold-duotone';
 import { Wordmark3 } from '@/components/ui/Wordmark';
 import { colors } from '@/design/tokens/colors';
@@ -15,6 +16,7 @@ export function DashboardHeader({
   onBellPress,
   hasNotifications = true,
 }: DashboardHeaderProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.header}>
       <Wordmark3 size={18} />
@@ -27,7 +29,7 @@ export function DashboardHeader({
         activeOpacity={0.8}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         accessibilityRole="button"
-        accessibilityLabel="Open notifications"
+        accessibilityLabel={t('dashboard.a11yOpenNotifications')}
       >
         <Bell size={19} color={colors.ink} />
         {hasNotifications ? <View style={styles.bellDot} /> : null}

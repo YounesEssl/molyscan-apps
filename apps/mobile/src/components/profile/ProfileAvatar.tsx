@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text as RNText } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pill } from '@/components/ui/Pill';
 import { colors } from '@/design/tokens/colors';
@@ -21,6 +22,7 @@ export function ProfileAvatar({
   scanCount = 0,
   matchRate = 0,
 }: ProfileAvatarProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.section}>
       <LinearGradient
@@ -38,11 +40,11 @@ export function ProfileAvatar({
       {scanCount > 0 ? (
         <View style={styles.pills}>
           <Pill variant="default" size="sm">
-            {`${scanCount} scan${scanCount > 1 ? 's' : ''}`}
+            {t('profile.pillScanCount', { count: scanCount })}
           </Pill>
           {matchRate > 0 ? (
             <Pill variant="accent" size="sm">
-              {`${matchRate}% match`}
+              {t('profile.pillMatchRate', { percent: matchRate })}
             </Pill>
           ) : null}
         </View>

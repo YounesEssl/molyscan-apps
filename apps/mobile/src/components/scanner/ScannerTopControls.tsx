@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AltArrowLeft } from 'react-native-solar-icons/icons/bold';
 import { Flashlight } from 'react-native-solar-icons/icons/bold';
@@ -18,6 +19,7 @@ export function ScannerTopControls({
   onClose,
   onToggleFlash,
 }: ScannerTopControlsProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.row}>
@@ -29,7 +31,7 @@ export function ScannerTopControls({
           }}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Close scanner"
+          accessibilityLabel={t('scanner.a11yClose')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <AltArrowLeft size={20} color={colors.ink} />
@@ -43,7 +45,7 @@ export function ScannerTopControls({
           }}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel={flashEnabled ? 'Turn off flash' : 'Turn on flash'}
+          accessibilityLabel={flashEnabled ? t('scanner.a11yFlashOff') : t('scanner.a11yFlashOn')}
           accessibilityState={{ selected: flashEnabled }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >

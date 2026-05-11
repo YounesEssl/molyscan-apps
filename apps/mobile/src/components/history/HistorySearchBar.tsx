@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Magnifer } from 'react-native-solar-icons/icons/bold-duotone';
 import { Filter } from 'react-native-solar-icons/icons/bold';
 import { colors } from '@/design/tokens/colors';
@@ -23,15 +24,17 @@ export function HistorySearchBar({
   value,
   onChangeText,
   onFilterPress,
-  placeholder = 'Reference, client, date…',
+  placeholder,
 }: HistorySearchBarProps): React.JSX.Element {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t('history.searchPlaceholder');
   return (
     <View style={styles.wrap}>
       <View style={styles.bar}>
         <Magnifer size={16} color={colors.ink2} />
         <TextInput
           style={styles.input}
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           placeholderTextColor={colors.ink2}
           value={value}
           onChangeText={onChangeText}

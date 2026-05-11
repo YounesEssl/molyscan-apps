@@ -43,7 +43,11 @@ export default function ExportScreen(): React.JSX.Element {
   }, []);
 
   const brandOptions = useMemo(() => {
-    return [...new Set(scans.map((s) => s.scannedProduct?.brand).filter(Boolean))];
+    return [...new Set(
+      scans
+        .map((s) => s.scannedProduct?.brand)
+        .filter((b): b is string => Boolean(b)),
+    )];
   }, [scans]);
 
   const filteredScans = useMemo(() => {

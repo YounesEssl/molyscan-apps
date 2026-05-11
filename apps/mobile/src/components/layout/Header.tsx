@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Platform, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AltArrowLeft } from 'react-native-solar-icons/icons/bold';
 import { useRouter } from 'expo-router';
 import { Text } from '@/components/ui';
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   rightAction,
 }) => {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.container}>
@@ -30,6 +32,8 @@ export const Header: React.FC<HeaderProps> = ({
           onPress={onBack ?? (() => router.back())}
           style={[styles.iconButton, SHADOW.sm as ViewStyle]}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('header.backA11y')}
         >
           <AltArrowLeft size={22} color={COLORS.text} />
         </TouchableOpacity>

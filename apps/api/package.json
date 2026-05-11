@@ -14,7 +14,8 @@
     "prisma:studio": "prisma studio",
     "test": "jest",
     "test:eval": "jest --testPathPatterns=rag.eval --testTimeout=90000 --forceExit --verbose",
-    "test:eval:real": "jest --testPathPatterns=rag.real-eval --testTimeout=120000 --forceExit --verbose --runInBand"
+    "test:eval:real": "jest --testPathPatterns=rag.real-eval --testTimeout=120000 --forceExit --verbose --runInBand",
+    "test:prod-feedback": "jest --testPathPatterns=rag.prod-feedback --testTimeout=180000 --forceExit --verbose --runInBand"
   },
   "jest": {
     "moduleFileExtensions": ["js", "json", "ts"],

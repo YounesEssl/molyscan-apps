@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Text as RNText,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AltArrowLeft } from 'react-native-solar-icons/icons/bold';
 import { MenuDots } from 'react-native-solar-icons/icons/bold-duotone';
 import { colors } from '@/design/tokens/colors';
@@ -19,10 +20,11 @@ interface ProductDetailHeaderProps {
 }
 
 export function ProductDetailHeader({
-  title = 'Product',
+  title,
   onBack,
   onMenu,
 }: ProductDetailHeaderProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.header}>
       <TouchableOpacity
@@ -33,12 +35,12 @@ export function ProductDetailHeader({
         }}
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('product.a11yBack')}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <AltArrowLeft size={18} color={colors.ink} />
       </TouchableOpacity>
-      <RNText style={styles.title}>{title}</RNText>
+      <RNText style={styles.title}>{title ?? t('product.headerDefaultTitle')}</RNText>
       <TouchableOpacity
         style={styles.btn}
         onPress={() => {
@@ -47,7 +49,7 @@ export function ProductDetailHeader({
         }}
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel="Open product menu"
+        accessibilityLabel={t('product.a11yMenu')}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <MenuDots size={18} color={colors.ink} />

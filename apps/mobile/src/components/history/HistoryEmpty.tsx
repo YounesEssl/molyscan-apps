@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { CloudWaterdrop } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from '@/components/ui/Text';
 import { colors } from '@/design/tokens/colors';
@@ -7,15 +8,16 @@ import { radius } from '@/design/tokens/radius';
 import { spacing } from '@/design/tokens/spacing';
 
 export function HistoryEmpty(): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.empty}>
       <View style={styles.icon}>
         <CloudWaterdrop size={32} color={colors.ink3} />
       </View>
       <Text variant="body" color={colors.ink2}>
-        No scans yet
+        {t('history.emptyState')}
       </Text>
-      <Text variant="caption">Take a photo of a product to get started</Text>
+      <Text variant="caption">{t('history.emptyHint')}</Text>
     </View>
   );
 }

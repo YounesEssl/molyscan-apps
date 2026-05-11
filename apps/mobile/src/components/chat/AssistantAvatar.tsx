@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text as RNText } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
 import { colors } from '@/design/tokens/colors';
@@ -12,9 +13,10 @@ interface AssistantAvatarProps {
 }
 
 export function AssistantAvatar({
-  name = 'Molydal Assistant',
-  subtitle = 'Contextualized on the catalog',
+  name,
+  subtitle,
 }: AssistantAvatarProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.row}>
       <LinearGradient
@@ -26,8 +28,8 @@ export function AssistantAvatar({
         <Stars size={16} color="#fff" />
       </LinearGradient>
       <View>
-        <RNText style={styles.name}>{name}</RNText>
-        <RNText style={styles.sub}>{subtitle}</RNText>
+        <RNText style={styles.name}>{name ?? t('chat.assistantNameDefault')}</RNText>
+        <RNText style={styles.sub}>{subtitle ?? t('chat.assistantSubDefault')}</RNText>
       </View>
     </View>
   );

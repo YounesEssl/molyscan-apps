@@ -7,6 +7,7 @@ import {
   Text as RNText,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/Text';
 import { Pill } from '@/components/ui/Pill';
 import { colors } from '@/design/tokens/colors';
@@ -21,10 +22,10 @@ interface RecentScansSectionProps {
   onSeeAllPress: () => void;
 }
 
-const STATUS_LABEL: Record<ScanStatus, string> = {
-  matched: '● Matched',
-  partial: '● Partial',
-  no_match: '○ None',
+const STATUS_KEY: Record<ScanStatus, string> = {
+  matched: 'recentScans.statusMatched',
+  partial: 'recentScans.statusPartial',
+  no_match: 'recentScans.statusNoMatch',
 };
 
 const STATUS_VARIANT: Record<
@@ -41,12 +42,13 @@ export function RecentScansSection({
   onScanPress,
   onSeeAllPress,
 }: RecentScansSectionProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent</Text>
+        <Text style={styles.sectionTitle}>{t('dashboard.recentTitle')}</Text>
         <TouchableOpacity onPress={onSeeAllPress} activeOpacity={0.7}>
-          <Text style={styles.seeAll}>See all</Text>
+          <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
         </TouchableOpacity>
       </View>
       <ScrollView
@@ -59,9 +61,7 @@ export function RecentScansSection({
         ))}
         {scans.length === 0 ? (
           <View style={styles.empty}>
-            <RNText style={styles.emptyText}>
-              No scans yet
-            </RNText>
+            <RNText style={styles.emptyText}>{t('dashboard.noScansYet')}</RNText>
           </View>
         ) : null}
       </ScrollView>
@@ -78,6 +78,7 @@ function RecentScanCard({
   scan,
   onPress,
 }: RecentScanCardProps): React.JSX.Element {
+  const { t } = useTranslation();
   const status = scan.status;
   const confidence = scan.molydalMatch?.confidence ?? 0;
   return (
@@ -88,7 +89,7 @@ function RecentScanCard({
     >
       <View style={styles.cardTop}>
         <Pill variant={STATUS_VARIANT[status]} size="sm">
-          {STATUS_LABEL[status]}
+          {t(STATUS_KEY[status])}
         </Pill>
         {confidence > 0 ? (
           <RNText style={styles.confidence}>
@@ -99,7 +100,7 @@ function RecentScanCard({
       </View>
       <RNText style={styles.competitor}>{scan.scannedProduct?.brand ?? ''}</RNText>
       <RNText style={styles.equivalent} numberOfLines={2}>
-        {scan.molydalMatch?.name ?? 'No equivalent'}
+        {scan.molydalMatch?.name ?? t('recentScans.noEquivalent')}
       </RNText>
       <RNText style={styles.place}>{scan.location?.label ?? ''}</RNText>
     </TouchableOpacity>

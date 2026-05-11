@@ -6,6 +6,7 @@ import {
   Text as RNText,
   ActivityIndicator,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { AltArrowLeft, Flag } from 'react-native-solar-icons/icons/bold';
 import { colors } from '@/design/tokens/colors';
 import { spacing } from '@/design/tokens/spacing';
@@ -26,6 +27,7 @@ export function AssistantHeader({
   submitting = false,
   submitted = false,
 }: AssistantHeaderProps): React.JSX.Element {
+  const { t } = useTranslation();
   const submitDisabled = submitting || submitted || !onSubmitForAnalysis;
 
   return (
@@ -35,7 +37,7 @@ export function AssistantHeader({
         onPress={onBack}
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel="Back"
+        accessibilityLabel={t('chat.backA11y')}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <AltArrowLeft size={18} color={colors.ink} />
@@ -52,7 +54,7 @@ export function AssistantHeader({
         activeOpacity={0.8}
         accessibilityRole="button"
         accessibilityLabel={
-          submitted ? 'Conversation envoyée pour analyse' : 'Envoyer pour analyse'
+          submitted ? t('chat.submitA11yDone') : t('chat.submitA11yPending')
         }
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >

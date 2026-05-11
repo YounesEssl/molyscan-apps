@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from '../chat/rag/rag.service';
-import { VectorStoreService } from '../chat/rag/vector-store.service';
+import { VectorStoreService, RetrievalFilters } from '../chat/rag/vector-store.service';
 
 /**
  * Canonical form of a product name/brand for cache lookups.
@@ -23,16 +23,61 @@ function normalize(s: string | null | undefined): string {
     .trim();
 }
 
+// Structured taxonomy aligned with Molydal catalog families. Used to build a
+// targeted RAG search query and (later) to drive metadata filters.
+export type ProductCategory =
+  | 'grease'
+  | 'cutting_oil_neat'
+  | 'cutting_fluid_soluble'
+  | 'hydraulic_oil'
+  | 'degreaser_cleaner'
+  | 'contact_cleaner_electrical'
+  | 'brake_parts_cleaner'
+  | 'anti_spatter_welding'
+  | 'assembly_paste'
+  | 'chain_lubricant'
+  | 'vanishing_oil'
+  | 'mold_release_paste'
+  | 'petroleum_jelly'
+  | 'general_lubricant_spray'
+  | 'other';
+
+export type ProductFormat =
+  | 'aerosol'
+  | 'spray_pump'
+  | 'liquid_bottle'
+  | 'liquid_drum'
+  | 'paste_tube'
+  | 'cartridge'
+  | 'bulk_drum'
+  | 'unknown';
+
+export interface IdentifiedProduct {
+  name: string;
+  brand: string;
+  /** Legacy free-text type (kept for backward compatibility) */
+  type: string;
+  /** Legacy free-text specs (kept for backward compatibility) */
+  specs: string;
+  /** Structured high-level category */
+  category?: ProductCategory;
+  /** Physical form factor (aerosol/spray/paste/etc) */
+  format?: ProductFormat;
+  /** Application contexts mentioned on packaging (welding, food_contact, marine, electrical, brake, …) */
+  applicationContext?: string[];
+  /** Certifications visible on packaging (NSF_H1, USDA, eco_responsible, …) */
+  certifications?: string[];
+  /** Thickener family for greases (lithium, calcium_complex, polyurea, PTFE, MoS2, …) */
+  thickener?: string;
+  /** ISO viscosity if visible (32, 46, 68, 100, …) */
+  isoViscosity?: number;
+}
+
 export interface ImageAnalysisResult {
   /** Scan ID (persisted in DB) */
   id: string;
   /** Identified competitor product */
-  identified: {
-    name: string;
-    brand: string;
-    type: string;
-    specs: string;
-  };
+  identified: IdentifiedProduct;
   /** Best Molydal equivalent(s) */
   equivalents: Array<{
     name: string;
@@ -159,17 +204,33 @@ export class ImageAnalysisService {
       };
     }
 
-    // Step 2: RAG search — build a Molydal-oriented search query
+    // Step 2: RAG search — build a Molydal-oriented search query from the
+    // STRUCTURED identification (category + format + application + certif + thickener).
+    // The structured query lands the embedding in the right cluster; the Gemini
+    // reformulation in parallel adds synonyms / variations.
     const t2 = Date.now();
-    const searchQuery = `grease oil lubricant Molydal equivalent ${identification.type} ${identification.specs} ${identification.name}`;
-    const reformulated = await this.ragService.reformulateQuery(
-      `Find the Molydal equivalent of ${identification.name} by ${identification.brand}. It is a ${identification.type}. Characteristics: ${identification.specs}`,
-      [],
-    );
+    const searchQuery = this.buildSearchQuery(identification);
+    this.logger.log(`   Search query: "${searchQuery.slice(0, 160)}${searchQuery.length > 160 ? '…' : ''}"`);
+    const reformulationInput = `Find the Molydal equivalent of ${identification.name} by ${identification.brand}.${
+      identification.category ? ` Category: ${identification.category}.` : ''
+    }${identification.format && identification.format !== 'unknown' ? ` Format: ${identification.format}.` : ''}${
+      identification.applicationContext?.length ? ` Application: ${identification.applicationContext.join(', ')}.` : ''
+    }${
+      identification.certifications?.length ? ` Certifications: ${identification.certifications.join(', ')}.` : ''
+    } Characteristics: ${identification.specs}`;
+    const reformulated = await this.ragService.reformulateQuery(reformulationInput, []);
     this.logger.log(`✅ Step 2a — Reformulation (Gemini): ${Date.now() - t2}ms`);
 
     const t2b = Date.now();
-    const allChunks = await this.vectorStore.dualSearch(searchQuery, reformulated);
+    const retrievalFilters = this.buildRetrievalFilters(identification);
+    if (Object.keys(retrievalFilters).length > 0) {
+      this.logger.log(`   Filters: ${JSON.stringify(retrievalFilters)}`);
+    }
+    const allChunks = await this.vectorStore.dualSearch(
+      searchQuery,
+      reformulated,
+      Object.keys(retrievalFilters).length > 0 ? retrievalFilters : undefined,
+    );
     // Keep only top 8 chunks to reduce context size and speed up Claude
     const chunks = allChunks.slice(0, 8);
     this.logger.log(`✅ Step 2b — RAG search (Supabase): ${Date.now() - t2b}ms → ${allChunks.length} chunks, kept ${chunks.length}`);
@@ -227,32 +288,41 @@ export class ImageAnalysisService {
     imageBase64: string,
     mimeType: string,
     userMessage?: string,
-  ): Promise<{ name: string; brand: string; type: string; specs: string }> {
+  ): Promise<IdentifiedProduct> {
     // Detect actual mime from magic bytes
     if (imageBase64.startsWith('iVBOR')) mimeType = 'image/png';
     else if (imageBase64.startsWith('/9j/')) mimeType = 'image/jpeg';
     else if (imageBase64.startsWith('R0lG')) mimeType = 'image/gif';
     else if (imageBase64.startsWith('UklG')) mimeType = 'image/webp';
 
-    const prompt = `Identify the lubricant/grease/oil product in this image.
+    const prompt = `Identify the lubricant / grease / oil / cleaner / paste industrial product in this image.
 
-If you see a lubricant, grease, oil, or industrial maintenance product, return:
+If you see one, return a STRUCTURED JSON with these fields:
 {
-  "name": "full product name",
-  "brand": "brand (Shell, Mobil, Klüber, Total, SKF, Fuchs, etc.)",
-  "type": "product type (grease, oil, spray, etc.)",
-  "specs": "visible technical characteristics (viscosity, NLGI, temperature, base, thickener, certifications, etc.)"
+  "name": "full product name as printed on the label",
+  "brand": "brand (Shell, Mobil, Klüber, Total, SKF, Fuchs, WD-40, CRC, Bardahl, Loctite, Molykote, INTERFLON, Bérulube, Igol, Jelt, …)",
+  "type": "short free-text type for legacy display (e.g. \\"grease aerosol\\")",
+  "specs": "free-text visible technical characteristics (viscosity, NLGI, temperature range, base oil, thickener, certifications, …)",
+  "category": "ONE of: grease | cutting_oil_neat | cutting_fluid_soluble | hydraulic_oil | degreaser_cleaner | contact_cleaner_electrical | brake_parts_cleaner | anti_spatter_welding | assembly_paste | chain_lubricant | vanishing_oil | mold_release_paste | petroleum_jelly | general_lubricant_spray | other",
+  "format": "ONE of: aerosol | spray_pump | liquid_bottle | liquid_drum | paste_tube | cartridge | bulk_drum | unknown",
+  "applicationContext": ["welding" | "food_contact" | "marine" | "electrical" | "brake" | "chain" | "bearings" | "high_speed" | "high_temperature" | "automotive" | "pharmaceutical" | …],
+  "certifications": ["NSF_H1" | "USDA" | "eco_responsible" | "biodegradable" | "halal" | "kosher" | …],
+  "thickener": "lithium | lithium_complex | calcium | calcium_complex | calcium_sulfonate | calcium_anhydrous | polyurea | PTFE | MoS2 | bentonite | aluminum_complex | null",
+  "isoViscosity": null | 32 | 46 | 68 | 100 | 150 | 220 | 320 | 460 | 680
 }
 
-If the image does NOT contain an identifiable lubricant product, return:
-{
-  "name": null,
-  "brand": null,
-  "type": null,
-  "specs": null
-}
+Guidelines:
+- Pick category based on the PRIMARY use stated on packaging.
+- format=aerosol when you see a metal can with a propellant valve. Even if "spray" is in the name, distinguish aerosol (compressed gas can) from spray_pump (trigger spray).
+- applicationContext = exact contexts shown on the label (e.g. "welding spray" → ["welding"], "for brake cleaning" → ["brake"], "food grade" → ["food_contact"]).
+- certifications = ONLY what is visibly printed (NSF logo, USDA, eco label). Do not infer.
+- For non-grease products, set thickener to null.
+- Be conservative: if a field is not visible/inferable from the image, set it to null (or empty array).
 
-Return ONLY the JSON, without markdown.${userMessage ? `\n\nUser context: ${userMessage}` : ''}`;
+If the image does NOT contain an identifiable lubricant product, return ALL fields as null:
+{"name": null, "brand": null, "type": null, "specs": null, "category": null, "format": null, "applicationContext": null, "certifications": null, "thickener": null, "isoViscosity": null}
+
+Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser context: ${userMessage}` : ''}`;
 
     // Greedy decoding — temperature 0, topP 0.1, topK 1 — eliminates the main
     // source of variability in scan results (same image → same identification).
@@ -275,14 +345,104 @@ Return ONLY the JSON, without markdown.${userMessage ? `\n\nUser context: ${user
       if (jsonStr.startsWith('```')) {
         jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       }
-      return JSON.parse(jsonStr);
+      const parsed = JSON.parse(jsonStr) as Partial<IdentifiedProduct>;
+      return {
+        name: parsed.name ?? '',
+        brand: parsed.brand ?? '',
+        type: parsed.type ?? '',
+        specs: parsed.specs ?? '',
+        category: parsed.category ?? undefined,
+        format: parsed.format ?? undefined,
+        applicationContext: Array.isArray(parsed.applicationContext)
+          ? parsed.applicationContext
+          : undefined,
+        certifications: Array.isArray(parsed.certifications)
+          ? parsed.certifications
+          : undefined,
+        thickener: parsed.thickener ?? undefined,
+        isoViscosity:
+          typeof parsed.isoViscosity === 'number' ? parsed.isoViscosity : undefined,
+      };
     } catch {
       return { name: text.slice(0, 100), brand: 'Unknown', type: 'lubricant', specs: '' };
     }
   }
 
+  /**
+   * Translate the structured identification into hard catalog filters.
+   * Only emit a filter when the field is unambiguous on the packaging.
+   */
+  private buildRetrievalFilters(id: IdentifiedProduct): RetrievalFilters {
+    const filters: RetrievalFilters = {};
+    if (id.format && id.format !== 'unknown') filters.format = id.format;
+    if (id.certifications?.includes('NSF_H1') || id.certifications?.includes('USDA')) {
+      filters.alimentaire = true;
+    }
+    if (id.certifications?.includes('eco_responsible')) {
+      filters.ecoResponsable = true;
+    }
+    // Family filter is intentionally NOT auto-derived from `category` — the
+    // mapping is not 1-to-1 (multiple categories live inside "MLS DIVERS").
+    return filters;
+  }
+
+  /**
+   * Build a Molydal-oriented RAG search query from the structured identification.
+   * Lead with category + format so the embedding lands in the right cluster of
+   * the catalog before the free-text specs add detail.
+   */
+  private buildSearchQuery(id: IdentifiedProduct): string {
+    const categoryToKeywords: Record<ProductCategory, string> = {
+      grease: 'grease lubricating bearing',
+      cutting_oil_neat: 'neat cutting oil entire mineral metalworking machining non-soluble',
+      cutting_fluid_soluble:
+        'soluble cutting fluid micro-emulsion semi-synthetic machining biostable',
+      hydraulic_oil: 'hydraulic oil ISO VG circuit reducer',
+      degreaser_cleaner: 'degreaser cleaner solvent industrial',
+      contact_cleaner_electrical:
+        'electrical contact cleaner aerosol plastic-safe fast-drying dielectric',
+      brake_parts_cleaner:
+        'brake parts cleaner aerosol fast-evaporating chlorine-free solvent',
+      anti_spatter_welding:
+        'welding anti-spatter ceramic dry film protective spray MIG MAG',
+      assembly_paste:
+        'assembly paste anti-seize high temperature mounting',
+      chain_lubricant: 'chain lubricant adhesive penetrating',
+      vanishing_oil: 'vanishing evaporating oil stamping cutting light',
+      mold_release_paste: 'mold release agent paste',
+      petroleum_jelly: 'petroleum jelly petrolatum technical pharmaceutical white grade',
+      general_lubricant_spray:
+        'multi-purpose lubricant aerosol spray penetrating maintenance',
+      other: '',
+    };
+    const parts: string[] = [];
+    if (id.category) parts.push(categoryToKeywords[id.category] || id.category);
+    if (id.format && id.format !== 'unknown') {
+      // emphasize aerosol/spray/paste as a hard signal — repeat keyword to weight it
+      parts.push(id.format.replace(/_/g, ' '));
+      if (id.format === 'aerosol') parts.push('aerosol can spray');
+      if (id.format === 'paste_tube') parts.push('paste tube');
+    }
+    if (id.applicationContext?.length) {
+      parts.push(...id.applicationContext.map((a) => a.replace(/_/g, ' ')));
+    }
+    if (id.certifications?.length) {
+      parts.push(
+        ...id.certifications.map((c) =>
+          c === 'NSF_H1' ? 'NSF H1 food grade' : c.replace(/_/g, ' '),
+        ),
+      );
+    }
+    if (id.thickener) parts.push(`${id.thickener} thickener`);
+    if (typeof id.isoViscosity === 'number') parts.push(`ISO VG ${id.isoViscosity}`);
+    if (id.specs) parts.push(id.specs);
+    if (id.name) parts.push(id.name);
+    if (id.brand) parts.push(id.brand);
+    return parts.filter(Boolean).join(' ');
+  }
+
   private async generateEquivalenceAnalysis(
-    identified: { name: string; brand: string; type: string; specs: string },
+    identified: IdentifiedProduct,
     ragContext: string,
     sources: string[],
     userMessage?: string,
@@ -291,14 +451,36 @@ Return ONLY the JSON, without markdown.${userMessage ? `\n\nUser context: ${user
       ? sources.map((s) => `- ${s}`).join('\n')
       : '(no product found)';
 
+    // Build hard constraints from the structured identification. These are
+    // emphasized in the system prompt so Claude does not propose a product
+    // from the wrong format/application/certification family.
+    const constraints: string[] = [];
+    if (identified.category) constraints.push(`category=${identified.category}`);
+    if (identified.format && identified.format !== 'unknown')
+      constraints.push(`format=${identified.format}`);
+    if (identified.applicationContext?.length)
+      constraints.push(`application=${identified.applicationContext.join(',')}`);
+    if (identified.certifications?.length)
+      constraints.push(`certifications=${identified.certifications.join(',')}`);
+    if (identified.thickener) constraints.push(`thickener=${identified.thickener}`);
+    const constraintsBlock = constraints.length
+      ? `\nHARD CONSTRAINTS (the equivalent MUST match these): ${constraints.join(' | ')}\n`
+      : '';
+
     const response = await this.anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 600,
       temperature: 0,
-      system: `Molydal expert. Find the equivalent of ${identified.name} (${identified.brand}, ${identified.type}, ${identified.specs}).
+      system: `Molydal expert. Find the equivalent of ${identified.name} (${identified.brand}, ${identified.type}, ${identified.specs}).${constraintsBlock}
 Available products: ${productList}
 Technical datasheets:
 ${ragContext}
+
+Selection rules:
+- The equivalent MUST respect the hard constraints above when present.
+- If the competitor is an AEROSOL, the equivalent must be an aerosol. If it's a paste, equivalent must be a paste.
+- If the application context says "welding", the equivalent must be a welding product (anti-spatter / protective coating).
+- Never recommend a product from a different family by default.
 
 Return ONLY a JSON without markdown:
 {"equivalents":[{"name":"...","family":"...","compatibility":0-100,"reason":"1 sentence"}],"analysis":"1 comparative paragraph"}

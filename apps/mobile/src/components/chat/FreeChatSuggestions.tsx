@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/Text';
 import { colors } from '@/design/tokens/colors';
 import { spacing } from '@/design/tokens/spacing';
@@ -11,21 +12,21 @@ interface FreeChatSuggestionsProps {
   onSelect: (question: string) => void;
 }
 
-const SUGGESTIONS = [
-  'Which grease for high-temperature bearings?',
-  'Which NSF H1 food-grade lubricant for gears?',
-  'Product for conveyor chains in humid environments?',
-  'Biodegradable grease for food processing industry?',
-];
-
 export function FreeChatSuggestions(
   props: FreeChatSuggestionsProps,
 ): React.JSX.Element {
   const { onSelect } = props;
+  const { t } = useTranslation();
+  const suggestions = [
+    t('chat.suggestion1'),
+    t('chat.suggestion2'),
+    t('chat.suggestion3'),
+    t('chat.suggestion4'),
+  ];
 
   return (
     <View style={styles.container}>
-      {SUGGESTIONS.map((q) => (
+      {suggestions.map((q) => (
         <TouchableOpacity
           key={q}
           style={styles.chip}

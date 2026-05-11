@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { View, StyleSheet, Image } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { CameraView } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
@@ -19,6 +20,7 @@ import { logger } from '@/lib/logger';
 
 export default function ScannerScreen(): React.JSX.Element {
   const router = useRouter();
+  const { t } = useTranslation();
   const cameraRef = useRef<CameraView>(null);
   const { isLoading: permLoading, isGranted, requestPermission } =
     useCameraPermission();
@@ -30,7 +32,7 @@ export default function ScannerScreen(): React.JSX.Element {
   if (permLoading) {
     return (
       <ScreenWrapper style={styles.centered}>
-        <Text variant="body">Loading...</Text>
+        <Text variant="body">{t('common.loading')}</Text>
       </ScreenWrapper>
     );
   }

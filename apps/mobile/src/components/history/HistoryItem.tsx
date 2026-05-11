@@ -6,6 +6,8 @@ import {
   Text as RNText,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/i18n';
 import { colors } from '@/design/tokens/colors';
 import { typography } from '@/design/tokens/typography';
 import { haptic } from '@/lib/haptics';
@@ -16,29 +18,19 @@ interface HistoryItemProps {
   onPress: () => void;
 }
 
-const STATUS: Record<
-  ScanStatus,
-  { label: string; bg: string; text: string }
-> = {
-  matched: {
-    label: 'Matched',
-    bg: colors.okBg,
-    text: colors.ok,
-  },
-  partial: {
-    label: 'Partial',
-    bg: colors.warnBg,
-    text: colors.warn,
-  },
+const STATUS_STYLE: Record<ScanStatus, { labelKey: string; bg: string; text: string }> = {
+  matched: { labelKey: 'history.statusMatched', bg: colors.okBg, text: colors.ok },
+  partial: { labelKey: 'history.statusPartial', bg: colors.warnBg, text: colors.warn },
   no_match: {
-    label: 'No match',
+    labelKey: 'history.statusNoMatch',
     bg: 'rgba(26,20,16,0.05)',
     text: colors.ink2,
   },
 };
 
 function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('en-US', {
+  const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
+  return new Date(dateStr).toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -48,19 +40,25 @@ export const HistoryItem = React.memo(function HistoryItem({
   scan,
   onPress,
 }: HistoryItemProps): React.JSX.Element {
+  const { t } = useTranslation();
   const confidence = scan.molydalMatch?.confidence ?? 0;
-  const status = STATUS[scan.status];
-  const brand = scan.scannedProduct?.brand ?? 'Competitor';
-  const equiv = scan.molydalMatch?.name ?? 'No equivalent';
+  const status = STATUS_STYLE[scan.status];
+  const brand = scan.scannedProduct?.brand ?? t('history.defaultBrand');
+  const equiv = scan.molydalMatch?.name ?? t('history.noEquivalent');
 
   const handlePress = useCallback(() => {
     haptic.light();
     onPress();
   }, [onPress]);
 
-  const accessibilityLabel = `Scan ${brand}, equivalent ${equiv}${
-    confidence > 0 ? `, confidence ${confidence} percent` : ''
-  }`;
+  const accessibilityLabel = t('history.a11yScan', {
+    brand,
+    equiv,
+    confidence:
+      confidence > 0
+        ? t('history.a11yConfidenceSuffix', { percent: confidence })
+        : '',
+  });
 
   return (
     <TouchableOpacity
@@ -74,7 +72,7 @@ export const HistoryItem = React.memo(function HistoryItem({
       <View style={styles.topRow}>
         <View style={[styles.pill, { backgroundColor: status.bg }]}>
           <RNText style={[styles.pillText, { color: status.text }]}>
-            {status.label}
+            {t(status.labelKey)}
           </RNText>
         </View>
         {confidence > 0 ? (

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
@@ -25,6 +26,7 @@ import {
 
 export default function ChatHubScreen(): React.JSX.Element {
   const router = useRouter();
+  const { t } = useTranslation();
   const { contentPaddingBottom } = useTabBarSpacing();
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -64,24 +66,28 @@ export default function ChatHubScreen(): React.JSX.Element {
       const conv = await chatFreeService.createConversation();
       router.push(`/chat/${conv.id}`);
     } catch {
-      Alert.alert('Error', 'Unable to create the conversation');
+      Alert.alert(t('chat.newConvErrorTitle'), t('chat.newConvError'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = (conv: ChatConversation): void => {
-    Alert.alert('Delete', `Delete "${conv.title}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await chatFreeService.deleteConversation(conv.id);
-          setConversations((prev) => prev.filter((c) => c.id !== conv.id));
+    Alert.alert(
+      t('chat.deleteTitle'),
+      t('chat.deleteConfirm', { title: conv.title }),
+      [
+        { text: t('chat.deleteCancel'), style: 'cancel' },
+        {
+          text: t('chat.deleteAction'),
+          style: 'destructive',
+          onPress: async () => {
+            await chatFreeService.deleteConversation(conv.id);
+            setConversations((prev) => prev.filter((c) => c.id !== conv.id));
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const handleCardPress = useCallback(
@@ -130,8 +136,8 @@ export default function ChatHubScreen(): React.JSX.Element {
           <View style={styles.empty}>
             <EmptyState
               icon={<Stars size={36} color={colors.ink3} />}
-              title="No conversations"
-              subtitle="Tap &quot;New&quot; to ask your first question"
+              title={t('chat.noConversationsHubTitle')}
+              subtitle={t('chat.noConversationsHubSub')}
             />
           </View>
         }

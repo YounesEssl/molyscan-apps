@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text as RNText } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Aura } from '@/components/ui/Aura';
@@ -19,6 +20,7 @@ import type { ScanRecord } from '@/schemas/scan.schema';
 
 export default function ProfileScreen(): React.JSX.Element {
   const router = useRouter();
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const { logout } = useAuth();
   const { contentPaddingBottom } = useTabBarSpacing();
@@ -39,9 +41,9 @@ export default function ProfileScreen(): React.JSX.Element {
   const fullName = user ? `${user.firstName} ${user.lastName}` : '';
 
   const stats: ProfileStatItem[] = [
-    { label: 'Scans', value: String(scans.length) },
-    { label: 'Matches', value: String(matchedCount) },
-    { label: 'Rate', value: `${matchRate}%` },
+    { label: t('profile.scans'), value: String(scans.length) },
+    { label: t('profile.matches'), value: String(matchedCount) },
+    { label: t('profile.rate'), value: `${matchRate}%` },
   ];
 
   const handleLogout = async (): Promise<void> => {
@@ -75,7 +77,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
         <ProfileSettings onLogout={handleLogout} />
 
-        <RNText style={styles.version}>MolyScan v1.0.0</RNText>
+        <RNText style={styles.version}>{t('profile.appVersion', { version: '1.0.0' })}</RNText>
       </ScrollView>
     </SafeAreaView>
   );

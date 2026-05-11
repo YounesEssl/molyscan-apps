@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
 import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
@@ -23,9 +24,12 @@ interface AIEntryCardProps {
 
 export function AIEntryCard({
   onPress,
-  title = 'AI Assistant',
-  subtitle = 'Your technical questions, expert answers',
+  title,
+  subtitle,
 }: AIEntryCardProps): React.JSX.Element {
+  const { t } = useTranslation();
+  const resolvedTitle = title ?? t('dashboard.aiAssistant');
+  const resolvedSubtitle = subtitle ?? t('dashboard.aiAssistantSub');
   return (
     <TouchableOpacity
       style={styles.card}
@@ -35,7 +39,7 @@ export function AIEntryCard({
       }}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={`${title} : ${subtitle}`}
+      accessibilityLabel={`${resolvedTitle} : ${resolvedSubtitle}`}
     >
       <LinearGradient
         colors={['#fff6e8', '#fff0df']}
@@ -52,8 +56,8 @@ export function AIEntryCard({
         <Stars size={20} color="#fff" />
       </LinearGradient>
       <View style={styles.text}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.sub}>{subtitle}</Text>
+        <Text style={styles.title}>{resolvedTitle}</Text>
+        <Text style={styles.sub}>{resolvedSubtitle}</Text>
       </View>
       <AltArrowRight size={16} color={colors.ink3} />
     </TouchableOpacity>

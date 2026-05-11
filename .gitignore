@@ -79,6 +79,9 @@ bugreport-*.txt
 *.log
 logs/
 
+# Generated script caches (runtime artifacts)
+apps/api/scripts/.cache/
+
 # Test / coverage
 coverage/
 *.lcov

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
@@ -49,6 +50,7 @@ function buildSpecs(scan: ScanDetail | null): ProductSpec[] {
 export default function ProductDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useTranslation();
   const [scan, setScan] = useState<ScanDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [creatingChat, setCreatingChat] = useState(false);
@@ -69,7 +71,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const confidence =
     bestEquiv?.compatibility ?? scan?.molydalMatch?.confidence ?? 0;
   const productName = bestEquiv?.name ?? scan?.molydalMatch?.name ?? '';
-  const competitorName = scan?.scannedProduct?.name ?? 'Competitor product';
+  const competitorName = scan?.scannedProduct?.name ?? t('product.competitorProductDefault');
   const hasEquivalent = productName.length > 0;
 
   const handleAskAI = async (): Promise<void> => {
@@ -80,7 +82,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
         scannedName: scan.scannedProduct.name,
         scannedBrand: scan.scannedProduct.brand,
         molydalName:
-          bestEquiv?.name || scan.molydalMatch?.name || 'To be determined',
+          bestEquiv?.name || scan.molydalMatch?.name || t('product.toBeDetermined'),
       });
       router.push(`/chat/${conv.id}`);
     } catch {
@@ -99,7 +101,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
         <ProductDetailHeader onBack={() => router.back()} />
         <View style={styles.centered}>
           <Text variant="body" color={colors.ink3}>
-            Loading...
+            {t('common.loading')}
           </Text>
         </View>
       </SafeAreaView>
@@ -131,11 +133,10 @@ export default function ProductDetailScreen(): React.JSX.Element {
         ) : (
           <View style={styles.emptyState}>
             <Text variant="heading" style={styles.emptyTitle}>
-              No equivalent found
+              {t('product.noEquivalentFoundTitle')}
             </Text>
             <Text variant="body" color={colors.ink3} style={styles.emptyBody}>
-              We haven't identified a Molydal equivalent product for{' '}
-              {competitorName} yet.
+              {t('product.noEquivalentFoundBody', { competitor: competitorName })}
             </Text>
           </View>
         )}

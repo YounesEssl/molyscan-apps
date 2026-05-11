@@ -15,6 +15,7 @@ import {
   Easing,
   type KeyboardEvent,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +31,7 @@ import { haptic } from '@/lib/haptics';
 
 export default function LoginScreen(): React.JSX.Element {
   const router = useRouter();
+  const { t } = useTranslation();
   const { login } = useAuth();
   const { width } = useWindowDimensions();
   const [loading, setLoading] = useState(false);
@@ -86,7 +88,7 @@ export default function LoginScreen(): React.JSX.Element {
   const handleLogin = async (): Promise<void> => {
     if (!email.trim() || !password) {
       haptic.warning();
-      Alert.alert('Error', 'Email and password required');
+      Alert.alert(t('common.error'), t('auth.requiredFields'));
       return;
     }
     setLoading(true);
@@ -100,8 +102,8 @@ export default function LoginScreen(): React.JSX.Element {
         (e as { response?: { data?: { message?: string } }; message?: string })
           ?.response?.data?.message ||
         (e as { message?: string })?.message ||
-        'Sign-in error';
-      Alert.alert('Error', msg);
+        t('auth.loginError');
+      Alert.alert(t('common.error'), msg);
     } finally {
       setLoading(false);
     }
@@ -164,22 +166,21 @@ export default function LoginScreen(): React.JSX.Element {
                     numberOfLines={3}
                     minimumFontScale={0.6}
                   >
-                    {'The\n'}
-                    <RNText style={styles.headlineItalicRed}>{'Molydal'}</RNText>
-                    {'\nequivalent, instantly.'}
+                    {t('auth.headlineLine1')}
+                    <RNText style={styles.headlineItalicRed}>{t('auth.headlineBrand')}</RNText>
+                    {t('auth.headlineLine2')}
                   </RNText>
                 </View>
                 <Text style={styles.subtitle}>
-                  Scan any competitor lubricant and get the Molydal equivalent
-                  in under 2 seconds.
+                  {t('auth.subtitle')}
                 </Text>
               </Animated.View>
 
               {/* Form — stays pinned, becomes the focus on keyboard open */}
               <View style={styles.formGroup}>
                 <Input
-                  label="Email"
-                  placeholder="vous@molydal.fr"
+                  label={t('auth.email')}
+                  placeholder={t('auth.emailPlaceholder')}
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -193,8 +194,8 @@ export default function LoginScreen(): React.JSX.Element {
                 />
                 <Input
                   ref={passwordRef}
-                  label="Password"
-                  placeholder="••••••••"
+                  label={t('auth.password')}
+                  placeholder={t('auth.passwordPlaceholder')}
                   value={password}
                   onChangeText={setPassword}
                   isPassword
@@ -214,7 +215,7 @@ export default function LoginScreen(): React.JSX.Element {
                   disabled={loading}
                   activeOpacity={0.85}
                   accessibilityRole="button"
-                  accessibilityLabel="Sign in"
+                  accessibilityLabel={t('auth.signInA11y')}
                   accessibilityState={{ disabled: loading, busy: loading }}
                 >
                   <LinearGradient
@@ -223,7 +224,7 @@ export default function LoginScreen(): React.JSX.Element {
                     end={{ x: 1, y: 1 }}
                     style={styles.primaryBtn}
                   >
-                    <RNText style={styles.primaryBtnText}>Sign in</RNText>
+                    <RNText style={styles.primaryBtnText}>{t('auth.signInButton')}</RNText>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>

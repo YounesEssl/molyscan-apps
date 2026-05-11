@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import i18n from '@/i18n';
 import { colors } from '@/design/tokens/colors';
 import { typography } from '@/design/tokens/typography';
 import { radius } from '@/design/tokens/radius';
@@ -40,17 +41,17 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     if (this.state.hasError) {
       return (
         <View style={styles.container}>
-          <Text style={styles.title}>Something went wrong</Text>
+          <Text style={styles.title}>{i18n.t('errors.boundaryTitle')}</Text>
           <Text style={styles.body}>
-            {this.state.error?.message ?? 'Unknown error'}
+            {this.state.error?.message ?? i18n.t('errors.unknown')}
           </Text>
           <TouchableOpacity
             style={styles.button}
             onPress={this.handleRetry}
             accessibilityRole="button"
-            accessibilityLabel="Retry"
+            accessibilityLabel={i18n.t('errors.boundaryRetry')}
           >
-            <Text style={styles.buttonText}>Retry</Text>
+            <Text style={styles.buttonText}>{i18n.t('errors.boundaryRetry')}</Text>
           </TouchableOpacity>
         </View>
       );

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
 import { Text } from '@/components/ui/Text';
@@ -8,6 +9,7 @@ import { radius } from '@/design/tokens/radius';
 import { spacing } from '@/design/tokens/spacing';
 
 export function ChatTypingIndicator(): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.row}>
       <LinearGradient
@@ -21,7 +23,7 @@ export function ChatTypingIndicator(): React.JSX.Element {
       <View style={styles.bubble}>
         <ActivityIndicator size="small" color={colors.purple} />
         <Text variant="caption" color={colors.ink2}>
-          Thinking...
+          {t('chat.typingIndicator')}
         </Text>
       </View>
     </View>

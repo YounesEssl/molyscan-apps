@@ -5,6 +5,8 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/i18n';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HistoryHeader } from '@/components/history/HistoryHeader';
@@ -23,33 +25,27 @@ import type { ScanRecord, ScanStatus } from '@/schemas/scan.schema';
 
 type Filter = ScanStatus | 'all';
 
-const FILTERS: HistoryFilterOption<Filter>[] = [
-  { id: 'all', label: 'All' },
-  { id: 'matched', label: 'Matched' },
-  { id: 'partial', label: 'Partial' },
-  { id: 'no_match', label: 'No match' },
-];
-
 interface DateGroup {
   date: string;
   items: ScanRecord[];
 }
 
-function groupByDate(scans: ScanRecord[]): DateGroup[] {
+function groupByDate(scans: ScanRecord[], todayLabel: string, yesterdayLabel: string): DateGroup[] {
   const groups = new Map<string, ScanRecord[]>();
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
+  const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
 
   for (const scan of scans) {
     const d = new Date(scan.scannedAt || Date.now());
     let label: string;
     if (d.toDateString() === today.toDateString()) {
-      label = 'Today';
+      label = todayLabel;
     } else if (d.toDateString() === yesterday.toDateString()) {
-      label = 'Yesterday';
+      label = yesterdayLabel;
     } else {
-      label = d.toLocaleDateString('en-US', {
+      label = d.toLocaleDateString(locale, {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
@@ -80,12 +76,20 @@ function filterScans(
 
 export default function HistoryScreen(): React.JSX.Element {
   const router = useRouter();
+  const { t } = useTranslation();
   const { contentPaddingBottom } = useTabBarSpacing();
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  const filters: HistoryFilterOption<Filter>[] = [
+    { id: 'all', label: t('history.filterAll') },
+    { id: 'matched', label: t('history.filterMatched') },
+    { id: 'partial', label: t('history.filterPartial') },
+    { id: 'no_match', label: t('history.filterNoMatch') },
+  ];
 
   useFocusEffect(
     useCallback(() => {
@@ -109,8 +113,13 @@ export default function HistoryScreen(): React.JSX.Element {
   }, []);
 
   const grouped = useMemo(
-    () => groupByDate(filterScans(scans, filter, search)),
-    [scans, filter, search],
+    () =>
+      groupByDate(
+        filterScans(scans, filter, search),
+        t('common.today'),
+        t('common.yesterday'),
+      ),
+    [scans, filter, search, t],
   );
 
   const handleItemPress = useCallback(
@@ -136,7 +145,7 @@ export default function HistoryScreen(): React.JSX.Element {
       <HistoryHeader />
       <HistorySearchBar value={search} onChangeText={setSearch} />
       <HistoryFilterChips
-        options={FILTERS}
+        options={filters}
         value={filter}
         onChange={setFilter}
       />

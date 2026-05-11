@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gallery } from 'react-native-solar-icons/icons/bold-duotone';
 import { colors } from '@/design/tokens/colors';
@@ -25,6 +26,7 @@ export function ScannerBottomControls({
   onCapture,
   onPickFromGallery,
 }: ScannerBottomControlsProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={[styles.container, { bottom }]} pointerEvents="box-none">
       <View style={styles.captureRow}>
@@ -37,7 +39,7 @@ export function ScannerBottomControls({
           disabled={isAnalyzing}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Choose a photo from the library"
+          accessibilityLabel={t('scanner.a11yPickGallery')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Gallery size={18} color={colors.ink} />
@@ -52,7 +54,7 @@ export function ScannerBottomControls({
           disabled={isAnalyzing}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel="Take a photo"
+          accessibilityLabel={t('scanner.a11yTakePhoto')}
           accessibilityState={{ busy: isAnalyzing, disabled: isAnalyzing }}
         >
           <LinearGradient

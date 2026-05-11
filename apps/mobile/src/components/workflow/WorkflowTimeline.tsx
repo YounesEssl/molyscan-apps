@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
 import { COLORS, SPACING } from '@/constants/theme';
@@ -10,34 +11,37 @@ interface WorkflowTimelineProps {
   steps: WorkflowStep[];
 }
 
-export const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ steps }) => (
-  <View style={styles.container}>
-    {steps.map((step, i) => (
-      <View key={i} style={styles.step}>
-        <View style={styles.lineContainer}>
-          <View style={[styles.dot, { backgroundColor: i === steps.length - 1 ? COLORS.accent : COLORS.primary }]} />
-          {i < steps.length - 1 && <View style={styles.line} />}
-        </View>
-        <View style={styles.content}>
-          <View style={styles.stepHeader}>
-            <StatusIndicator status={step.status} />
-            <Text variant="caption" color={COLORS.textMuted}>
-              {formatFullDate(step.date)}
-            </Text>
+export const WorkflowTimeline: React.FC<WorkflowTimelineProps> = ({ steps }) => {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.container}>
+      {steps.map((step, i) => (
+        <View key={i} style={styles.step}>
+          <View style={styles.lineContainer}>
+            <View style={[styles.dot, { backgroundColor: i === steps.length - 1 ? COLORS.accent : COLORS.primary }]} />
+            {i < steps.length - 1 && <View style={styles.line} />}
           </View>
-          <Text variant="caption" color={COLORS.textSecondary}>
-            Par {step.actor}
-          </Text>
-          {step.comment && (
-            <Text variant="body" style={styles.comment}>
-              {step.comment}
+          <View style={styles.content}>
+            <View style={styles.stepHeader}>
+              <StatusIndicator status={step.status} />
+              <Text variant="caption" color={COLORS.textMuted}>
+                {formatFullDate(step.date)}
+              </Text>
+            </View>
+            <Text variant="caption" color={COLORS.textSecondary}>
+              {t('workflow.timelineByActor', { actor: step.actor })}
             </Text>
-          )}
+            {step.comment && (
+              <Text variant="body" style={styles.comment}>
+                {step.comment}
+              </Text>
+            )}
+          </View>
         </View>
-      </View>
-    ))}
-  </View>
-);
+      ))}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

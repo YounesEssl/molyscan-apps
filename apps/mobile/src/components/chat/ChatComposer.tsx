@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Text as RNText,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AddCircle, CloseCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
@@ -41,11 +42,13 @@ export function ChatComposer({
   onSubmit,
   disabled = false,
   onAddPress,
-  placeholder = 'Ask your question…',
+  placeholder,
   attachment,
   attachmentUploading,
   onRemoveAttachment,
 }: ChatComposerProps): React.JSX.Element {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t('chat.composerPlaceholder');
   const handleTranscription = useCallback(
     (text: string) => {
       onChangeText(value ? `${value.trimEnd()} ${text}` : text);
@@ -74,7 +77,7 @@ export function ChatComposer({
               <TouchableOpacity
                 onPress={onRemoveAttachment}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityLabel="Remove attachment"
+                accessibilityLabel={t('chat.composerRemoveAttachmentA11y')}
               >
                 <CloseCircle size={16} color={colors.ink2} />
               </TouchableOpacity>
@@ -89,7 +92,7 @@ export function ChatComposer({
           activeOpacity={0.7}
           onPress={onAddPress}
           accessibilityRole="button"
-          accessibilityLabel="Attach a file"
+          accessibilityLabel={t('chat.composerAttachA11y')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <AddCircle size={16} color={colors.ink} />
@@ -99,13 +102,13 @@ export function ChatComposer({
           <View style={styles.recordingIndicator}>
             <View style={styles.recordingDot} />
             <RNText style={styles.recordingText}>
-              Recording · {formatDuration(voice.duration)}
+              {t('chat.composerRecording', { duration: formatDuration(voice.duration) })}
             </RNText>
           </View>
         ) : (
           <TextInput
             style={styles.input}
-            placeholder={isTranscribing ? 'Transcribing…' : placeholder}
+            placeholder={isTranscribing ? t('chat.composerTranscribing') : resolvedPlaceholder}
             placeholderTextColor={colors.ink2}
             value={value}
             onChangeText={onChangeText}
@@ -126,7 +129,7 @@ export function ChatComposer({
             activeOpacity={0.8}
             disabled={disabled}
             accessibilityRole="button"
-            accessibilityLabel="Send message"
+            accessibilityLabel={t('chat.composerSendA11y')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <LinearGradient
@@ -145,7 +148,7 @@ export function ChatComposer({
           activeOpacity={0.8}
           disabled={disabled || isTranscribing}
           accessibilityRole="button"
-          accessibilityLabel={isRecording ? 'Stop dictation' : 'Dictate a message'}
+          accessibilityLabel={isRecording ? t('chat.composerStopDictateA11y') : t('chat.composerDictateA11y')}
           accessibilityState={{ selected: isRecording, busy: isTranscribing }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >

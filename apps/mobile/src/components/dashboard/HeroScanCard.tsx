@@ -6,6 +6,7 @@ import {
   Text as RNText,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Bolt } from 'react-native-solar-icons/icons/bold-duotone';
 import { Camera } from 'react-native-solar-icons/icons/bold-duotone';
@@ -26,6 +27,7 @@ interface HeroScanCardProps {
 const MODE_ICONS = [Camera, Microphone2];
 
 export function HeroScanCard({ onPress }: HeroScanCardProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     // Outer: shadow only, NO overflow hidden (iOS would clip the shadow)
     <View style={styles.shadowWrap}>
@@ -37,7 +39,7 @@ export function HeroScanCard({ onPress }: HeroScanCardProps): React.JSX.Element 
         activeOpacity={0.92}
         style={styles.clipWrap}
         accessibilityRole="button"
-        accessibilityLabel="Scan a competitor product"
+        accessibilityLabel={t('dashboard.a11yScanCompetitor')}
       >
         <LinearGradient
           colors={['#fff6e8', '#ffe8dc', '#ffd7c4']}
@@ -63,14 +65,14 @@ export function HeroScanCard({ onPress }: HeroScanCardProps): React.JSX.Element 
         <View style={styles.heroInner}>
           <View style={styles.accentPill}>
             <Bolt size={11} color={colors.red} />
-            <RNText style={styles.accentPillText}>Main action</RNText>
+            <RNText style={styles.accentPillText}>{t('dashboard.heroPill')}</RNText>
           </View>
 
           <RNText style={styles.heroTitle}>
-            {'Scan a competitor\n'}
-            <RNText style={styles.heroTitleItalic}>product</RNText>
+            {t('dashboard.heroTitleLine1')}
+            <RNText style={styles.heroTitleItalic}>{t('dashboard.heroTitleItalic')}</RNText>
           </RNText>
-          <Text style={styles.heroSubtitle}>Photo · Voice</Text>
+          <Text style={styles.heroSubtitle}>{t('dashboard.heroSubtitle')}</Text>
 
           <View style={styles.heroBottom}>
             <View style={styles.heroIcons}>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text as RNText } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors } from '@/design/tokens/colors';
 import { spacing } from '@/design/tokens/spacing';
 import { typography } from '@/design/tokens/typography';
@@ -9,11 +10,12 @@ interface HistoryHeaderProps {
 }
 
 export function HistoryHeader({
-  title = 'History',
+  title,
 }: HistoryHeaderProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.header}>
-      <RNText style={styles.title}>{title}</RNText>
+      <RNText style={styles.title}>{title ?? t('history.title')}</RNText>
     </View>
   );
 }

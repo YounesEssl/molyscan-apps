@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text as RNText } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
 import { FreeChatSuggestions } from '@/components/chat/FreeChatSuggestions';
@@ -14,6 +15,7 @@ interface ChatEmptyStateProps {
 export function ChatEmptyState({
   onSuggestionSelect,
 }: ChatEmptyStateProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -24,10 +26,8 @@ export function ChatEmptyState({
       >
         <Stars size={28} color="#fff" />
       </LinearGradient>
-      <RNText style={styles.title}>How can I help?</RNText>
-      <RNText style={styles.subtitle}>
-        Ask a question about Molydal lubricants, greases or oils
-      </RNText>
+      <RNText style={styles.title}>{t('chat.emptyTitle')}</RNText>
+      <RNText style={styles.subtitle}>{t('chat.emptySubtitle')}</RNText>
       <FreeChatSuggestions onSelect={onSuggestionSelect} />
     </View>
   );
