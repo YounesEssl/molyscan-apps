@@ -21,14 +21,18 @@ export class StorageService implements OnModuleInit {
     // Internal client — for uploads, direct localhost connection
     this.client = new Minio.Client({ endPoint: endpoint, port, useSSL, accessKey, secretKey });
 
-    // Signing client — presigned URLs must be signed with the host the mobile
-    // client will use, otherwise the HMAC-SHA256 signature won't match (403).
-    // MINIO_PUBLIC_ENDPOINT format: "51.77.158.155" (host only, no protocol/port)
+    // Signing client — presigned URLs must be signed with the host/port/SSL
+    // that the mobile client will use, otherwise the HMAC-SHA256 won't match.
+    // MINIO_PUBLIC_ENDPOINT : public hostname (e.g. "api.molyscan.fr")
+    // MINIO_PUBLIC_PORT     : public port (e.g. 443 behind nginx HTTPS)
+    // MINIO_PUBLIC_SSL      : "true" when served over HTTPS
     const publicHost = this.configService.get<string>('MINIO_PUBLIC_ENDPOINT', '') || endpoint;
+    const publicPort = parseInt(this.configService.get<string>('MINIO_PUBLIC_PORT', String(port)), 10);
+    const publicSSL  = this.configService.get<string>('MINIO_PUBLIC_SSL', String(useSSL)) === 'true';
     this.signingClient = new Minio.Client({
       endPoint: publicHost,
-      port,
-      useSSL,
+      port: publicPort,
+      useSSL: publicSSL,
       accessKey,
       secretKey,
     });
