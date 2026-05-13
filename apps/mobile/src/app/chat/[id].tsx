@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -43,14 +42,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
   const [inputText, setInputText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [keyboardShown, setKeyboardShown] = useState(false);
   const fileAttachment = useFileAttachment();
-
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardShown(true));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardShown(false));
-    return () => { show.remove(); hide.remove(); };
-  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -201,11 +193,9 @@ export default function ChatDetailScreen(): React.JSX.Element {
         <AssistantAvatar />
       </SafeAreaView>
 
-      {/* "pan" mode: OS pans the whole screen above the keyboard.
-          KAV only needed on iOS where the OS does not pan automatically. */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
       >
         <FlatList
           ref={listRef}
@@ -230,8 +220,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
           initialNumToRender={8}
         />
 
-        {/* When keyboard is shown, OS already panned the screen up — no bottom padding needed. */}
-        <View style={{ paddingBottom: keyboardShown ? 0 : insets.bottom }}>
+        <View style={{ paddingBottom: insets.bottom }}>
           <ChatComposer
             value={inputText}
             onChangeText={setInputText}
