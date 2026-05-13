@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   View,
   type ListRenderItem,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,7 +43,14 @@ export default function ChatDetailScreen(): React.JSX.Element {
   const [inputText, setInputText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [keyboardShown, setKeyboardShown] = useState(false);
   const fileAttachment = useFileAttachment();
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardShown(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardShown(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -193,9 +201,11 @@ export default function ChatDetailScreen(): React.JSX.Element {
         <AssistantAvatar />
       </SafeAreaView>
 
+      {/* "pan" mode: OS pans the whole screen above the keyboard.
+          KAV only needed on iOS where the OS does not pan automatically. */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior="padding"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <FlatList
           ref={listRef}
@@ -220,7 +230,8 @@ export default function ChatDetailScreen(): React.JSX.Element {
           initialNumToRender={8}
         />
 
-        <View style={{ paddingBottom: insets.bottom }}>
+        {/* When keyboard is shown, OS already panned the screen up — no bottom padding needed. */}
+        <View style={{ paddingBottom: keyboardShown ? 0 : insets.bottom }}>
           <ChatComposer
             value={inputText}
             onChangeText={setInputText}

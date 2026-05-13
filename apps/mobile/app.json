@@ -35,7 +35,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "softwareKeyboardLayoutMode": "resize",
+      "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -50,7 +50,6 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "react-native-keyboard-controller",
       [
         "expo-router",
         {

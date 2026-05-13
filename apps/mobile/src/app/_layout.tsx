@@ -5,7 +5,6 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { queryClient } from '@/lib/queryClient';
 import { OfflineBanner } from '@/components/layout/OfflineBanner';
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
@@ -104,10 +103,8 @@ export default function RootLayout(): React.JSX.Element {
     <ThemeProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <KeyboardProvider>
-            <StatusBar style="dark" />
-            <RootContent />
-          </KeyboardProvider>
+          <StatusBar style="dark" />
+          <RootContent />
         </QueryClientProvider>
       </ErrorBoundary>
     </ThemeProvider>
