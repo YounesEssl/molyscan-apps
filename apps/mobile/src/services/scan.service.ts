@@ -25,7 +25,7 @@ export const scanService = {
 
   async getById(id: string): Promise<ScanRecord | undefined> {
     const response = await api.get(ENDPOINTS.scans.detail(id));
-    return response.data;
+    return response.data.data ?? response.data;
   },
 
   async getLinkedConversations(id: string): Promise<ScanLinkedConversation[]> {
