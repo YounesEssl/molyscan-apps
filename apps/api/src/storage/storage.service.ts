@@ -6,8 +6,8 @@ import { Readable } from 'stream';
 @Injectable()
 export class StorageService implements OnModuleInit {
   private client: Minio.Client;
+  private signingClient: Minio.Client;
   private bucket: string;
-  private publicEndpoint: string | null;
   private readonly logger = new Logger(StorageService.name);
 
   constructor(private configService: ConfigService) {
@@ -15,15 +15,22 @@ export class StorageService implements OnModuleInit {
     const endpoint = this.configService.get<string>('MINIO_ENDPOINT', 'localhost');
     const port = this.configService.get<number>('MINIO_PORT', 9000);
     const useSSL = this.configService.get<string>('MINIO_USE_SSL') === 'true';
-    // Public endpoint for presigned URLs — needed when MinIO is on localhost
-    // but clients are remote. Format: "http://51.77.158.155:9000" (no trailing slash)
-    this.publicEndpoint = this.configService.get<string>('MINIO_PUBLIC_ENDPOINT', '') || null;
-    this.client = new Minio.Client({
-      endPoint: endpoint,
+    const accessKey = this.configService.get<string>('MINIO_ACCESS_KEY', 'molyscan');
+    const secretKey = this.configService.get<string>('MINIO_SECRET_KEY', 'molyscan_dev');
+
+    // Internal client — for uploads, direct localhost connection
+    this.client = new Minio.Client({ endPoint: endpoint, port, useSSL, accessKey, secretKey });
+
+    // Signing client — presigned URLs must be signed with the host the mobile
+    // client will use, otherwise the HMAC-SHA256 signature won't match (403).
+    // MINIO_PUBLIC_ENDPOINT format: "51.77.158.155" (host only, no protocol/port)
+    const publicHost = this.configService.get<string>('MINIO_PUBLIC_ENDPOINT', '') || endpoint;
+    this.signingClient = new Minio.Client({
+      endPoint: publicHost,
       port,
       useSSL,
-      accessKey: this.configService.get<string>('MINIO_ACCESS_KEY', 'molyscan'),
-      secretKey: this.configService.get<string>('MINIO_SECRET_KEY', 'molyscan_dev'),
+      accessKey,
+      secretKey,
     });
   }
 
@@ -51,13 +58,7 @@ export class StorageService implements OnModuleInit {
   }
 
   async getPresignedUrl(key: string, expirySeconds = 3600): Promise<string> {
-    const url = await this.client.presignedGetObject(this.bucket, key, expirySeconds);
-    if (!this.publicEndpoint) return url;
-    // Replace the internal endpoint (e.g. http://localhost:9000) with the
-    // public-facing one so mobile clients can actually reach the URL.
-    const parsed = new URL(url);
-    const internal = `${parsed.protocol}//${parsed.host}`;
-    return url.replace(internal, this.publicEndpoint);
+    return this.signingClient.presignedGetObject(this.bucket, key, expirySeconds);
   }
 
   async delete(key: string): Promise<void> {
