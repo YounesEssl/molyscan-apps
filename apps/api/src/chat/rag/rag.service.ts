@@ -273,6 +273,10 @@ ${prompt}`,
       scannedBrand: string | null;
       molydalName: string | null;
       molydalReference: string | null;
+      identifiedType?: string | null;
+      identifiedSpecs?: string | null;
+      equivalents?: Array<{ name: string; family: string; compatibility: number; reason: string }>;
+      analysisText?: string | null;
     },
     attachment?: AttachmentEntry,
     retrievalFilters?: RetrievalFilters,
@@ -310,13 +314,32 @@ ${prompt}`,
     const sources = [...new Set(chunks.map((c) => c.product_name))];
 
     const productBlock = productContext?.scannedName
-      ? `━━━ SCAN CONTEXT ━━━
-Scanned competitor product: ${productContext.scannedBrand ?? '?'} ${productContext.scannedName}
-Identified Molydal equivalent: ${productContext.molydalName ?? 'undetermined'}${productContext.molydalReference ? ` (ref. ${productContext.molydalReference})` : ''}
+      ? (() => {
+          const lines: string[] = ['━━━ SCAN CONTEXT ━━━'];
+          lines.push(`Scanned competitor product: ${productContext.scannedBrand ?? '?'} ${productContext.scannedName}`);
+          if (productContext.identifiedType) lines.push(`Type: ${productContext.identifiedType}`);
+          if (productContext.identifiedSpecs) lines.push(`Specs: ${productContext.identifiedSpecs}`);
+          lines.push('');
 
-The user is asking you specifically about this match. Stay focused on these two products in your responses.
+          if (productContext.equivalents && productContext.equivalents.length > 0) {
+            lines.push('Proposed Molydal equivalents (ranked by compatibility):');
+            for (const eq of productContext.equivalents) {
+              lines.push(`  • ${eq.name} (${eq.family}) — ${eq.compatibility}% — ${eq.reason}`);
+            }
+          } else {
+            lines.push(`Identified Molydal equivalent: ${productContext.molydalName ?? 'undetermined'}${productContext.molydalReference ? ` (ref. ${productContext.molydalReference})` : ''}`);
+          }
 
-`
+          if (productContext.analysisText) {
+            lines.push('');
+            lines.push(`Initial analysis: ${productContext.analysisText}`);
+          }
+
+          lines.push('');
+          lines.push('The user is asking you specifically about this scan. Stay focused on these products in your responses.');
+          lines.push('');
+          return lines.join('\n');
+        })()
       : '';
 
     const reformulationBlock =

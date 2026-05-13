@@ -5,6 +5,17 @@ import { insertOfflineScan } from '@/lib/database';
 import type { ScanRecord } from '@/schemas/scan.schema';
 import i18n from '@/i18n';
 
+export interface ScanLinkedConversation {
+  id: string;
+  title: string;
+  scannedName: string | null;
+  molydalName: string | null;
+  lastMessage: { role: string; text: string; timestamp: string } | null;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const scanService = {
   async getHistory(): Promise<ScanRecord[]> {
     const response = await api.get(ENDPOINTS.scans.list);
@@ -15,6 +26,11 @@ export const scanService = {
   async getById(id: string): Promise<ScanRecord | undefined> {
     const response = await api.get(ENDPOINTS.scans.detail(id));
     return response.data;
+  },
+
+  async getLinkedConversations(id: string): Promise<ScanLinkedConversation[]> {
+    const response = await api.get(ENDPOINTS.scans.conversations(id));
+    return response.data ?? [];
   },
 
   async matchBarcode(barcode: string, scanMethod: string = 'barcode'): Promise<ScanRecord> {

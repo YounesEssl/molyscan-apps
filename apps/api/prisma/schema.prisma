@@ -179,6 +179,7 @@ model Scan {
   compatibility       Int?
   analysisText        String?
   equivalentsJson     Json?
+  photoKey            String?
 
   user              User               @relation(fields: [userId], references: [id])
   competitorProduct CompetitorProduct?  @relation(fields: [competitorProductId], references: [id])

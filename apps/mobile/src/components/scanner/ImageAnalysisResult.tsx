@@ -122,6 +122,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
         scannedName: result.identified.name,
         scannedBrand: result.identified.brand,
         molydalName: bestEquiv?.name || t('product.toBeDetermined'),
+        scanId: result.id,
       });
       onScanAgain(); // close the bottom sheet
       router.push(`/chat/${conv.id}`);

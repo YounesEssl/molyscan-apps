@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from '../chat/rag/rag.service';
 import { VectorStoreService, RetrievalFilters } from '../chat/rag/vector-store.service';
+import { StorageService } from '../storage/storage.service';
 
 /**
  * Canonical form of a product name/brand for cache lookups.
@@ -102,6 +103,7 @@ export class ImageAnalysisService {
     private prisma: PrismaService,
     private ragService: RagService,
     private vectorStore: VectorStoreService,
+    private storage: StorageService,
   ) {
     this.anthropic = new Anthropic({
       apiKey: this.configService.getOrThrow<string>('ANTHROPIC_API_KEY'),
@@ -121,6 +123,10 @@ export class ImageAnalysisService {
     const t0 = Date.now();
     this.logger.log(`🔍 Analyse démarrée (image ${(imageBase64.length * 0.75 / 1024).toFixed(0)} Ko)`);
 
+    // Upload photo to MinIO in parallel with Gemini identification.
+    // We tolerate upload failures — the scan still completes, just without a stored photo.
+    const photoUploadPromise = this.uploadScanPhoto(imageBase64, mimeType, userId);
+
     // Step 1: Gemini vision — identify the product from the image
     const identification = await this.identifyProduct(imageBase64, mimeType, userMessage);
     this.logger.log(`✅ Step 1 — Identification (Gemini): ${Date.now() - t0}ms → ${identification.name || 'aucun produit'}`);
@@ -128,6 +134,7 @@ export class ImageAnalysisService {
     // No product found — persist as no_match and return early
     if (!identification.name || identification.name === 'null' || identification.name === null) {
       this.logger.log(`⚠️ Aucun produit détecté, total: ${Date.now() - t0}ms`);
+      const photoKey = await photoUploadPromise;
       const scan = await this.prisma.scan.create({
         data: {
           status: 'no_match' as any,
@@ -136,6 +143,7 @@ export class ImageAnalysisService {
           locationLat: location?.lat,
           locationLng: location?.lng,
           locationLabel: location?.label,
+          photoKey,
         },
       });
       return {
@@ -174,6 +182,7 @@ export class ImageAnalysisService {
         ? bestEquiv.compatibility >= 70 ? 'matched' : 'partial'
         : 'no_match';
 
+      const photoKey = await photoUploadPromise;
       const scan = await this.prisma.scan.create({
         data: {
           status: status as any,
@@ -191,6 +200,7 @@ export class ImageAnalysisService {
           compatibility: bestEquiv?.compatibility || null,
           analysisText: cachedScan.analysisText,
           equivalentsJson: cachedScan.equivalentsJson as any,
+          photoKey,
         },
       });
 
@@ -260,6 +270,7 @@ export class ImageAnalysisService {
       ? bestEquiv.compatibility >= 70 ? 'matched' : 'partial'
       : 'no_match';
 
+    const photoKey = await photoUploadPromise;
     const scan = await this.prisma.scan.create({
       data: {
         status: status as any,
@@ -277,11 +288,32 @@ export class ImageAnalysisService {
         compatibility: bestEquiv?.compatibility || null,
         analysisText: analysis.analysis,
         equivalentsJson: analysis.equivalents as any,
+        photoKey,
       },
     });
 
     this.logger.log(`🏁 Analyse terminée en ${Date.now() - t0}ms — ${identification.name} → ${bestEquiv?.name || 'aucun'} (${bestEquiv?.compatibility || 0}%)`);
     return { ...analysis, id: scan.id };
+  }
+
+  private async uploadScanPhoto(
+    imageBase64: string,
+    mimeType: string,
+    userId: string,
+  ): Promise<string | null> {
+    try {
+      const buffer = Buffer.from(imageBase64, 'base64');
+      const ext = mimeType.includes('png') ? 'png'
+        : mimeType.includes('webp') ? 'webp'
+        : mimeType.includes('gif') ? 'gif'
+        : 'jpg';
+      const key = `scans/${userId}/${Date.now()}.${ext}`;
+      await this.storage.upload(key, buffer, mimeType || 'image/jpeg');
+      return key;
+    } catch (error) {
+      this.logger.warn(`Photo upload failed: ${error}`);
+      return null;
+    }
   }
 
   private async identifyProduct(

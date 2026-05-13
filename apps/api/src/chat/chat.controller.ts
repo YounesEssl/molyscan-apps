@@ -71,6 +71,15 @@ export class ChatController {
     return this.chatService.getConversations(user.sub);
   }
 
+  @Get('conversations/:id')
+  @ApiOperation({ summary: 'Get a single conversation with scan context if linked' })
+  getConversationById(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.chatService.getConversationById(id, user.sub);
+  }
+
   @Post('conversations')
   @ApiOperation({ summary: 'Create a product-linked conversation' })
   createConversation(

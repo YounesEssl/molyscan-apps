@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -18,11 +19,13 @@ import { ChatMessage } from '@/components/chat/ChatMessage';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 import { ChatEmptyState } from '@/components/chat/ChatEmptyState';
 import { ChatTypingIndicator } from '@/components/chat/ChatTypingIndicator';
+import { ScanContextCard } from '@/components/chat/ScanContextCard';
 import { colors } from '@/design/tokens/colors';
 import { spacing } from '@/design/tokens/spacing';
 import {
   chatFreeService,
   type ChatMessage as ChatMessageModel,
+  type ScanContext,
 } from '@/services/chatFree.service';
 import { useFileAttachment } from '@/hooks/useFileAttachment';
 
@@ -34,19 +37,40 @@ export default function ChatDetailScreen(): React.JSX.Element {
   const listRef = useRef<FlatList<ChatMessageModel>>(null);
 
   const [messages, setMessages] = useState<ChatMessageModel[]>([]);
+  const [scanContext, setScanContext] = useState<ScanContext | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [title, setTitle] = useState(t('chat.detailDefaultTitle'));
   const [inputText, setInputText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const fileAttachment = useFileAttachment();
 
   useEffect(() => {
+    // iOS fires Will* events before animation — instant response.
+    // Android fires Did* events (no Will* equivalent with resize mode).
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!id) return;
-    chatFreeService
-      .getMessages(id)
-      .then((msgs) => {
+    Promise.all([
+      chatFreeService.getMessages(id),
+      chatFreeService.getConversationById(id),
+    ])
+      .then(([msgs, conv]) => {
         setMessages(msgs);
+        if (conv.title && conv.title !== 'Nouvelle conversation') {
+          setTitle(conv.title);
+        }
+        setScanContext(conv.scanContext ?? null);
         setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 50);
       })
       .catch(() => {});
@@ -184,8 +208,8 @@ export default function ChatDetailScreen(): React.JSX.Element {
         <AssistantAvatar />
       </SafeAreaView>
 
-      {/* On Android, softwareKeyboardLayoutMode="pan" handles keyboard avoidance
-          natively — KeyboardAvoidingView overcorrects and fails to restore position. */}
+      {/* iOS: KAV with "padding" raises content as keyboard slides up.
+          Android: "resize" mode shrinks the window — no KAV needed. */}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -200,6 +224,9 @@ export default function ChatDetailScreen(): React.JSX.Element {
           onContentSizeChange={() =>
             listRef.current?.scrollToEnd({ animated: false })
           }
+          ListHeaderComponent={
+            scanContext ? <ScanContextCard context={scanContext} /> : null
+          }
           ListEmptyComponent={
             <ChatEmptyState onSuggestionSelect={handleSend} />
           }
@@ -210,7 +237,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
           initialNumToRender={8}
         />
 
-        <View style={{ paddingBottom: insets.bottom }}>
+        <View style={{ paddingBottom: keyboardVisible ? 0 : insets.bottom }}>
           <ChatComposer
             value={inputText}
             onChangeText={setInputText}

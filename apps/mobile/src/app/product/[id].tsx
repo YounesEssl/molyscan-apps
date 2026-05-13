@@ -13,8 +13,11 @@ import {
 } from '@/components/product/ProductSpecs';
 import { AIProductEntry } from '@/components/product/AIProductEntry';
 import { PriceRequestCTA } from '@/components/product/PriceRequestCTA';
+import { ScanPhotoCard } from '@/components/product/ScanPhotoCard';
+import { ScanEquivalentsList } from '@/components/product/ScanEquivalentsList';
+import { LinkedConversationsList } from '@/components/product/LinkedConversationsList';
 import { colors } from '@/design/tokens/colors';
-import { scanService } from '@/services/scan.service';
+import { scanService, type ScanLinkedConversation } from '@/services/scan.service';
 import { chatFreeService } from '@/services/chatFree.service';
 
 interface ScanDetail {
@@ -34,6 +37,7 @@ interface ScanDetail {
   }>;
   analysisText: string | null;
   identifiedSpecs: string | null;
+  photoUrl: string | null;
   status: string;
   scannedAt: string;
   scanMethod: string;
@@ -52,6 +56,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const router = useRouter();
   const { t } = useTranslation();
   const [scan, setScan] = useState<ScanDetail | null>(null);
+  const [conversations, setConversations] = useState<ScanLinkedConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingChat, setCreatingChat] = useState(false);
 
@@ -59,10 +64,14 @@ export default function ProductDetailScreen(): React.JSX.Element {
     useCallback(() => {
       if (!id) return;
       setLoading(true);
-      scanService
-        .getById(id)
-        .then((s) => setScan((s as unknown as ScanDetail) ?? null))
-        .catch(() => {})
+      Promise.all([
+        scanService.getById(id).catch(() => null),
+        scanService.getLinkedConversations(id).catch(() => []),
+      ])
+        .then(([s, convs]) => {
+          setScan((s as unknown as ScanDetail) ?? null);
+          setConversations(convs);
+        })
         .finally(() => setLoading(false));
     }, [id]),
   );
@@ -73,6 +82,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const productName = bestEquiv?.name ?? scan?.molydalMatch?.name ?? '';
   const competitorName = scan?.scannedProduct?.name ?? t('product.competitorProductDefault');
   const hasEquivalent = productName.length > 0;
+  const allEquivalents = scan?.equivalents ?? [];
 
   const handleAskAI = async (): Promise<void> => {
     if (!scan?.scannedProduct || creatingChat) return;
@@ -83,6 +93,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
         scannedBrand: scan.scannedProduct.brand,
         molydalName:
           bestEquiv?.name || scan.molydalMatch?.name || t('product.toBeDetermined'),
+        scanId: scan.id,
       });
       router.push(`/chat/${conv.id}`);
     } catch {
@@ -124,6 +135,8 @@ export default function ProductDetailScreen(): React.JSX.Element {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
+        {scan?.photoUrl ? <ScanPhotoCard photoUrl={scan.photoUrl} /> : null}
+
         {hasEquivalent ? (
           <ProductMainCard
             productName={productName}
@@ -143,6 +156,10 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
         <ProductSpecs specs={buildSpecs(scan)} />
 
+        {allEquivalents.length > 0 ? (
+          <ScanEquivalentsList equivalents={allEquivalents} />
+        ) : null}
+
         {hasEquivalent ? (
           <AIProductEntry
             productName={productName}
@@ -150,6 +167,8 @@ export default function ProductDetailScreen(): React.JSX.Element {
             disabled={creatingChat}
           />
         ) : null}
+
+        <LinkedConversationsList conversations={conversations} />
 
         <PriceRequestCTA
           onPress={() => router.push('/workflow/price-request')}

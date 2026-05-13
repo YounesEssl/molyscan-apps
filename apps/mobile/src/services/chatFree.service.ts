@@ -6,16 +6,35 @@ import { api } from '@/lib/axios';
 import { storage } from '@/lib/storage';
 import { API_CONFIG } from '@/constants/api';
 
+export interface ScanContext {
+  id: string;
+  photoUrl: string | null;
+  identifiedName: string | null;
+  identifiedBrand: string | null;
+  identifiedType: string | null;
+  identifiedSpecs: string | null;
+  equivalents: Array<{
+    name: string;
+    family: string;
+    compatibility: number;
+    reason: string;
+  }>;
+  analysisText: string | null;
+  scannedAt: string;
+}
+
 export interface ChatConversation {
   id: string;
   type: 'free' | 'product';
   title: string;
+  scanId?: string | null;
   product: {
     scannedName: string;
     scannedBrand: string;
     molydalName: string;
     molydalReference: string;
   } | null;
+  scanContext?: ScanContext | null;
   lastMessage: {
     role: string;
     text: string;
@@ -48,6 +67,12 @@ export const chatFreeService = {
     return res.data;
   },
 
+  /** Get a single conversation with scan context if linked */
+  async getConversationById(id: string): Promise<ChatConversation> {
+    const res = await api.get(`/chat/conversations/${id}`);
+    return res.data;
+  },
+
   /** Create a new free conversation */
   async createConversation(title?: string): Promise<ChatConversation> {
     const res = await api.post('/chat/conversations/free', { title });
@@ -55,17 +80,19 @@ export const chatFreeService = {
   },
 
   /** Create a product-linked conversation */
-  async createProductConversation(product: {
+  async createProductConversation(input: {
     scannedName: string;
     scannedBrand: string;
     molydalName: string;
+    scanId?: string;
   }): Promise<ChatConversation> {
     const res = await api.post('/chat/conversations', {
+      scanId: input.scanId,
       product: {
-        scannedName: product.scannedName,
-        scannedBrand: product.scannedBrand,
-        molydalName: product.molydalName,
-        molydalReference: product.molydalName,
+        scannedName: input.scannedName,
+        scannedBrand: input.scannedBrand,
+        molydalName: input.molydalName,
+        molydalReference: input.molydalName,
       },
     });
     return res.data;

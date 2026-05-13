@@ -57,6 +57,12 @@ export class ScansController {
     return this.scansService.findById(id, user.sub);
   }
 
+  @Get(':id/conversations')
+  @ApiOperation({ summary: 'List AI conversations linked to this scan' })
+  findConversations(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.scansService.findConversationsByScan(id, user.sub);
+  }
+
   @Post(':id/equivalent-feedback')
   @ApiOperation({ summary: 'Submit user feedback on a proposed Molydal equivalent' })
   submitEquivalentFeedback(

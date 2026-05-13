@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from './rag/rag.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import type { AttachmentEntry } from './attachment.store';
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
   constructor(
     private prisma: PrismaService,
     private ragService: RagService,
+    private storage: StorageService,
   ) {}
 
   // ── Helpers ────────────────────────────────────────────────────
@@ -65,6 +69,47 @@ export class ChatService {
     });
 
     return conversations.map((c) => this.formatConversation(c));
+  }
+
+  async getConversationById(id: string, userId: string) {
+    const conversation = await this.prisma.aIConversation.findFirst({
+      where: { id, userId },
+      include: {
+        scan: true,
+        messages: { orderBy: { timestamp: 'desc' }, take: 1 },
+        _count: { select: { messages: true } },
+      },
+    });
+    if (!conversation) throw new NotFoundException('Conversation not found');
+
+    const base = this.formatConversation(conversation);
+    const scan = conversation.scan;
+
+    if (!scan) return { ...base, scanContext: null };
+
+    let photoUrl: string | null = null;
+    if (scan.photoKey) {
+      try {
+        photoUrl = await this.storage.getPresignedUrl(scan.photoKey, 60 * 60 * 6);
+      } catch (error) {
+        this.logger.warn(`Failed to sign scan photo for conversation ${id}: ${error}`);
+      }
+    }
+
+    return {
+      ...base,
+      scanContext: {
+        id: scan.id,
+        photoUrl,
+        identifiedName: scan.identifiedName,
+        identifiedBrand: scan.identifiedBrand,
+        identifiedType: scan.identifiedType,
+        identifiedSpecs: scan.identifiedSpecs,
+        equivalents: (scan.equivalentsJson as any[]) || [],
+        analysisText: scan.analysisText,
+        scannedAt: scan.scannedAt.toISOString(),
+      },
+    };
   }
 
   async createConversation(userId: string, dto: CreateConversationDto) {
@@ -225,17 +270,36 @@ export class ChatService {
     // Update conversation title
     await this.updateConversationMeta(conversationId, text, conversation.title);
 
-    // For product-linked conversations, inject the scan context into the RAG
-    // system prompt so Claude knows which product pair it's discussing.
-    const productContext =
-      conversation.type === 'product'
-        ? {
-            scannedName: conversation.scannedName,
-            scannedBrand: conversation.scannedBrand,
-            molydalName: conversation.molydalName,
-            molydalReference: conversation.molydalReference,
-          }
-        : undefined;
+    // For product-linked conversations, inject the full scan context into the
+    // RAG system prompt so Claude knows exactly what was scanned and why each
+    // equivalent was proposed — same data shown in the UI toggle card.
+    let productContext: Parameters<typeof this.ragService.generateStreamingResponse>[2] | undefined;
+
+    if (conversation.type === 'product') {
+      let scan: any = null;
+      if (conversation.scanId) {
+        scan = await this.prisma.scan.findUnique({
+          where: { id: conversation.scanId },
+          select: {
+            identifiedType: true,
+            identifiedSpecs: true,
+            equivalentsJson: true,
+            analysisText: true,
+          },
+        });
+      }
+
+      productContext = {
+        scannedName: conversation.scannedName,
+        scannedBrand: conversation.scannedBrand,
+        molydalName: conversation.molydalName,
+        molydalReference: conversation.molydalReference,
+        identifiedType: scan?.identifiedType ?? null,
+        identifiedSpecs: scan?.identifiedSpecs ?? null,
+        equivalents: (scan?.equivalentsJson as any[] | null) ?? [],
+        analysisText: scan?.analysisText ?? null,
+      };
+    }
 
     return this.ragService.generateStreamingResponse(
       text,
