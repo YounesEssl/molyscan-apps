@@ -1,14 +1,15 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text as RNText, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ChatRoundDots } from 'react-native-solar-icons/icons/bold-duotone';
-import { AltArrowRight } from 'react-native-solar-icons/icons/bold-duotone';
-import { Text } from '@/components/ui/Text';
-import { Card } from '@/components/ui/Card';
+import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
 import { colors } from '@/design/tokens/colors';
-import { spacing } from '@/design/tokens/spacing';
 import { radius } from '@/design/tokens/radius';
+import { spacing } from '@/design/tokens/spacing';
+import { typography } from '@/design/tokens/typography';
+import { haptic } from '@/lib/haptics';
 import type { ScanLinkedConversation } from '@/services/scan.service';
 
 interface LinkedConversationsListProps {
@@ -36,47 +37,43 @@ export function LinkedConversationsList({
   if (conversations.length === 0) return null;
 
   return (
-    <View style={styles.container}>
-      <Text variant="label" color={colors.ink2} style={styles.title}>
-        {t('product.linkedConversations')}
-      </Text>
+    <View style={styles.section}>
       {conversations.map((conv) => {
         const preview = conv.lastMessage?.text || t('product.linkedConversationsNoMessages');
         const displayTitle = conv.title || conv.scannedName || t('chat.detailDefaultTitle');
+        const meta = `${t('product.linkedConversationsMessages', { count: conv.messageCount })} · ${formatRelativeDate(conv.updatedAt, i18n.language)}`;
+
         return (
           <Pressable
             key={conv.id}
-            onPress={() => router.push(`/chat/${conv.id}`)}
-            style={({ pressed }) => [styles.pressable, pressed && styles.pressed]}
+            onPress={() => {
+              haptic.light();
+              router.push(`/chat/${conv.id}`);
+            }}
+            style={({ pressed }) => [styles.card, pressed && styles.pressed]}
             accessibilityRole="button"
             accessibilityLabel={displayTitle}
           >
-            <Card variant="outlined" style={styles.card}>
-              <View style={styles.row}>
-                <View style={styles.iconWrap}>
-                  <ChatRoundDots size={20} color={colors.red} />
-                </View>
-                <View style={styles.body}>
-                  <Text variant="subheading" numberOfLines={1}>
-                    {displayTitle}
-                  </Text>
-                  <Text
-                    variant="caption"
-                    color={colors.ink2}
-                    numberOfLines={1}
-                    style={styles.preview}
-                  >
-                    {preview}
-                  </Text>
-                  <Text variant="caption" color={colors.ink3} style={styles.meta}>
-                    {t('product.linkedConversationsMessages', { count: conv.messageCount })}
-                    {' · '}
-                    {formatRelativeDate(conv.updatedAt, i18n.language)}
-                  </Text>
-                </View>
-                <AltArrowRight size={18} color={colors.ink3} />
-              </View>
-            </Card>
+            <LinearGradient
+              colors={['#f0ecff', '#ebe4ff']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <LinearGradient
+              colors={[colors.purpleVivid, colors.purple]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.iconBox}
+            >
+              <ChatRoundDots size={20} color="#fff" />
+            </LinearGradient>
+            <View style={styles.body}>
+              <RNText style={styles.title} numberOfLines={1}>{displayTitle}</RNText>
+              <RNText style={styles.preview} numberOfLines={1}>{preview}</RNText>
+              <RNText style={styles.meta}>{meta}</RNText>
+            </View>
+            <AltArrowRight size={16} color={colors.ink3} />
           </Pressable>
         );
       })}
@@ -85,46 +82,58 @@ export function LinkedConversationsList({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginHorizontal: spacing.section,
-    marginTop: spacing.lg,
+  section: {
+    paddingHorizontal: spacing.section,
+    marginTop: 20,
     gap: spacing.sm,
-  },
-  title: {
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-  },
-  pressable: {
-    borderRadius: radius.lg,
-  },
-  pressed: {
-    opacity: 0.7,
   },
   card: {
-    paddingVertical: spacing.sm,
-  },
-  row: {
+    padding: 16,
+    borderRadius: radius.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(91,45,255,0.12)',
+    overflow: 'hidden',
+    position: 'relative',
+  } as ViewStyle,
+  pressed: {
+    opacity: 0.75,
   },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(232,119,34,0.10)',
+  iconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.purple,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 7,
+    elevation: 4,
   },
   body: {
     flex: 1,
     gap: 2,
   },
+  title: {
+    fontFamily: typography.fonts.sansSemibold,
+    fontSize: 14,
+    color: colors.ink,
+    letterSpacing: -0.2,
+  },
   preview: {
-    lineHeight: 16,
+    fontFamily: typography.fonts.sans,
+    fontSize: 12,
+    color: colors.ink2,
+    lineHeight: 17,
+    letterSpacing: -0.1,
   },
   meta: {
-    marginTop: 2,
+    fontFamily: typography.fonts.sans,
+    fontSize: 11,
+    color: colors.ink3,
+    marginTop: 1,
   },
 });
