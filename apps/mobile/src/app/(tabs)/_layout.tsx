@@ -32,7 +32,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
-  const bottom = 24 + Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0);
+  const bottom = Math.max(insets.bottom, 8) + 8;
 
   const labels: Record<string, string> = {
     index: t('tabs.home'),
