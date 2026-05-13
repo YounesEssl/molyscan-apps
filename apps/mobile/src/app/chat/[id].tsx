@@ -2,13 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   View,
   type ListRenderItem,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,21 +42,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
   const [inputText, setInputText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const fileAttachment = useFileAttachment();
-
-  useEffect(() => {
-    // iOS fires Will* events before animation — instant response.
-    // Android fires Did* events (no Will* equivalent with resize mode).
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -208,11 +193,9 @@ export default function ChatDetailScreen(): React.JSX.Element {
         <AssistantAvatar />
       </SafeAreaView>
 
-      {/* iOS: KAV with "padding" raises content as keyboard slides up.
-          Android: "resize" mode shrinks the window — no KAV needed. */}
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
       >
         <FlatList
           ref={listRef}
@@ -237,7 +220,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
           initialNumToRender={8}
         />
 
-        <View style={{ paddingBottom: keyboardVisible ? 0 : insets.bottom }}>
+        <View style={{ paddingBottom: insets.bottom }}>
           <ChatComposer
             value={inputText}
             onChangeText={setInputText}
