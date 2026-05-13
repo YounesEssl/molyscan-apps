@@ -92,8 +92,8 @@ const fr = {
     a11yOpenNotifications: 'Ouvrir les notifications',
     a11yOpenWorkflow: 'Ouvrir la demande {{product}} pour {{client}}',
     heroPill: 'Action principale',
-    heroTitleLine1: 'Scanner un\nconcurrent',
-    heroTitleItalic: 'produit',
+    heroTitleLine1: 'Scanner un\nproduit',
+    heroTitleItalic: 'concurrent',
     heroSubtitle: 'Photo · Vocal',
   },
   scanner: {
