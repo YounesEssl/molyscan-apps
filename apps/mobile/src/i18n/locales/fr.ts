@@ -212,7 +212,7 @@ const fr = {
     requestPrice: 'Demander un prix',
     askAI: "Poser une question à l'IA",
     askAITitle: "Interroger l'IA",
-    askAISub: 'Contextualisé sur {{name}}',
+    askAISub: 'Scan complet disponible en contexte',
     technicalSheet: 'Fiche technique',
     share: 'Partager',
     competitorProduct: 'Produit concurrent',

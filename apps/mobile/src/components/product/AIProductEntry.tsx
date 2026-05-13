@@ -58,7 +58,7 @@ export function AIProductEntry({
         </LinearGradient>
         <View style={styles.text}>
           <RNText style={styles.title}>{t('product.askAITitle')}</RNText>
-          <RNText style={styles.sub}>{t('product.askAISub', { name: productName })}</RNText>
+          <RNText style={styles.sub}>{t('product.askAISub')}</RNText>
         </View>
         <AltArrowRight size={16} color={colors.ink3} />
       </TouchableOpacity>

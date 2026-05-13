@@ -213,7 +213,7 @@ const en: TranslationKeys = {
     requestPrice: 'Request a price',
     askAI: 'Ask AI a question',
     askAITitle: 'Ask the AI',
-    askAISub: 'Contextualized on {{name}}',
+    askAISub: 'Full scan available as context',
     technicalSheet: 'Technical sheet',
     share: 'Share',
     competitorProduct: 'Competitor product',
