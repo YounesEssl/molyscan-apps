@@ -34,9 +34,6 @@ yarn-error.*
 .env
 .env*.local
 
-# Prisma
-apps/api/prisma/migrations/
-
 # NestJS
 apps/api/dist/
 
