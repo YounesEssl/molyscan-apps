@@ -162,6 +162,8 @@ model Scan {
   barcode             String?
   status              ScanStatus
   scanMethod          ScanMethod @default(barcode)
+  // Idempotency key from the mobile offline outbox — dedupes replayed syncs.
+  clientRequestId     String?    @unique
   locationLat         Float?
   locationLng         Float?
   locationLabel       String?
@@ -221,8 +223,14 @@ model ScanEquivalentFeedback {
 
 model PriceWorkflow {
   id               String         @id @default(uuid())
+  // Idempotency key from the mobile offline outbox — dedupes replayed syncs.
+  clientRequestId  String?        @unique
   scanId           String
-  molydalProductId String
+  // Optional FK — AI-identified equivalents are free-text, not catalog rows.
+  molydalProductId String?
+  // Product identity stored directly (AI equivalent name/ref or catalog fallback).
+  productName      String?
+  molydalRef       String?
   clientName       String
   quantity         Float
   unit             String         @default("L")
@@ -234,9 +242,9 @@ model PriceWorkflow {
   reviewComment    String?
   organizationId   String?
 
-  scan           Scan           @relation(fields: [scanId], references: [id])
-  molydalProduct MolydalProduct @relation(fields: [molydalProductId], references: [id])
-  user           User           @relation(fields: [userId], references: [id])
+  scan           Scan            @relation(fields: [scanId], references: [id])
+  molydalProduct MolydalProduct? @relation(fields: [molydalProductId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
 
   steps WorkflowStep[]
 

@@ -61,7 +61,7 @@ Refusing to propose anything is the wrong default — the user needs at least a 
    Respect the form factor: aerosol/spray | liquid in bottle | paste in tube | grease in cartridge.
    - A spray/aerosol can only be replaced by another spray/aerosol (or by a product that is explicitly available as an aerosol variant — say so).
    - A paste cannot be replaced by a liquid grease.
-   - If user mentions "aerosol", "spray", "en bombe", "pulvérisable", treat format as a hard constraint.
+   - If the competitor product name OR the user's message contains "aerosol", "spray", "en bombe", "pulvérisable", "bomb", treat format as a hard constraint — even if the user does not repeat it. Extract format from the product name automatically.
 
 3. Non-negotiable regulatory CERTIFICATION.
    NSF H1 / food contact / USDA → the Molydal equivalent must be NSF H1.

@@ -56,18 +56,39 @@ export class WorkflowsService {
   }
 
   async create(userId: string, dto: CreateWorkflowDto) {
+    // Idempotency: a replayed offline sync must not create a duplicate.
+    if (dto.clientRequestId) {
+      const existing = await this.prisma.priceWorkflow.findUnique({
+        where: { clientRequestId: dto.clientRequestId },
+        include: { steps: { orderBy: { date: 'asc' } }, molydalProduct: true },
+      });
+      if (existing) return this.formatWorkflow(existing);
+    }
+
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    const molydalProduct = await this.prisma.molydalProduct.findUniqueOrThrow({
-      where: { id: dto.molydalProductId },
-    });
+
+    // The FK is optional: AI-identified equivalents are free-text names, not
+    // catalog rows. Only resolve a MolydalProduct when an id is explicitly given.
+    let productName = dto.productName ?? null;
+    let molydalRef = dto.molydalRef ?? null;
+    if (dto.molydalProductId) {
+      const molydalProduct = await this.prisma.molydalProduct.findUniqueOrThrow({
+        where: { id: dto.molydalProductId },
+      });
+      productName = productName ?? molydalProduct.name;
+      molydalRef = molydalRef ?? molydalProduct.reference;
+    }
 
     const actorName = `${user.firstName} ${user.lastName}`;
     const now = new Date();
 
     const wf = await this.prisma.priceWorkflow.create({
       data: {
+        clientRequestId: dto.clientRequestId,
         scanId: dto.scanId,
-        molydalProductId: dto.molydalProductId,
+        molydalProductId: dto.molydalProductId ?? null,
+        productName,
+        molydalRef,
         clientName: dto.clientName,
         quantity: dto.quantity,
         unit: dto.unit || 'L',
@@ -122,7 +143,7 @@ export class WorkflowsService {
       wf.userId,
       NotificationType.price_approved,
       'Prix validé',
-      `Votre demande de prix pour ${updated.molydalProduct.name} (${wf.clientName}) a été approuvée à ${dto.approvedPrice}€/${updated.unit}.`,
+      `Votre demande de prix pour ${updated.productName || updated.molydalProduct?.name || 'le produit'} (${wf.clientName}) a été approuvée à ${dto.approvedPrice}€/${updated.unit}.`,
       id,
     );
 
@@ -163,7 +184,7 @@ export class WorkflowsService {
       wf.userId,
       NotificationType.price_rejected,
       'Prix refusé',
-      `Votre demande pour ${updated.molydalProduct.name} (${wf.clientName}) a été refusée. Motif : ${dto.comment}`,
+      `Votre demande pour ${updated.productName || updated.molydalProduct?.name || 'le produit'} (${wf.clientName}) a été refusée. Motif : ${dto.comment}`,
       id,
     );
 
@@ -174,8 +195,8 @@ export class WorkflowsService {
     return {
       id: wf.id,
       scanId: wf.scanId,
-      productName: wf.molydalProduct?.name || '',
-      molydalRef: wf.molydalProduct?.reference || '',
+      productName: wf.productName || wf.molydalProduct?.name || '',
+      molydalRef: wf.molydalRef || wf.molydalProduct?.reference || '',
       clientName: wf.clientName,
       quantity: wf.quantity,
       unit: wf.unit,

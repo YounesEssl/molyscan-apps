@@ -6,6 +6,11 @@ export class AnalyzeImageDto {
   @IsString()
   image!: string;
 
+  @ApiProperty({ required: false, description: 'Idempotency key from the mobile offline outbox' })
+  @IsString()
+  @IsOptional()
+  clientRequestId?: string;
+
   @ApiProperty({ description: 'MIME type (image/jpeg, image/png, etc.)' })
   @IsString()
   mimeType!: string;

@@ -119,8 +119,20 @@ export class ImageAnalysisService {
     userId: string,
     userMessage?: string,
     location?: { lat?: number; lng?: number; label?: string },
+    clientRequestId?: string,
   ): Promise<ImageAnalysisResult> {
     const t0 = Date.now();
+
+    // Idempotency: a replayed offline sync returns the existing scan instead of
+    // re-running the (costly) Gemini + RAG + Claude pipeline.
+    if (clientRequestId) {
+      const existing = await this.prisma.scan.findUnique({ where: { clientRequestId } });
+      if (existing) {
+        this.logger.log(`♻️ Idempotent hit — scan ${existing.id} déjà créé pour clientRequestId`);
+        return this.scanToResult(existing);
+      }
+    }
+
     this.logger.log(`🔍 Analyse démarrée (image ${(imageBase64.length * 0.75 / 1024).toFixed(0)} Ko)`);
 
     // Upload photo to MinIO in parallel with Gemini identification.
@@ -137,6 +149,7 @@ export class ImageAnalysisService {
       const photoKey = await photoUploadPromise;
       const scan = await this.prisma.scan.create({
         data: {
+          clientRequestId,
           status: 'no_match' as any,
           scanMethod: 'image' as any,
           userId,
@@ -185,6 +198,7 @@ export class ImageAnalysisService {
       const photoKey = await photoUploadPromise;
       const scan = await this.prisma.scan.create({
         data: {
+          clientRequestId,
           status: status as any,
           scanMethod: 'image' as any,
           userId,
@@ -273,6 +287,7 @@ export class ImageAnalysisService {
     const photoKey = await photoUploadPromise;
     const scan = await this.prisma.scan.create({
       data: {
+        clientRequestId,
         status: status as any,
         scanMethod: 'image' as any,
         userId,
@@ -294,6 +309,33 @@ export class ImageAnalysisService {
 
     this.logger.log(`🏁 Analyse terminée en ${Date.now() - t0}ms — ${identification.name} → ${bestEquiv?.name || 'aucun'} (${bestEquiv?.compatibility || 0}%)`);
     return { ...analysis, id: scan.id };
+  }
+
+  /** Map a persisted scan row back into the analysis result shape (idempotency replay). */
+  private scanToResult(scan: {
+    id: string;
+    identifiedName: string | null;
+    identifiedBrand: string | null;
+    identifiedType: string | null;
+    identifiedSpecs: string | null;
+    analysisText: string | null;
+    equivalentsJson: unknown;
+  }): ImageAnalysisResult {
+    const equivalents = Array.isArray(scan.equivalentsJson)
+      ? (scan.equivalentsJson as ImageAnalysisResult['equivalents'])
+      : [];
+    return {
+      id: scan.id,
+      identified: {
+        name: scan.identifiedName ?? '',
+        brand: scan.identifiedBrand ?? '',
+        type: scan.identifiedType ?? '',
+        specs: scan.identifiedSpecs ?? '',
+      },
+      equivalents,
+      analysis: scan.analysisText ?? '',
+      sources: [],
+    };
   }
 
   private async uploadScanPhoto(

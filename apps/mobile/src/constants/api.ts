@@ -17,7 +17,7 @@ export const ENDPOINTS = {
   },
   scans: {
     list: '/scans',
-    create: '/scans',
+    analyzeImage: '/scans/analyze-image',
     detail: (id: string) => `/scans/${id}`,
     conversations: (id: string) => `/scans/${id}/conversations`,
     equivalentFeedback: (id: string) => `/scans/${id}/equivalent-feedback`,

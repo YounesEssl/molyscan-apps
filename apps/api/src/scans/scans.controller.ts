@@ -5,7 +5,6 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decorator';
 import { ScansService } from './scans.service';
 import { ImageAnalysisService } from './image-analysis.service';
-import { CreateScanDto } from './dto/create-scan.dto';
 import { AnalyzeImageDto } from './dto/analyze-image.dto';
 import { ScanFiltersDto } from './dto/scan-filters.dto';
 import { EquivalentFeedbackDto } from './dto/equivalent-feedback.dto';
@@ -26,12 +25,6 @@ export class ScansController {
     return this.scansService.findAll(user.sub, filters);
   }
 
-  @Post()
-  @ApiOperation({ summary: 'Create a new scan' })
-  create(@CurrentUser() user: JwtPayload, @Body() dto: CreateScanDto) {
-    return this.scansService.create(user.sub, dto);
-  }
-
   @Post('analyze-image')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Analyze a product image and find Molydal equivalent' })
@@ -42,13 +35,8 @@ export class ScansController {
       user.sub,
       dto.message,
       { lat: dto.locationLat, lng: dto.locationLng, label: dto.locationLabel },
+      dto.clientRequestId,
     );
-  }
-
-  @Post('batch')
-  @ApiOperation({ summary: 'Create multiple scans (offline sync)' })
-  createBatch(@CurrentUser() user: JwtPayload, @Body() dtos: CreateScanDto[]) {
-    return this.scansService.createBatch(user.sub, dtos);
   }
 
   @Get(':id')

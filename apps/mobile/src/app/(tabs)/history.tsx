@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Platform,
@@ -21,6 +21,7 @@ import { useTabBarSpacing } from '@/hooks/useTabBarSpacing';
 import { colors } from '@/design/tokens/colors';
 import { spacing } from '@/design/tokens/spacing';
 import { scanService } from '@/services/scan.service';
+import { useOutboxStore } from '@/stores/outbox.store';
 import type { ScanRecord, ScanStatus } from '@/schemas/scan.schema';
 
 type Filter = ScanStatus | 'all';
@@ -99,6 +100,16 @@ export default function HistoryScreen(): React.JSX.Element {
         .catch(() => {});
     }, []),
   );
+
+  // Refresh once queued scans finish syncing so the analyzed results appear.
+  const pendingCount = useOutboxStore((s) => s.pendingCount);
+  const prevPending = useRef(pendingCount);
+  useEffect(() => {
+    if (pendingCount < prevPending.current && useOutboxStore.getState().isOnline) {
+      scanService.getHistory().then(setScans).catch(() => {});
+    }
+    prevPending.current = pendingCount;
+  }, [pendingCount]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

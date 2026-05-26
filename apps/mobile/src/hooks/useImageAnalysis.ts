@@ -1,14 +1,20 @@
 import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
+import axios from 'axios';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '@/lib/axios';
+import { ENDPOINTS } from '@/constants/api';
 import { logger } from '@/lib/logger';
 import { useLocation } from '@/hooks/useLocation';
+import { useOutboxStore } from '@/stores/outbox.store';
+import { enqueueScanAnalysis } from '@/lib/outbox/enqueue';
 
 export interface AnalysisResult {
   /** Persisted scan id — used for equivalent feedback submission */
   id?: string;
+  /** True when the scan was queued offline and will be analyzed on reconnection. */
+  queued?: boolean;
   identified: { name: string; brand: string; type: string; specs: string };
   equivalents: Array<{
     name: string;
@@ -26,6 +32,18 @@ const EMPTY_RESULT: AnalysisResult = {
   analysis: 'Analysis failed.',
   sources: [],
 };
+
+const QUEUED_RESULT: AnalysisResult = {
+  identified: { name: '', brand: '', type: '', specs: '' },
+  equivalents: [],
+  analysis: '',
+  sources: [],
+  queued: true,
+};
+
+/** A network/timeout error (no HTTP response) — eligible for the offline queue. */
+const isNetworkError = (error: unknown): boolean =>
+  axios.isAxiosError(error) && !error.response;
 
 export interface UseImageAnalysis {
   isAnalyzing: boolean;
@@ -45,35 +63,57 @@ export function useImageAnalysis(): UseImageAnalysis {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
 
+  const queueScan = useCallback(
+    async (base64: string, mimeType: string, location: Awaited<ReturnType<typeof getCurrentLocation>>) => {
+      await enqueueScanAnalysis({ base64, mimeType, location });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setResult(QUEUED_RESULT);
+    },
+    [],
+  );
+
   const analyzeBase64 = useCallback(
     async (base64: string, mimeType = 'image/jpeg'): Promise<void> => {
       const sizeKb = Math.round((base64.length * 0.75) / 1024);
       logger.debug(`[analyze] start — ${sizeKb} Ko, mime=${mimeType}`);
 
-      logger.debug('[analyze] fetching location…');
-      const tLoc = Date.now();
       const location = await getCurrentLocation();
-      logger.debug(`[analyze] location resolved in ${Date.now() - tLoc}ms`, location);
+
+      // Offline: queue the scan; analysis happens on reconnection.
+      if (!useOutboxStore.getState().isOnline) {
+        logger.debug('[analyze] offline — queuing scan');
+        await queueScan(base64, mimeType, location);
+        return;
+      }
 
       logger.debug('[analyze] POST /scans/analyze-image…');
       const tApi = Date.now();
-      const response = await api.post(
-        '/scans/analyze-image',
-        {
-          image: base64,
-          mimeType,
-          locationLat: location?.lat,
-          locationLng: location?.lng,
-          locationLabel: location?.label,
-        },
-        { timeout: 90000 },
-      );
-      logger.debug(`[analyze] API responded in ${Date.now() - tApi}ms`);
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setResult(response.data);
+      try {
+        const response = await api.post(
+          ENDPOINTS.scans.analyzeImage,
+          {
+            image: base64,
+            mimeType,
+            locationLat: location?.lat,
+            locationLng: location?.lng,
+            locationLabel: location?.label,
+          },
+          { timeout: 90000 },
+        );
+        logger.debug(`[analyze] API responded in ${Date.now() - tApi}ms`);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setResult(response.data);
+      } catch (error) {
+        // Lost connectivity mid-request → fall back to the queue instead of failing.
+        if (isNetworkError(error)) {
+          logger.warn('[analyze] network error — queuing scan');
+          await queueScan(base64, mimeType, location);
+          return;
+        }
+        throw error;
+      }
     },
-    [getCurrentLocation],
+    [getCurrentLocation, queueScan],
   );
 
   const analyzeFromGallery = useCallback(async (): Promise<void> => {

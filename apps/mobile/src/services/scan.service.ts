@@ -1,9 +1,6 @@
 import { api } from '@/lib/axios';
 import { ENDPOINTS } from '@/constants/api';
-import { useOfflineStore } from '@/stores/offline.store';
-import { insertOfflineScan } from '@/lib/database';
 import type { ScanRecord } from '@/schemas/scan.schema';
-import i18n from '@/i18n';
 
 export interface ScanLinkedConversation {
   id: string;
@@ -31,28 +28,6 @@ export const scanService = {
   async getLinkedConversations(id: string): Promise<ScanLinkedConversation[]> {
     const response = await api.get(ENDPOINTS.scans.conversations(id));
     return response.data ?? [];
-  },
-
-  async matchBarcode(barcode: string, scanMethod: string = 'barcode'): Promise<ScanRecord> {
-    const { isOffline } = useOfflineStore.getState();
-    if (isOffline) {
-      const record: ScanRecord = {
-        id: `scan-offline-${Date.now()}`,
-        barcode,
-        scannedProduct: { name: barcode, brand: i18n.t('common.unknown'), category: i18n.t('common.uncategorized'), barcode },
-        molydalMatch: null,
-        status: 'no_match',
-        scannedAt: new Date().toISOString(),
-        scanMethod: scanMethod as 'barcode' | 'label' | 'voice',
-        location: null,
-      };
-      await insertOfflineScan(record.id, record.barcode, JSON.stringify(record), null);
-      await useOfflineStore.getState().loadPendingCount();
-      return record;
-    }
-
-    const response = await api.post(ENDPOINTS.scans.create, { barcode, scanMethod });
-    return response.data;
   },
 
   async submitEquivalentFeedback(

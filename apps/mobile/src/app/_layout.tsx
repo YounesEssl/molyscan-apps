@@ -8,8 +8,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { OfflineBanner } from '@/components/layout/OfflineBanner';
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
-import { useNetworkStatus } from '@/hooks/useNetworkStatus';
-import { useSync } from '@/hooks/useSync';
+import { useOutbox } from '@/hooks/useOutbox';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAuthStore } from '@/stores/auth.store';
 import { authService } from '@/services/auth.service';
@@ -17,8 +16,7 @@ import { storage } from '@/lib/storage';
 import { COLORS } from '@/constants/theme';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 function AppHooks(): null {
-  useNetworkStatus();
-  useSync();
+  useOutbox();
   usePushNotifications();
   useEffect(() => {
     loadStoredLanguage();

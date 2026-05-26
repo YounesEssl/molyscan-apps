@@ -2,10 +2,9 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from '../products/products.service';
 import { StorageService } from '../storage/storage.service';
-import { CreateScanDto } from './dto/create-scan.dto';
 import { ScanFiltersDto } from './dto/scan-filters.dto';
 import { EquivalentFeedbackDto } from './dto/equivalent-feedback.dto';
-import { EquivalentFeedbackVote, ScanMethod, ScanStatus } from '@prisma/client';
+import { EquivalentFeedbackVote } from '@prisma/client';
 
 @Injectable()
 export class ScansService {
@@ -111,64 +110,6 @@ export class ScansService {
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
     }));
-  }
-
-  async create(userId: string, dto: CreateScanDto) {
-    let competitorProductId: string | null = null;
-    let status: ScanStatus = ScanStatus.no_match;
-
-    const product = await this.prisma.competitorProduct.findUnique({
-      where: { barcode: dto.barcode },
-      include: {
-        equivalences: {
-          include: { molydalProduct: true },
-          orderBy: { confidenceScore: 'desc' },
-          take: 1,
-        },
-      },
-    });
-
-    if (product) {
-      competitorProductId = product.id;
-      const equiv = product.equivalences[0];
-      if (equiv) {
-        status = equiv.confidenceScore >= 80 ? ScanStatus.matched : ScanStatus.partial;
-      }
-    }
-
-    const scan = await this.prisma.scan.create({
-      data: {
-        barcode: dto.barcode,
-        scanMethod: dto.scanMethod || ScanMethod.barcode,
-        status,
-        userId,
-        competitorProductId,
-        locationLat: dto.locationLat,
-        locationLng: dto.locationLng,
-        locationLabel: dto.locationLabel,
-      },
-      include: {
-        competitorProduct: {
-          include: {
-            equivalences: {
-              include: { molydalProduct: true },
-              orderBy: { confidenceScore: 'desc' },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
-
-    return this.formatScanRecord(scan);
-  }
-
-  async createBatch(userId: string, dtos: CreateScanDto[]) {
-    const results = [];
-    for (const dto of dtos) {
-      results.push(await this.create(userId, dto));
-    }
-    return results;
   }
 
   async submitEquivalentFeedback(

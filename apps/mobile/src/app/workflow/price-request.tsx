@@ -10,6 +10,7 @@ import {
   Keyboard,
   TextInput,
 } from 'react-native';
+import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Shop } from 'react-native-solar-icons/icons/bold-duotone';
@@ -22,8 +23,11 @@ import { COLORS, SPACING } from '@/constants/theme';
 import { scanService } from '@/services/scan.service';
 import { workflowService } from '@/services/workflow.service';
 import { useWorkflowStore } from '@/stores/workflow.store';
+import { useOutboxStore } from '@/stores/outbox.store';
+import { enqueueWorkflowCreate } from '@/lib/outbox/enqueue';
 import { haptic } from '@/lib/haptics';
 import type { ScanRecord } from '@/schemas/scan.schema';
+import type { WorkflowCreatePayload } from '@/lib/outbox/types';
 
 export default function PriceRequestScreen(): React.JSX.Element {
   const router = useRouter();
@@ -46,6 +50,24 @@ export default function PriceRequestScreen(): React.JSX.Element {
   const [price, setPrice] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const queueOffline = async (payload: WorkflowCreatePayload): Promise<void> => {
+    const id = await enqueueWorkflowCreate(payload);
+    const now = new Date().toISOString();
+    addWorkflow({
+      id,
+      ...payload,
+      status: 'submitted',
+      steps: [{ status: 'submitted', date: now, actor: 'You' }],
+      createdAt: now,
+      updatedAt: now,
+    });
+    setLoading(false);
+    haptic.success();
+    Alert.alert(t('common.success'), t('workflow.queuedOffline'), [
+      { text: 'OK', onPress: () => router.back() },
+    ]);
+  };
+
   const handleSubmit = async (): Promise<void> => {
     if (!clientName.trim() || !quantity.trim()) {
       haptic.warning();
@@ -53,23 +75,36 @@ export default function PriceRequestScreen(): React.JSX.Element {
       return;
     }
     setLoading(true);
+
+    const payload: WorkflowCreatePayload = {
+      scanId: scanId ?? '',
+      productName: scan?.molydalMatch?.name ?? '',
+      molydalRef: scan?.molydalMatch?.reference ?? '',
+      clientName: clientName.trim(),
+      quantity: parseInt(quantity, 10) || 0,
+      unit: 'L',
+      requestedPrice: price ? parseFloat(price) : undefined,
+    };
+
+    if (!useOutboxStore.getState().isOnline) {
+      await queueOffline(payload);
+      return;
+    }
+
     try {
-      const wf = await workflowService.create({
-        scanId: scanId ?? '',
-        productName: scan?.molydalMatch?.name ?? '',
-        molydalRef: scan?.molydalMatch?.reference ?? '',
-        clientName: clientName.trim(),
-        quantity: parseInt(quantity, 10) || 0,
-        unit: 'L',
-        requestedPrice: price ? parseFloat(price) : undefined,
-      });
+      const wf = await workflowService.create(payload);
       addWorkflow(wf);
       setLoading(false);
       haptic.success();
       Alert.alert(t('common.success'), t('workflow.submitSuccess'), [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    } catch {
+    } catch (error) {
+      // Lost connectivity mid-request → queue instead of failing.
+      if (axios.isAxiosError(error) && !error.response) {
+        await queueOffline(payload);
+        return;
+      }
       setLoading(false);
       haptic.error();
       Alert.alert(t('common.error'), t('workflow.submitError'));

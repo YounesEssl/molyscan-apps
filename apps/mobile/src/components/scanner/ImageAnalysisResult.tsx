@@ -29,6 +29,8 @@ import { logger } from '@/lib/logger';
 
 interface AnalysisResult {
   id?: string;
+  /** True when the scan was queued offline and will be analyzed on reconnection. */
+  queued?: boolean;
   identified: { name: string; brand: string; type: string; specs: string };
   equivalents: Array<{
     name: string;
@@ -137,6 +139,33 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       setCreatingChat(false);
     }
   };
+
+  if (result.queued) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.statusIcon}>
+          <CheckCircle size={48} color={colors.ok} />
+        </View>
+        <Text variant="heading" style={styles.statusTitle}>
+          {t('scanner.queuedTitle')}
+        </Text>
+        <Card variant="outlined" style={styles.card}>
+          <Text variant="caption" color={colors.ink2} style={styles.analysisText}>
+            {t('scanner.queuedBody')}
+          </Text>
+        </Card>
+        <View style={styles.actions}>
+          <Button
+            label={t('scanner.scanAnotherProduct')}
+            variant="primary"
+            icon={<Camera size={18} color={colors.textOnRed} />}
+            onPress={onScanAgain}
+            fullWidth
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
