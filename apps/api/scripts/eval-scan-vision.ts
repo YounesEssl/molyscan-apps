@@ -24,6 +24,7 @@
 import { NestFactory } from '@nestjs/core';
 import { Readable } from 'stream';
 import * as fs from 'fs';
+import { createClient } from '@supabase/supabase-js';
 import { AppModule } from '../src/app.module';
 import { ImageAnalysisService } from '../src/scans/image-analysis.service';
 import { RagService } from '../src/chat/rag/rag.service';
@@ -73,10 +74,18 @@ const expand = (name: string): string[] => {
   const n = norm(name);
   return [n, ...(ALIASES[n] ?? [])];
 };
+const despace = (s: string) => norm(s).replace(/ /g, '');
+// A candidate matches an expected name if (a) the normalized candidate contains
+// the normalized expected/alias (handles "AIRBUL NF" ⊇ "AIRBUL"), or (b) the
+// fully de-spaced forms are EQUAL (handles "SCA200" == "SCA 200" without the
+// "TOP 5" ⊂ "TOP 50" false positive that a de-spaced *includes* would cause).
 const matches = (candidate: string, list: string[]) => {
   const c = norm(candidate);
   if (!c) return false;
-  return list.some((x) => expand(x).some((alias) => c.includes(alias)));
+  const cd = despace(candidate);
+  return list.some((x) =>
+    expand(x).some((alias) => c.includes(alias) || cd === alias.replace(/ /g, '')),
+  );
 };
 
 interface Case {
@@ -179,9 +188,10 @@ async function runOnce(
   );
   const sources = [...new Set(allChunks.map((x: any) => x.product_name))];
   const expectedRank = sources.findIndex((s: any) => matches(s as string, c.expected));
-  const expectedInTop8 = expectedRank >= 0 && expectedRank < 8;
+  const TOP_K = parseInt(process.env.TOP_K ?? '15', 10);
+  const expectedInTop8 = expectedRank >= 0 && expectedRank < TOP_K;
 
-  const top = allChunks.slice(0, 8);
+  const top = allChunks.slice(0, TOP_K);
   const context = top
     .map(
       (x: any) =>
@@ -227,8 +237,37 @@ async function runOnce(
   const prisma = app.get(PrismaService);
 
   const cases = await loadCases(prisma);
+
+  // Load the distinct catalog product names from Supabase so we can flag cases
+  // whose expected answer simply does NOT exist in the vector store (true
+  // catalog gaps — unfixable by retrieval/selection) and report the score both
+  // with and without them.
+  const catalogNames: string[] = [];
+  try {
+    const sb = createClient(
+      process.env.SUPABASE_URL as string,
+      process.env.SUPABASE_ANON_KEY as string,
+    );
+    let off = 0;
+    for (;;) {
+      const { data } = await sb
+        .from('product_chunks')
+        .select('product_name')
+        .range(off, off + 999);
+      if (!data || data.length === 0) break;
+      catalogNames.push(...data.map((d: any) => d.product_name));
+      if (data.length < 1000) break;
+      off += 1000;
+    }
+  } catch (e: any) {
+    console.log(`(catalog load failed: ${e.message} — gap detection disabled)`);
+  }
+  const uniqCatalog = [...new Set(catalogNames)];
+  const isCatalogGap = (expected: string[]) =>
+    uniqCatalog.length > 0 && !uniqCatalog.some((cn) => matches(cn, expected));
+
   console.log(
-    `\nScan regression harness — ${cases.length} cases × ${RUNS} runs (since ${SINCE}, ONLY=${ONLY})\n`,
+    `\nScan regression harness — ${cases.length} cases × ${RUNS} runs (since ${SINCE}, ONLY=${ONLY}) — catalog: ${uniqCatalog.length} products\n`,
   );
 
   let totalPass = 0;
@@ -273,6 +312,7 @@ async function runOnce(
     for (const o of outcomes)
       if (!o.pass) diagTally[o.diagnosis] = (diagTally[o.diagnosis] ?? 0) + 1;
 
+    const gap = isCatalogGap(c.expected);
     const rate = `${passes}/${RUNS}`;
     const icon = passes === RUNS ? '✅' : passes === 0 ? '❌' : '🟨';
     const diagSet = [...new Set(outcomes.filter((o) => !o.pass).map((o) => o.diagnosis))];
@@ -280,7 +320,7 @@ async function runOnce(
     const cats = [...new Set(outcomes.map((o) => o.category))];
     done++;
     console.log(
-      `${icon} ${rate}  [${String(done).padStart(2)}/${cases.length}] ${c.label.padEnd(40)} attendu:[${c.expected.join(', ')}]\n` +
+      `${icon} ${rate}  [${String(done).padStart(2)}/${cases.length}] ${c.label.padEnd(40)}${gap ? ' 🕳️GAP' : ''} attendu:[${c.expected.join(', ')}]\n` +
         `        picks:[${picks.join(', ')}] cat:[${cats.join(',')}] ${diagSet.length ? 'diag:[' + diagSet.join(',') + ']' : ''}`,
     );
 
@@ -290,20 +330,34 @@ async function runOnce(
       expected: c.expected,
       forbidden: c.forbidden,
       hadDown: c.hadDown,
+      gap,
       passes,
       runs: RUNS,
       outcomes,
     };
   }).then((r) => r.filter(Boolean));
 
+  // Scores: all cases, and excluding true catalog gaps (unfixable by the model).
+  const gapCases = report.filter((r: any) => r.gap);
+  const gapRuns = gapCases.reduce((s: number, r: any) => s + r.runs, 0);
+  const gapPass = gapCases.reduce((s: number, r: any) => s + r.passes, 0);
+  const ngRuns = totalRuns - gapRuns;
+  const ngPass = totalPass - gapPass;
   const pct = totalRuns ? ((totalPass / totalRuns) * 100).toFixed(1) : '0';
+  const pctNoGap = ngRuns ? ((ngPass / ngRuns) * 100).toFixed(1) : '0';
+  // Case-level (case passes if majority of its runs pass), excluding gaps.
+  const ngCases = report.filter((r: any) => !r.gap);
+  const ngCaseFull = ngCases.filter((r: any) => r.passes >= Math.ceil(r.runs / 2)).length;
   console.log('\n' + '━'.repeat(70));
-  console.log(`  OVERALL: ${totalPass}/${totalRuns} run-passes (${pct}%)`);
+  console.log(`  OVERALL (tous)        : ${totalPass}/${totalRuns} = ${pct}%`);
+  console.log(`  HORS trous catalogue  : ${ngPass}/${ngRuns} = ${pctNoGap}%  (${ngCases.length} cas)`);
+  console.log(`  Cas OK (majorité, hors trous): ${ngCaseFull}/${ngCases.length} = ${ngCases.length ? ((100 * ngCaseFull) / ngCases.length).toFixed(1) : '0'}%`);
+  console.log(`  Trous catalogue (${gapCases.length}): ${gapCases.map((r: any) => r.label.slice(0, 22) + ' → ' + r.expected.join('/')).join(' | ')}`);
   console.log(`  Failure diagnosis tally: ${JSON.stringify(diagTally)}`);
   console.log('━'.repeat(70) + '\n');
 
   if (OUT) {
-    fs.writeFileSync(OUT, JSON.stringify({ meta: { RUNS, SINCE, ONLY, totalPass, totalRuns, pct, diagTally }, report }, null, 2));
+    fs.writeFileSync(OUT, JSON.stringify({ meta: { RUNS, SINCE, ONLY, totalPass, totalRuns, pct, pctNoGap, ngPass, ngRuns, gapCount: gapCases.length, diagTally }, report }, null, 2));
     console.log(`Wrote ${OUT}`);
   }
 

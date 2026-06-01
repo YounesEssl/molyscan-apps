@@ -165,6 +165,7 @@ EXPECTED OUTPUT: only the search terms, no explanation, no trailing punctuation,
 
 Rules for the search query:
 - Lead with the APPLICATION family (cutting oil, grease, paste, cleaner, spray) — this drives retrieval.
+- PRESERVE every distinctive technical differentiator explicitly provided in the input — thickener / chemistry (calcium sulfonate, polyurea, lithium complex, aluminium complex, PTFE, MoS2, bentonite), base oil (mineral, PAO, ester, silicone), certifications (NSF H1 / food grade), ISO grade and NLGI. These are what separate the correct equivalent from its siblings in the SAME family — never drop them when they are given.
 - Add the PHYSICAL FORM only when it is a defining feature (aerosol, spray, paste, cartridge).
 - Include APPLICATION CONTEXT when relevant (welding, marine, food contact, electrical contacts, brake parts).
 - Do not invent specifications (no fake ISO grade, no fake NSF H1, no fake viscosity).

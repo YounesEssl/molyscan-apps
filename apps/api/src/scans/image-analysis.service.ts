@@ -242,6 +242,10 @@ export class ImageAnalysisService {
       identification.applicationContext?.length ? ` Application: ${identification.applicationContext.join(', ')}.` : ''
     }${
       identification.certifications?.length ? ` Certifications: ${identification.certifications.join(', ')}.` : ''
+    }${
+      identification.thickener ? ` Thickener/chemistry: ${identification.thickener.replace(/_/g, ' ')}.` : ''
+    }${
+      typeof identification.isoViscosity === 'number' ? ` ISO viscosity: ${identification.isoViscosity}.` : ''
     } Characteristics: ${identification.specs}`;
     const reformulated = await this.ragService.reformulateQuery(reformulationInput, []);
     this.logger.log(`✅ Step 2a — Reformulation (Gemini): ${Date.now() - t2}ms`);
@@ -256,8 +260,11 @@ export class ImageAnalysisService {
       reformulated,
       Object.keys(retrievalFilters).length > 0 ? retrievalFilters : undefined,
     );
-    // Keep only top 8 chunks to reduce context size and speed up Claude
-    const chunks = allChunks.slice(0, 8);
+    // Keep the top 15 chunks: enough to surface the right spec-specific product
+    // (e.g. a calcium-sulfonate grease that ranks ~13th behind generic calcium
+    // greases) without flooding Claude's context. Was 8 — raised after prod
+    // feedback showed correct equivalents getting cut just below the threshold.
+    const chunks = allChunks.slice(0, 15);
     this.logger.log(`✅ Step 2b — RAG search (Supabase): ${Date.now() - t2b}ms → ${allChunks.length} chunks, kept ${chunks.length}`);
 
     const context = chunks.length > 0
@@ -537,7 +544,7 @@ Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser c
         ),
       );
     }
-    if (id.thickener) parts.push(`${id.thickener} thickener`);
+    if (id.thickener) parts.push(`${id.thickener.replace(/_/g, ' ')} thickener`);
     if (typeof id.isoViscosity === 'number') parts.push(`ISO VG ${id.isoViscosity}`);
     if (id.specs) parts.push(id.specs);
     if (id.name) parts.push(id.name);
