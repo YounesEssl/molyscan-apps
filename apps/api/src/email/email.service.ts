@@ -26,7 +26,7 @@ export interface PriceRequestPayload {
   recipients: string[];
   distributor: { firstName: string; lastName: string; email: string };
   product: { name: string; ref: string };
-  quantity: number;
+  quantity?: number | null;
   unit: string;
   clientName?: string | null;
   departmentName?: string | null;
@@ -188,7 +188,7 @@ export class EmailService {
     const { applicant, reviewUrl } = payload;
 
     return wrapLayout(`
-      <h1 style="${H1}">Nouvelle demande d'accès</h1>
+      <h1 style="${H1}">Nouvelle demande d'${accent('accès')}</h1>
       <p style="${P}">
         Un utilisateur souhaite créer un compte sur <strong>MolyScan</strong>.
         Ouvrez la console d'administration pour vérifier la demande, lui
@@ -214,14 +214,14 @@ export class EmailService {
     product: string,
   ): string {
     const { distributor, quantity, unit, clientName, departmentName } = payload;
-    const qty = Number.isFinite(quantity) ? `${quantity} ${escapeHtml(unit)}` : '—';
+    const hasQty = quantity != null && Number.isFinite(quantity);
 
     const fallbackNote = payload.isFallback
       ? `<p style="${MUTED}">Aucun commercial n'est rattaché à ce département : cette demande vous est transmise en tant qu'administrateur, à router manuellement.</p>`
       : '';
 
     return wrapLayout(`
-      <h1 style="${H1}">Nouvelle demande de prix</h1>
+      <h1 style="${H1}">Nouvelle demande de ${accent('prix')}</h1>
       <p style="${P}">
         <strong>${escapeHtml(fullName)}</strong> (distributeur) souhaite obtenir
         un prix pour le produit Molydal ci-dessous. Merci de le recontacter
@@ -232,7 +232,7 @@ export class EmailService {
         ${row('Email', escapeHtml(distributor.email))}
         ${row('Produit', escapeHtml(product))}
         ${payload.product.ref ? row('Référence', escapeHtml(payload.product.ref)) : ''}
-        ${row('Quantité', qty)}
+        ${hasQty ? row('Quantité', `${quantity} ${escapeHtml(unit)}`) : ''}
         ${clientName ? row('Client final', escapeHtml(clientName)) : ''}
         ${departmentName ? row('Département', escapeHtml(departmentName)) : ''}
       </table>
@@ -248,7 +248,7 @@ export class EmailService {
 
     if (params.approved) {
       return wrapLayout(`
-        <h1 style="${H1}">Compte approuvé ✅</h1>
+        <h1 style="${H1}">Compte ${accent('approuvé')}</h1>
         <p style="${P}">${greeting}</p>
         <p style="${P}">
           Votre demande d'accès à <strong>MolyScan</strong> a été approuvée.
@@ -259,7 +259,7 @@ export class EmailService {
     }
 
     return wrapLayout(`
-      <h1 style="${H1}">Demande non retenue</h1>
+      <h1 style="${H1}">Demande ${accent('non retenue')}</h1>
       <p style="${P}">${greeting}</p>
       <p style="${P}">
         Votre demande d'accès à <strong>MolyScan</strong> n'a pas été retenue.
@@ -270,43 +270,64 @@ export class EmailService {
 }
 
 // ─── Styles & helpers de rendu (inline, compatibilité clients mail) ──────────
+// Direction artistique calquée sur l'app : papier crème, encre chaude, rouge
+// Molydal, serif éditorial (Georgia ≈ Fraunces) pour les titres, sans pour le
+// corps. Pas de gradient/webfont (rendu incohérent sur Outlook/Gmail) — rouge
+// plein + pill bulletproof.
 
-const BRAND = '#1B3A5C';
+const PAPER = '#f5f1ea';
+const CARD = '#fffdf8';
+const INK = '#1a1410';
+const INK_2 = '#6f675c';
+const INK_3 = '#9a9288';
+const RED = '#d4251c';
+const RED_SOFT = '#fbeceb';
+const BORDER = '#efe7da';
 
-const H1 = `margin:0 0 16px;font-size:22px;line-height:1.3;color:${BRAND};font-family:Helvetica,Arial,sans-serif;`;
-const P = `margin:0 0 14px;font-size:15px;line-height:1.55;color:#1a1410;font-family:Helvetica,Arial,sans-serif;`;
-const MUTED = `margin:24px 0 0;font-size:12px;line-height:1.5;color:#8a8178;font-family:Helvetica,Arial,sans-serif;`;
-const TABLE = `width:100%;border-collapse:collapse;margin:8px 0 8px;`;
-const BTN_PRIMARY = `display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:10px;font-size:15px;font-weight:600;font-family:Helvetica,Arial,sans-serif;`;
+const SERIF = "Georgia,'Times New Roman',serif";
+const SANS = "'Helvetica Neue',Helvetica,Arial,sans-serif";
+
+const H1 = `margin:0 0 16px;font-size:27px;line-height:1.18;color:${INK};font-family:${SERIF};font-weight:normal;letter-spacing:-0.2px;`;
+const P = `margin:0 0 14px;font-size:15px;line-height:1.6;color:${INK_2};font-family:${SANS};`;
+const MUTED = `margin:24px 0 0;font-size:12px;line-height:1.5;color:${INK_3};font-family:${SANS};`;
+const TABLE = `width:100%;border-collapse:collapse;margin:20px 0 8px;background:${PAPER};border-radius:14px;`;
+const BTN_PRIMARY = `display:inline-block;background:${RED};color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:999px;font-size:15px;font-weight:600;font-family:${SANS};`;
+
+/** Accent rouge en italique serif — signature visuelle de l'app. */
+const ACCENT = `color:${RED};font-family:${SERIF};font-style:italic;`;
+function accent(text: string): string {
+  return `<span style="${ACCENT}">${text}</span>`;
+}
 
 function row(label: string, value: string): string {
   return `
     <tr>
-      <td style="padding:8px 0;font-size:13px;color:#8a8178;font-family:Helvetica,Arial,sans-serif;width:120px;vertical-align:top;">${label}</td>
-      <td style="padding:8px 0;font-size:15px;color:#1a1410;font-family:Helvetica,Arial,sans-serif;font-weight:600;">${value}</td>
+      <td style="padding:11px 16px;font-size:12px;text-transform:uppercase;letter-spacing:0.6px;color:${INK_3};font-family:${SANS};width:130px;vertical-align:top;">${label}</td>
+      <td style="padding:11px 16px 11px 0;font-size:15px;color:${INK};font-family:${SANS};font-weight:600;">${value}</td>
     </tr>`;
 }
 
 function wrapLayout(content: string): string {
   return `<!DOCTYPE html>
 <html lang="fr">
-  <body style="margin:0;padding:0;background:#f5f1ea;">
-    <table role="presentation" width="100%" style="background:#f5f1ea;padding:32px 0;">
+  <body style="margin:0;padding:0;background:${PAPER};">
+    <table role="presentation" width="100%" style="background:${PAPER};padding:40px 0;">
       <tr>
         <td align="center">
-          <table role="presentation" width="520" style="max-width:520px;width:100%;background:#fffdf8;border-radius:16px;overflow:hidden;border:1px solid #ece5da;">
+          <table role="presentation" width="540" style="max-width:540px;width:100%;background:${CARD};border-radius:24px;overflow:hidden;border:1px solid ${BORDER};">
             <tr>
-              <td style="background:${BRAND};padding:20px 28px;">
-                <span style="font-size:18px;font-weight:700;color:#ffffff;font-family:Helvetica,Arial,sans-serif;letter-spacing:0.5px;">MolyScan</span>
+              <td style="padding:26px 32px 0 32px;">
+                <span style="font-size:20px;font-weight:bold;color:${INK};font-family:${SERIF};letter-spacing:-0.3px;">Moly<span style="color:${RED};">Scan</span></span>
+                <div style="height:1px;background:${BORDER};margin:22px 0 0;"></div>
               </td>
             </tr>
             <tr>
-              <td style="padding:28px;">
+              <td style="padding:28px 32px 34px 32px;">
                 ${content}
               </td>
             </tr>
           </table>
-          <p style="margin:18px 0 0;font-size:11px;color:#b5aca0;font-family:Helvetica,Arial,sans-serif;">Molydal · MolyScan</p>
+          <p style="margin:20px 0 0;font-size:11px;color:${INK_3};font-family:${SANS};letter-spacing:0.4px;">Molydal · MolyScan</p>
         </td>
       </tr>
     </table>
