@@ -185,9 +185,67 @@ MINIO_BUCKET=molyscan
 MINIO_USE_SSL=false
 
 EXPO_PUSH_ACCESS_TOKEN=<token>
+
+# Emails transactionnels (Resend) + plateforme d'administration
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL="MolyScan <noreply@blindtrack.fr>"
+ADMIN_WEB_URL="https://admin.molyscan.fr"
 ```
 
+`ADMIN_WEB_URL` sert à construire le lien « Examiner la demande » dans l'email
+envoyé aux admins lors d'une demande d'accès. `RESEND_*` est optionnel : si la clé
+est absente, l'`EmailService` passe en no-op (aucun email, aucune erreur).
+
 Ne jamais committer ce fichier. Il ne doit exister que sur le VPS.
+
+## Seed des départements en production
+
+`npm run prisma:seed` lance le seed **complet** (avec données de démo) — à ne PAS
+exécuter en prod. Pour n'insérer que la liste de référence des départements
+(idempotent, aucune donnée de démo) :
+
+```bash
+cd ~/molyscan-apps/apps/api
+npm run prisma:seed:departments
+```
+
+## Plateforme web d'administration (apps/admin)
+
+SPA statique (Vite) servie par nginx sur **https://admin.molyscan.fr**, qui
+consomme l'API de prod (`VITE_API_URL=https://api.molyscan.fr/api`, figé dans
+`apps/admin/.env.production`). Accès réservé aux comptes `role=admin`.
+
+### Déployer une nouvelle version de l'admin
+
+Depuis le poste local :
+
+```bash
+./deploy-admin.sh      # build + upload vers /var/www/admin.molyscan.fr
+```
+
+### Première installation (DNS + nginx + SSL)
+
+```bash
+# 1. DNS : enregistrement A  admin.molyscan.fr → 51.77.158.155 (chez le registrar)
+
+# 2. nginx : /etc/nginx/sites-available/admin.molyscan.fr
+server {
+    listen 80;
+    listen [::]:80;
+    server_name admin.molyscan.fr;
+    root /var/www/admin.molyscan.fr;
+    index index.html;
+    location / { try_files $uri $uri/ /index.html; }   # fallback SPA
+    location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; access_log off; }
+    location = /index.html { add_header Cache-Control "no-cache, no-store, must-revalidate"; }
+}
+
+sudo ln -s /etc/nginx/sites-available/admin.molyscan.fr /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# 3. HTTPS (une fois le DNS propagé)
+sudo certbot --nginx -d admin.molyscan.fr
+```
 
 ## Workflow complet (poste local → prod)
 
