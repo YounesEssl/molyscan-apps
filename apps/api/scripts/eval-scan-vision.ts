@@ -57,9 +57,27 @@ async function pool<T, R>(
 }
 
 const norm = (s: string) =>
-  (s ?? '').toLowerCase().replace(/[\s/\-_.+]+/g, ' ').trim();
-const matches = (candidate: string, list: string[]) =>
-  list.some((x) => candidate && norm(candidate).includes(norm(x)));
+  (s ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip accents: aérosol → aerosol
+    .toLowerCase()
+    .replace(/[\s/\-_.+]+/g, ' ')
+    .trim();
+
+// Vocabulary aliases: the reviewer's wording vs the catalog product name for the
+// SAME product. Used only to score correctly — e.g. "3790 aérosol" IS "GRAISSE 3790".
+const ALIASES: Record<string, string[]> = {
+  '3790 aerosol': ['graisse 3790'],
+};
+const expand = (name: string): string[] => {
+  const n = norm(name);
+  return [n, ...(ALIASES[n] ?? [])];
+};
+const matches = (candidate: string, list: string[]) => {
+  const c = norm(candidate);
+  if (!c) return false;
+  return list.some((x) => expand(x).some((alias) => c.includes(alias)));
+};
 
 interface Case {
   scanId: string;

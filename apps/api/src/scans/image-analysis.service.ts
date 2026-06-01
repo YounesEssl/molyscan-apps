@@ -583,6 +583,7 @@ ${ragContext}
 Selection rules:
 - The equivalent MUST respect the hard constraints above when present.
 - Match on PRIMARY FUNCTION first — what the product DOES (cleaning, lubricating, leak detection, anti-seize, …) — then secondary specs.
+- The datasheets are listed in RETRIEVAL RELEVANCE order. When several listed products satisfy the constraints AND share the competitor's primary function, pick the one listed FIRST as the #1 equivalent. Do NOT demote it for a lower-listed product over secondary spec nuances (viscosity grade, exact thickener) — only do so if the first clearly has a different function or breaks a hard constraint, and say why in "reason".
 - If the competitor is an AEROSOL, the equivalent must be an aerosol. If it's a paste, equivalent must be a paste.
 - If the application context says "welding", the equivalent must be a welding product (anti-spatter / protective coating).
 - Never recommend a product from a different family by default.
