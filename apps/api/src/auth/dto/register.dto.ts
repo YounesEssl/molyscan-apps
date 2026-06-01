@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @ApiProperty({ example: 'marc.dupont@molydal.com' })
@@ -20,4 +20,14 @@ export class RegisterDto {
   @IsString()
   @MinLength(1)
   lastName!: string;
+
+  // Le rôle est déduit côté serveur du domaine email (jamais envoyé par le
+  // client). Le département n'est attendu QUE pour les distributeurs (email hors
+  // @molydal.com) ; il est ignoré pour les commerciaux (attribué par l'admin).
+  @ApiPropertyOptional({
+    description: 'Département demandé — requis pour les inscriptions distributeur',
+  })
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
 }

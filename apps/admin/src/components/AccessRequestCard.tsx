@@ -4,6 +4,7 @@ import { Check, X, Loader2, Mail, Calendar } from 'lucide-react';
 import { api, getApiErrorMessage } from '@/lib/api';
 import type { AccessRequest, Department } from '@/lib/types';
 import { DepartmentMultiSelect } from './DepartmentMultiSelect';
+import { RoleBadge } from './UserBadges';
 
 interface Props {
   request: AccessRequest;
@@ -25,8 +26,13 @@ export function AccessRequestCard({
   departmentsLoading,
 }: Props) {
   const queryClient = useQueryClient();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Pré-sélectionne le département choisi par le distributeur à l'inscription
+  // (vide pour un commercial : l'admin choisit).
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(request.departments.map((d) => d.id)),
+  );
   const [error, setError] = useState<string | null>(null);
+  const isDistributor = request.role === 'distributor';
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['access-requests'] });
@@ -78,9 +84,12 @@ export function AccessRequestCard({
           {initials}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="font-display text-xl font-semibold tracking-tight text-ink">
-            {request.firstName} {request.lastName}
-          </h3>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h3 className="font-display text-xl font-semibold tracking-tight text-ink">
+              {request.firstName} {request.lastName}
+            </h3>
+            <RoleBadge role={request.role} />
+          </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
             <span className="inline-flex items-center gap-1.5">
               <Mail className="h-3.5 w-3.5" />
@@ -97,12 +106,18 @@ export function AccessRequestCard({
       <div className="border-t border-ink-4 px-6 py-5">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-2">
-            Départements à attribuer
+            {isDistributor ? 'Département demandé' : 'Départements à attribuer'}
           </p>
           <span className="text-xs font-medium text-ink-3">
             {selected.size} sélectionné{selected.size > 1 ? 's' : ''}
           </span>
         </div>
+        {isDistributor && (
+          <p className="mt-1.5 text-xs text-ink-3">
+            Choisi par le distributeur à l'inscription — modifiable avant
+            approbation.
+          </p>
+        )}
 
         <div className="mt-3">
           <DepartmentMultiSelect

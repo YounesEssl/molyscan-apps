@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -23,8 +23,16 @@ import { colors } from '@/design/tokens/colors';
 import { typography } from '@/design/tokens/typography';
 import { radius } from '@/design/tokens/radius';
 import { authService } from '@/services/auth.service';
-import { RegisterRequestSchema } from '@/schemas/auth.schema';
+import { departmentsService } from '@/services/departments.service';
+import { RegisterRequestSchema, type Department } from '@/schemas/auth.schema';
+import {
+  CountryDepartmentSelect,
+  FRANCE,
+  type CountryDepartmentValue,
+} from '@/components/auth/CountryDepartmentSelect';
 import { haptic } from '@/lib/haptics';
+
+const MOLYDAL_DOMAIN = 'molydal.com';
 
 export default function RegisterScreen(): React.JSX.Element {
   const router = useRouter();
@@ -39,6 +47,34 @@ export default function RegisterScreen(): React.JSX.Element {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // Distributeur = email hors @molydal.com → on demande pays + département.
+  const domain = email.includes('@')
+    ? (email.split('@')[1] ?? '').trim().toLowerCase()
+    : '';
+  const isDistributor = domain.includes('.') && domain !== MOLYDAL_DOMAIN;
+
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [geo, setGeo] = useState<CountryDepartmentValue>({
+    country: FRANCE,
+    departmentId: null,
+  });
+
+  // Charge la liste publique des départements dès qu'un distributeur est détecté.
+  useEffect(() => {
+    if (!isDistributor || departments.length > 0 || departmentsLoading) return;
+    const controller = new AbortController();
+    setDepartmentsLoading(true);
+    departmentsService
+      .list({ signal: controller.signal })
+      .then(setDepartments)
+      .catch(() => {
+        /* silencieux : l'utilisateur verra le bloc vide / pourra réessayer */
+      })
+      .finally(() => setDepartmentsLoading(false));
+    return () => controller.abort();
+  }, [isDistributor, departments.length, departmentsLoading]);
+
   const lastNameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -49,11 +85,14 @@ export default function RegisterScreen(): React.JSX.Element {
   };
 
   const handleSubmit = async (): Promise<void> => {
+    const resolvedDepartmentId = isDistributor ? geo.departmentId : undefined;
+
     const payload = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: email.trim(),
       password,
+      ...(resolvedDepartmentId ? { departmentId: resolvedDepartmentId } : {}),
     };
 
     // Validation locale (messages dédiés) avant l'appel réseau.
@@ -70,6 +109,12 @@ export default function RegisterScreen(): React.JSX.Element {
     if (password !== confirmPassword) {
       haptic.warning();
       Alert.alert(t('common.error'), t('auth.passwordMismatch'));
+      return;
+    }
+    // Distributeur : pays + département obligatoires.
+    if (isDistributor && !resolvedDepartmentId) {
+      haptic.warning();
+      Alert.alert(t('common.error'), t('auth.departmentRequired'));
       return;
     }
 
@@ -218,6 +263,16 @@ export default function RegisterScreen(): React.JSX.Element {
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 blurOnSubmit={false}
               />
+
+              {isDistributor && (
+                <CountryDepartmentSelect
+                  departments={departments}
+                  loading={departmentsLoading}
+                  value={geo}
+                  onChange={setGeo}
+                />
+              )}
+
               <Input
                 ref={passwordRef}
                 label={t('auth.password')}

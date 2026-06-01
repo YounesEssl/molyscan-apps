@@ -8,6 +8,7 @@ import {
 import { Prisma, UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { DepartmentsService } from '../departments/departments.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const ACCESS_REQUEST_SELECT = {
@@ -15,9 +16,10 @@ const ACCESS_REQUEST_SELECT = {
   email: true,
   firstName: true,
   lastName: true,
+  role: true,
   status: true,
   createdAt: true,
-  departments: { select: { id: true, name: true } },
+  departments: { select: { id: true, name: true, code: true } },
 } satisfies Prisma.UserSelect;
 
 const USER_SELECT = {
@@ -47,13 +49,13 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly departmentsService: DepartmentsService,
   ) {}
 
   // ─── Départements ──────────────────────────────────────────────────────
 
   listDepartments() {
-    // Tri par code (NULLS LAST en Postgres pour l'ASC → zones export en fin).
-    return this.prisma.department.findMany({ orderBy: { code: 'asc' } });
+    return this.departmentsService.list();
   }
 
   async createDepartment(name: string) {

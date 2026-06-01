@@ -22,6 +22,7 @@ export interface AccessRequest {
   email: string;
   firstName: string;
   lastName: string;
+  role: UserRole;
   status: UserStatus;
   createdAt: string;
   departments: Department[];

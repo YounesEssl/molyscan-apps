@@ -27,9 +27,22 @@ export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 export const RegisterRequestSchema = LoginRequestSchema.extend({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
+  // Requis uniquement pour les distributeurs (email hors @molydal.com) ;
+  // le serveur fait foi sur le rôle et la validation.
+  departmentId: z.string().optional(),
 });
 
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
+
+export const DepartmentSchema = z.object({
+  id: z.string(),
+  code: z.string().nullable(),
+  name: z.string(),
+});
+
+export type Department = z.infer<typeof DepartmentSchema>;
+
+export const DepartmentsResponseSchema = z.array(DepartmentSchema);
 
 // L'inscription ne renvoie plus de tokens : le compte est créé en attente de
 // validation par un administrateur.

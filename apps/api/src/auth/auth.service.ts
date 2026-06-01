@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +15,10 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UserRole, UserStatus, User } from '@prisma/client';
 import { randomUUID } from 'crypto';
+
+// Les adresses @molydal.com sont des commerciaux internes ; tout autre domaine
+// correspond à un distributeur partenaire.
+const MOLYDAL_DOMAIN = 'molydal.com';
 
 @Injectable()
 export class AuthService {
@@ -46,6 +51,27 @@ export class AuthService {
     });
     if (existing) throw new ConflictException('Email already registered');
 
+    // Rôle déduit du domaine email (autorité serveur). Distributeur =
+    // département choisi à l'inscription ; commercial = attribué par l'admin.
+    const isMolydal = dto.email.trim().toLowerCase().endsWith(`@${MOLYDAL_DOMAIN}`);
+    const role = isMolydal ? UserRole.commercial : UserRole.distributor;
+
+    let departmentConnect: { connect: { id: string }[] } | undefined;
+    if (!isMolydal) {
+      if (!dto.departmentId) {
+        throw new BadRequestException(
+          'Le département est obligatoire pour une inscription distributeur.',
+        );
+      }
+      const department = await this.prisma.department.findUnique({
+        where: { id: dto.departmentId },
+      });
+      if (!department) {
+        throw new BadRequestException('Département introuvable.');
+      }
+      departmentConnect = { connect: [{ id: department.id }] };
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
       data: {
@@ -53,8 +79,9 @@ export class AuthService {
         passwordHash,
         firstName: dto.firstName,
         lastName: dto.lastName,
-        role: UserRole.commercial,
+        role,
         status: UserStatus.pending,
+        ...(departmentConnect ? { departments: departmentConnect } : {}),
       },
     });
 

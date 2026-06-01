@@ -10,6 +10,9 @@ export const ENDPOINTS = {
     me: '/auth/me',
     refresh: '/auth/refresh',
   },
+  departments: {
+    list: '/departments',
+  },
   products: {
     search: '/products/search',
     byBarcode: '/products/barcode',

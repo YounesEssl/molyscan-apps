@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { EmailModule } from './email/email.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
+import { DepartmentsModule } from './departments/departments.module';
 import { UsersModule } from './users/users.module';
 import { ProductsModule } from './products/products.module';
 import { ScansModule } from './scans/scans.module';
@@ -25,6 +26,7 @@ import { HealthModule } from './health/health.module';
     EmailModule,
     AuthModule,
     AdminModule,
+    DepartmentsModule,
     UsersModule,
     ProductsModule,
     ScansModule,
