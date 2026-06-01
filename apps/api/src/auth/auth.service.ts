@@ -1,23 +1,29 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { UserRole } from '@prisma/client';
+import { UserRole, UserStatus, User } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private emailService: EmailService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -28,6 +34,8 @@ export class AuthService {
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
+
+    this.assertAccountApproved(user.status);
 
     return this.generateTokens(user.id, user.email, user.role);
   }
@@ -45,11 +53,20 @@ export class AuthService {
         passwordHash,
         firstName: dto.firstName,
         lastName: dto.lastName,
-        role: dto.role || UserRole.commercial,
+        role: UserRole.commercial,
+        status: UserStatus.pending,
       },
     });
 
-    return this.generateTokens(user.id, user.email, user.role);
+    // Notification admin (best-effort : ne jamais faire échouer l'inscription
+    // si l'envoi d'email échoue — le compte est créé et reste en attente).
+    await this.notifyAdminsOfAccessRequest(user);
+
+    return {
+      status: UserStatus.pending,
+      message:
+        'Votre demande a été enregistrée. Un administrateur doit valider votre compte avant que vous puissiez vous connecter.',
+    };
   }
 
   async refresh(refreshToken: string) {
@@ -64,6 +81,8 @@ export class AuthService {
       }
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+
+    this.assertAccountApproved(stored.user.status);
 
     const accessToken = this.jwtService.sign({
       sub: stored.user.id,
@@ -83,9 +102,56 @@ export class AuthService {
   async getMe(userId: string) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
+      include: { departments: { select: { id: true, name: true } } },
     });
     const { passwordHash: _, ...result } = user;
     return result;
+  }
+
+  // ─── Validation des comptes ────────────────────────────────────────────
+
+  private assertAccountApproved(status: UserStatus): void {
+    if (status === UserStatus.approved) return;
+
+    if (status === UserStatus.pending) {
+      throw new ForbiddenException(
+        'Votre compte est en attente de validation par un administrateur.',
+      );
+    }
+
+    throw new ForbiddenException(
+      "Votre demande de création de compte n'a pas été acceptée.",
+    );
+  }
+
+  private async notifyAdminsOfAccessRequest(user: User): Promise<void> {
+    try {
+      const admins = await this.prisma.user.findMany({
+        where: { role: UserRole.admin, status: UserStatus.approved },
+        select: { email: true },
+      });
+      const recipients = admins.map((a) => a.email);
+
+      const base = this.configService
+        .get<string>('ADMIN_WEB_URL', 'http://localhost:5173')
+        .replace(/\/$/, '');
+      const reviewUrl = `${base}/access-requests`;
+
+      await this.emailService.sendAccessRequestToAdmins({
+        applicant: {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+        },
+        reviewUrl,
+        recipients,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      this.logger.error(
+        `Notification admin échouée pour ${user.email}: ${message}`,
+      );
+    }
   }
 
   private async generateTokens(userId: string, email: string, role: UserRole) {

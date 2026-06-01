@@ -18,12 +18,20 @@
     "test:prod-feedback": "jest --testPathPatterns=rag.prod-feedback --testTimeout=180000 --forceExit --verbose --runInBand"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
-    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
     "testEnvironment": "node",
-    "moduleNameMapper": { "@/(.*)": "<rootDir>/$1" }
+    "moduleNameMapper": {
+      "@/(.*)": "<rootDir>/$1"
+    }
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
@@ -52,6 +60,7 @@
     "passport-jwt": "^4.0.1",
     "pdfkit": "^0.15.0",
     "reflect-metadata": "^0.2.0",
+    "resend": "^6.12.4",
     "rxjs": "^7.8.0",
     "tesseract.js": "^5.1.0"
   },

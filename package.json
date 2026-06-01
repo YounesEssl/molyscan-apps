@@ -5,7 +5,9 @@
   "scripts": {
     "dev:api": "npm -w api run start:dev",
     "dev:mobile": "cd apps/mobile && npx expo start",
+    "dev:admin": "cd apps/admin && npm run dev",
     "build:api": "npm -w api run build",
+    "build:admin": "cd apps/admin && npm run build",
     "db:migrate": "npm -w api run prisma:migrate",
     "db:seed": "npm -w api run prisma:seed",
     "db:studio": "npm -w api run prisma:studio",

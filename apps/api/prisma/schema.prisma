@@ -17,6 +17,12 @@ enum UserRole {
   admin
 }
 
+enum UserStatus {
+  pending
+  approved
+  rejected
+}
+
 enum ScanStatus {
   matched
   partial
@@ -74,6 +80,7 @@ model User {
   firstName      String
   lastName       String
   role           UserRole
+  status         UserStatus @default(pending)
   company        String?
   phone          String?
   avatarUrl      String?
@@ -91,8 +98,21 @@ model User {
   refreshTokens           RefreshToken[]
   conversationSubmissions ConversationSubmission[]
   equivalentFeedbacks     ScanEquivalentFeedback[]
+  departments             Department[]             @relation("UserDepartments")
 
   @@map("users")
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  code      String?  @unique
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[] @relation("UserDepartments")
+
+  @@map("departments")
 }
 
 model RefreshToken {

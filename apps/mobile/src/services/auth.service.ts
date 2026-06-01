@@ -4,7 +4,10 @@ import { storage } from '@/lib/storage';
 import { ENDPOINTS } from '@/constants/api';
 import {
   UserSchema,
+  RegisterResponseSchema,
   type LoginRequest,
+  type RegisterRequest,
+  type RegisterResponse,
   type User,
 } from '@/schemas/auth.schema';
 
@@ -23,12 +26,11 @@ export const authService = {
     return tokens;
   },
 
-  register: async (credentials: LoginRequest): Promise<AuthTokens> => {
-    const { data } = await api.post(ENDPOINTS.auth.register, credentials);
-    const tokens = AuthTokensSchema.parse(data);
-    await storage.setToken(tokens.accessToken);
-    await storage.setRefreshToken(tokens.refreshToken);
-    return tokens;
+  // Crée une demande de compte. Aucun token n'est renvoyé : le compte reste
+  // en attente jusqu'à validation d'un administrateur.
+  register: async (payload: RegisterRequest): Promise<RegisterResponse> => {
+    const { data } = await api.post(ENDPOINTS.auth.register, payload);
+    return RegisterResponseSchema.parse(data);
   },
 
   getMe: async (config?: { signal?: AbortSignal }): Promise<User> => {

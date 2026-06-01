@@ -227,6 +227,19 @@ export default function LoginScreen(): React.JSX.Element {
                     <RNText style={styles.primaryBtnText}>{t('auth.signInButton')}</RNText>
                   </LinearGradient>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.linkRow}
+                  onPress={() => {
+                    haptic.light();
+                    router.push('/(auth)/register');
+                  }}
+                  accessibilityRole="link"
+                  accessibilityLabel={t('auth.requestAccess')}
+                >
+                  <RNText style={styles.linkMuted}>{t('auth.noAccount')} </RNText>
+                  <RNText style={styles.linkAccent}>{t('auth.requestAccess')}</RNText>
+                </TouchableOpacity>
               </View>
             </View>
           </SafeAreaView>
@@ -298,5 +311,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#fff',
     letterSpacing: -0.2,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 14,
+    paddingVertical: 8,
+  },
+  linkMuted: {
+    fontFamily: typography.fonts.sans,
+    fontSize: 14,
+    color: colors.ink2,
+  },
+  linkAccent: {
+    fontFamily: typography.fonts.sansSemibold,
+    fontSize: 14,
+    color: colors.red,
   },
 });

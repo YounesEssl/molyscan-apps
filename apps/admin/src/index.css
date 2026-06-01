@@ -1,0 +1,67 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Paper palette (identique à l'app mobile) */
+  --color-paper-bg: #ece5d8;
+  --color-paper: #f5f1ea;
+  --color-paper-2: #fffdf8;
+  --color-paper-warm: #fff6e8;
+
+  /* Ink */
+  --color-ink: #1a1410;
+  --color-ink-2: rgba(26, 20, 16, 0.55);
+  --color-ink-3: rgba(26, 20, 16, 0.35);
+  --color-ink-4: rgba(26, 20, 16, 0.14);
+
+  /* Brand red */
+  --color-red: #d4251c;
+  --color-red-vivid: #ff5b50;
+  --color-red-soft: rgba(212, 37, 28, 0.08);
+  --color-red-border: rgba(212, 37, 28, 0.2);
+
+  /* Status */
+  --color-ok: #228a3c;
+  --color-ok-bg: rgba(48, 209, 88, 0.1);
+  --color-warn: #b8700a;
+
+  /* Fonts */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  /* Radius (échelle mobile) */
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+
+  /* Shadows (noir basse opacité = ombre chaude sur crème) */
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-float: 0 8px 20px rgba(0, 0, 0, 0.12);
+  --shadow-red: 0 12px 22px -8px rgba(212, 37, 28, 0.4);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+/* Aura — taches radiales floutées (signature visuelle mobile) */
+.aura {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}

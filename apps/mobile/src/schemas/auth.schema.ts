@@ -27,7 +27,15 @@ export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 export const RegisterRequestSchema = LoginRequestSchema.extend({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  role: UserRoleSchema.optional(),
 });
 
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
+
+// L'inscription ne renvoie plus de tokens : le compte est créé en attente de
+// validation par un administrateur.
+export const RegisterResponseSchema = z.object({
+  status: z.string(),
+  message: z.string(),
+});
+
+export type RegisterResponse = z.infer<typeof RegisterResponseSchema>;
