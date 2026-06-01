@@ -127,8 +127,8 @@ export class WorkflowsService {
         molydalProductId: dto.molydalProductId ?? null,
         productName,
         molydalRef,
-        clientName: dto.clientName,
-        quantity: dto.quantity,
+        clientName: dto.clientName ?? null,
+        quantity: dto.quantity ?? null,
         unit: dto.unit || 'L',
         requestedPrice: dto.requestedPrice,
         status: WorkflowStatus.submitted,
@@ -151,9 +151,9 @@ export class WorkflowsService {
       recipients,
       distributor: user,
       product: { name: productName ?? '', ref: molydalRef ?? '' },
-      quantity: dto.quantity,
+      quantity: dto.quantity ?? null,
       unit: dto.unit || 'L',
-      clientName: dto.clientName,
+      clientName: dto.clientName ?? null,
       departmentName: user.departments[0]?.name ?? null,
       routedToAdmins,
     });
@@ -171,7 +171,7 @@ export class WorkflowsService {
       recipients: { id: string; email: string }[];
       distributor: { firstName: string; lastName: string; email: string };
       product: { name: string; ref: string };
-      quantity: number;
+      quantity?: number | null;
       unit: string;
       clientName?: string | null;
       departmentName?: string | null;

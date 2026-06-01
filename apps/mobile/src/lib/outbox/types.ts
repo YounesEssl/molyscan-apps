@@ -24,9 +24,10 @@ export interface WorkflowCreatePayload {
   scanId: string;
   productName: string;
   molydalRef: string;
-  clientName: string;
-  quantity: number;
-  unit: string;
+  // Optionnels : la demande de prix se fait sans formulaire (simple envoi).
+  clientName?: string;
+  quantity?: number;
+  unit?: string;
   requestedPrice?: number;
 }
 

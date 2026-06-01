@@ -56,7 +56,7 @@ const fr = {
     headlineBrand: 'Molydal',
     headlineLine2: ',\ninstantanément.',
     subtitle:
-      "Scannez n'importe quel lubrifiant concurrent et obtenez l'équivalent Molydal en moins de 2 secondes.",
+      "Scannez n'importe quel lubrifiant concurrent et obtenez l'équivalent Molydal.",
     registerTitle: 'Demander un accès',
     registerSubtitle:
       'Créez votre demande de compte. Un administrateur la validera avant votre première connexion.',
@@ -398,6 +398,13 @@ const fr = {
   },
   workflow: {
     priceRequest: 'Demande de prix',
+    confirmTitle: 'Demander un prix',
+    confirmBody:
+      'Votre demande sera transmise par email à un commercial Molydal de votre secteur, qui vous recontactera pour ce produit.',
+    confirmCta: 'Envoyer la demande',
+    sentTitle: 'Demande envoyée',
+    sentBody:
+      'Un commercial de votre secteur vous recontactera prochainement.',
     clientName: 'Nom du client',
     clientPlaceholder: 'Ex: Airbus Toulouse',
     quantity: 'Quantité (L)',

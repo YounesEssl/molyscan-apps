@@ -39,7 +39,6 @@ export function PriceRequestsPage() {
         r.user.email,
         r.productName ?? '',
         r.molydalRef ?? '',
-        r.clientName,
         r.routedDepartment?.name ?? '',
         ...r.recipients.map((x) => `${fullName(x)} ${x.email}`),
       ]
@@ -104,7 +103,6 @@ export function PriceRequestsPage() {
                   <tr className="border-b border-ink-4 text-xs font-semibold uppercase tracking-[0.1em] text-ink-3">
                     <th className="px-5 py-3.5 font-semibold">Distributeur</th>
                     <th className="px-5 py-3.5 font-semibold">Produit</th>
-                    <th className="px-5 py-3.5 font-semibold">Qté</th>
                     <th className="px-5 py-3.5 font-semibold">Département</th>
                     <th className="px-5 py-3.5 font-semibold">Envoyé à</th>
                     <th className="px-5 py-3.5 font-semibold">Date</th>
@@ -143,12 +141,6 @@ function PriceRequestRow({ request: r }: { request: PriceRequest }) {
         {r.molydalRef && (
           <p className="font-mono text-xs text-ink-3">{r.molydalRef}</p>
         )}
-        {r.clientName && (
-          <p className="mt-0.5 text-xs text-ink-3">Client : {r.clientName}</p>
-        )}
-      </td>
-      <td className="px-5 py-4 whitespace-nowrap text-sm text-ink-2">
-        {r.quantity} {r.unit}
       </td>
       <td className="px-5 py-4">
         {r.routedDepartment ? (

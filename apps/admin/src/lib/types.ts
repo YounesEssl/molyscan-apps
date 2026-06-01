@@ -55,8 +55,8 @@ export interface PriceRequest {
   id: string;
   productName: string | null;
   molydalRef: string | null;
-  clientName: string;
-  quantity: number;
+  clientName: string | null;
+  quantity: number | null;
   unit: string;
   status: string;
   routedToAdmins: boolean;

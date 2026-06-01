@@ -58,7 +58,7 @@ const en: TranslationKeys = {
     headlineBrand: 'Molydal',
     headlineLine2: '\nequivalent, instantly.',
     subtitle:
-      'Scan any competitor lubricant and get the Molydal equivalent in under 2 seconds.',
+      'Scan any competitor lubricant and get the Molydal equivalent.',
     registerTitle: 'Request access',
     registerSubtitle:
       'Create your account request. An administrator will approve it before your first login.',
@@ -398,6 +398,12 @@ const en: TranslationKeys = {
   },
   workflow: {
     priceRequest: 'Price request',
+    confirmTitle: 'Request a price',
+    confirmBody:
+      'Your request will be emailed to a Molydal sales rep for your area, who will get back to you about this product.',
+    confirmCta: 'Send request',
+    sentTitle: 'Request sent',
+    sentBody: 'A sales rep for your area will contact you shortly.',
     clientName: 'Client name',
     clientPlaceholder: 'E.g.: Airbus Toulouse',
     quantity: 'Quantity (L)',

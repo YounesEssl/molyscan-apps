@@ -26,13 +26,16 @@ export class CreateWorkflowDto {
   @IsString()
   molydalProductId?: string;
 
-  @ApiProperty()
+  // Optionnels : la demande de prix distributeur se fait sans formulaire.
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  clientName!: string;
+  clientName?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsNumber()
-  quantity!: number;
+  quantity?: number;
 
   @ApiPropertyOptional({ default: 'L' })
   @IsOptional()

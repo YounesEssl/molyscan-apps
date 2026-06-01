@@ -13,6 +13,7 @@ import {
 } from '@/components/product/ProductSpecs';
 import { AIProductEntry } from '@/components/product/AIProductEntry';
 import { PriceRequestCTA } from '@/components/product/PriceRequestCTA';
+import { PriceRequestModal } from '@/components/product/PriceRequestModal';
 import { ScanPhotoCard } from '@/components/product/ScanPhotoCard';
 import { ScanEquivalentsList } from '@/components/product/ScanEquivalentsList';
 import { LinkedConversationsList } from '@/components/product/LinkedConversationsList';
@@ -57,6 +58,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const router = useRouter();
   // Seuls les distributeurs peuvent émettre une demande de prix.
   const isDistributor = useAuthStore((s) => s.user?.role) === 'distributor';
+  const [priceModalOpen, setPriceModalOpen] = useState(false);
   const { t } = useTranslation();
   const [scan, setScan] = useState<ScanDetail | null>(null);
   const [conversations, setConversations] = useState<ScanLinkedConversation[]>([]);
@@ -174,16 +176,21 @@ export default function ProductDetailScreen(): React.JSX.Element {
         <LinkedConversationsList conversations={conversations} />
 
         {isDistributor ? (
-          <PriceRequestCTA
-            onPress={() =>
-              router.push({
-                pathname: '/workflow/price-request',
-                params: { scanId: id },
-              })
-            }
-          />
+          <PriceRequestCTA onPress={() => setPriceModalOpen(true)} />
         ) : null}
       </ScrollView>
+
+      {isDistributor ? (
+        <PriceRequestModal
+          visible={priceModalOpen}
+          onClose={() => setPriceModalOpen(false)}
+          scanId={id}
+          product={{
+            name: scan?.molydalMatch?.name ?? productName ?? '',
+            ref: scan?.molydalMatch?.reference ?? '',
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

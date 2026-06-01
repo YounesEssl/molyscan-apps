@@ -253,8 +253,10 @@ model PriceWorkflow {
   // Product identity stored directly (AI equivalent name/ref or catalog fallback).
   productName      String?
   molydalRef       String?
-  clientName       String
-  quantity         Float
+  // Optionnels : une demande de prix distributeur se fait sans formulaire
+  // (un simple envoi). Conservés pour le legacy / l'éventuelle saisie manuelle.
+  clientName       String?
+  quantity         Float?
   unit             String         @default("L")
   requestedPrice   Float?
   approvedPrice    Float?

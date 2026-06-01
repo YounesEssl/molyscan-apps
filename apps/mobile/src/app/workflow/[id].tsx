@@ -38,10 +38,19 @@ export default function WorkflowDetailScreen(): React.JSX.Element {
           <Text variant="caption" color={COLORS.textSecondary}>
             {t('common.ref')} {workflow.molydalRef}
           </Text>
-          <View style={styles.detailRow}>
-            <DetailItem label={t('workflow.clientLabel')} value={workflow.clientName} />
-            <DetailItem label={t('workflow.quantityLabel')} value={`${workflow.quantity} ${workflow.unit}`} />
-          </View>
+          {(workflow.clientName || workflow.quantity != null) && (
+            <View style={styles.detailRow}>
+              {workflow.clientName && (
+                <DetailItem label={t('workflow.clientLabel')} value={workflow.clientName} />
+              )}
+              {workflow.quantity != null && (
+                <DetailItem
+                  label={t('workflow.quantityLabel')}
+                  value={`${workflow.quantity} ${workflow.unit}`}
+                />
+              )}
+            </View>
+          )}
           {workflow.requestedPrice && (
             <View style={styles.detailRow}>
               <DetailItem label={t('workflow.requestedPrice')} value={`${workflow.requestedPrice.toFixed(2)} €/${workflow.unit}`} />
