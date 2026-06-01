@@ -9,6 +9,8 @@ export const ENDPOINTS = {
     register: '/auth/register',
     me: '/auth/me',
     refresh: '/auth/refresh',
+    forgotPassword: '/auth/forgot-password',
+    resetPassword: '/auth/reset-password',
   },
   departments: {
     list: '/departments',

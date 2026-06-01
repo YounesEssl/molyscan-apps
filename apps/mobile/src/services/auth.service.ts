@@ -5,9 +5,13 @@ import { ENDPOINTS } from '@/constants/api';
 import {
   UserSchema,
   RegisterResponseSchema,
+  MessageResponseSchema,
   type LoginRequest,
   type RegisterRequest,
   type RegisterResponse,
+  type ForgotPasswordRequest,
+  type ResetPasswordRequest,
+  type MessageResponse,
   type User,
 } from '@/schemas/auth.schema';
 
@@ -31,6 +35,22 @@ export const authService = {
   register: async (payload: RegisterRequest): Promise<RegisterResponse> => {
     const { data } = await api.post(ENDPOINTS.auth.register, payload);
     return RegisterResponseSchema.parse(data);
+  },
+
+  // Demande un code de réinitialisation (réponse toujours générique).
+  forgotPassword: async (
+    payload: ForgotPasswordRequest,
+  ): Promise<MessageResponse> => {
+    const { data } = await api.post(ENDPOINTS.auth.forgotPassword, payload);
+    return MessageResponseSchema.parse(data);
+  },
+
+  // Réinitialise le mot de passe avec le code reçu par email.
+  resetPassword: async (
+    payload: ResetPasswordRequest,
+  ): Promise<MessageResponse> => {
+    const { data } = await api.post(ENDPOINTS.auth.resetPassword, payload);
+    return MessageResponseSchema.parse(data);
   },
 
   getMe: async (config?: { signal?: AbortSignal }): Promise<User> => {

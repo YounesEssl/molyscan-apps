@@ -44,6 +44,22 @@ export type Department = z.infer<typeof DepartmentSchema>;
 
 export const DepartmentsResponseSchema = z.array(DepartmentSchema);
 
+// Mot de passe oublié — l'API renvoie toujours un message générique.
+export const MessageResponseSchema = z.object({ message: z.string() });
+export type MessageResponse = z.infer<typeof MessageResponseSchema>;
+
+export const ForgotPasswordRequestSchema = z.object({
+  email: z.string().email(),
+});
+export type ForgotPasswordRequest = z.infer<typeof ForgotPasswordRequestSchema>;
+
+export const ResetPasswordRequestSchema = z.object({
+  email: z.string().email(),
+  code: z.string().length(6),
+  password: z.string().min(6),
+});
+export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequestSchema>;
+
 // L'inscription ne renvoie plus de tokens : le compte est créé en attente de
 // validation par un administrateur.
 export const RegisterResponseSchema = z.object({

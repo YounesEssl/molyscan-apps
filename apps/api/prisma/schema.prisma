@@ -97,6 +97,7 @@ model User {
   voiceNotes              VoiceNote[]
   exports                 ExportRecord[]
   refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
   conversationSubmissions ConversationSubmission[]
   equivalentFeedbacks     ScanEquivalentFeedback[]
   departments             Department[]             @relation("UserDepartments")
@@ -126,6 +127,22 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  // Hash bcrypt du code à 6 chiffres (jamais stocké en clair).
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model CompetitorProduct {

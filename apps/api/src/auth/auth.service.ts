@@ -14,7 +14,10 @@ import { EmailService } from '../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UserRole, UserStatus, User } from '@prisma/client';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomInt } from 'crypto';
+
+const RESET_CODE_TTL_MIN = 15;
+const RESET_MAX_ATTEMPTS = 5;
 
 // Les adresses @molydal.com sont des commerciaux internes ; tout autre domaine
 // correspond à un distributeur partenaire.
@@ -138,6 +141,101 @@ export class AuthService {
     }
     const { passwordHash: _, ...result } = user;
     return result;
+  }
+
+  // ─── Mot de passe oublié ───────────────────────────────────────────────
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    // Message générique dans tous les cas (pas d'énumération d'emails).
+    const message =
+      "Si un compte existe pour cet email, un code de réinitialisation vient d'être envoyé.";
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) return { message };
+
+    // Invalide les éventuels codes précédents non utilisés.
+    await this.prisma.passwordResetToken.deleteMany({
+      where: { userId: user.id, usedAt: null },
+    });
+
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const codeHash = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + RESET_CODE_TTL_MIN * 60_000);
+
+    await this.prisma.passwordResetToken.create({
+      data: { userId: user.id, codeHash, expiresAt },
+    });
+
+    // Best-effort : ne pas révéler un échec d'envoi (ni énumération ni 500).
+    try {
+      await this.emailService.sendPasswordResetCode({
+        firstName: user.firstName,
+        email: user.email,
+        code,
+        expiresMinutes: RESET_CODE_TTL_MIN,
+      });
+    } catch (err: unknown) {
+      const m = err instanceof Error ? err.message : 'Erreur inconnue';
+      this.logger.error(`Email reset échoué pour ${user.email}: ${m}`);
+    }
+
+    return { message };
+  }
+
+  async resetPassword(
+    email: string,
+    code: string,
+    password: string,
+  ): Promise<{ message: string }> {
+    const invalid = () =>
+      new BadRequestException('Code invalide ou expiré. Veuillez recommencer.');
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw invalid();
+
+    const token = await this.prisma.passwordResetToken.findFirst({
+      where: { userId: user.id, usedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!token) throw invalid();
+
+    if (token.expiresAt < new Date()) {
+      await this.prisma.passwordResetToken.delete({ where: { id: token.id } });
+      throw invalid();
+    }
+    if (token.attempts >= RESET_MAX_ATTEMPTS) {
+      await this.prisma.passwordResetToken.delete({ where: { id: token.id } });
+      throw new BadRequestException(
+        'Trop de tentatives. Demandez un nouveau code.',
+      );
+    }
+
+    const ok = await bcrypt.compare(code, token.codeHash);
+    if (!ok) {
+      await this.prisma.passwordResetToken.update({
+        where: { id: token.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw invalid();
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    // Met à jour le mot de passe, consomme le code, et invalide les sessions.
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: token.id },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
+    ]);
+
+    return {
+      message: 'Mot de passe réinitialisé. Vous pouvez maintenant vous connecter.',
+    };
   }
 
   // ─── Validation des comptes ────────────────────────────────────────────

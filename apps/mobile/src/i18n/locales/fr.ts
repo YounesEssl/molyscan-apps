@@ -85,6 +85,22 @@ const fr = {
     requestAccess: 'Demander un accès',
     haveAccount: 'Déjà un compte ?',
     signInLink: 'Se connecter',
+    forgotTitle: 'Mot de passe oublié',
+    forgotSubtitle:
+      'Saisissez votre email : nous vous enverrons un code à 6 chiffres pour réinitialiser votre mot de passe.',
+    forgotSendCode: 'Envoyer le code',
+    resetTitle: 'Nouveau mot de passe',
+    resetSubtitle:
+      'Saisissez le code reçu par email et choisissez un nouveau mot de passe.',
+    codeLabel: 'Code à 6 chiffres',
+    codePlaceholder: '123456',
+    newPassword: 'Nouveau mot de passe',
+    resetCta: 'Réinitialiser',
+    codeRequired: 'Saisissez le code à 6 chiffres reçu par email',
+    resetError: 'Code invalide ou expiré',
+    resetSuccessTitle: 'Mot de passe réinitialisé',
+    resetSuccessMessage:
+      'Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.',
   },
   roles: {
     commercial: 'Commercial terrain',

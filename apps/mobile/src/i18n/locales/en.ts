@@ -87,6 +87,22 @@ const en: TranslationKeys = {
     requestAccess: 'Request access',
     haveAccount: 'Already have an account?',
     signInLink: 'Sign in',
+    forgotTitle: 'Forgot password',
+    forgotSubtitle:
+      "Enter your email: we'll send you a 6-digit code to reset your password.",
+    forgotSendCode: 'Send code',
+    resetTitle: 'New password',
+    resetSubtitle:
+      'Enter the code you received by email and choose a new password.',
+    codeLabel: '6-digit code',
+    codePlaceholder: '123456',
+    newPassword: 'New password',
+    resetCta: 'Reset password',
+    codeRequired: 'Enter the 6-digit code from your email',
+    resetError: 'Invalid or expired code',
+    resetSuccessTitle: 'Password reset',
+    resetSuccessMessage:
+      'You can now sign in with your new password.',
   },
   roles: {
     commercial: 'Field sales',

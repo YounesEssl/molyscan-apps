@@ -207,6 +207,19 @@ export default function LoginScreen(): React.JSX.Element {
                   onSubmitEditing={handleLogin}
                 />
                 <TouchableOpacity
+                  style={styles.forgotRow}
+                  onPress={() => {
+                    haptic.light();
+                    router.push('/(auth)/forgot-password');
+                  }}
+                  accessibilityRole="link"
+                  accessibilityLabel={t('auth.forgotPassword')}
+                >
+                  <RNText style={styles.linkAccent}>
+                    {t('auth.forgotPassword')}
+                  </RNText>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={styles.primaryBtnWrapper}
                   onPress={() => {
                     haptic.medium();
@@ -289,6 +302,11 @@ const styles = StyleSheet.create({
   },
   formGroup: {
     gap: 12,
+  },
+  forgotRow: {
+    alignSelf: 'flex-end',
+    marginTop: -2,
+    paddingVertical: 4,
   },
   primaryBtnWrapper: {
     borderRadius: radius.pill,

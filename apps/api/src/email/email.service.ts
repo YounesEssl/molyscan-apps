@@ -22,6 +22,13 @@ export interface AccountDecisionPayload {
   email: string;
 }
 
+export interface PasswordResetPayload {
+  firstName?: string | null;
+  email: string;
+  code: string;
+  expiresMinutes: number;
+}
+
 export interface PriceRequestPayload {
   recipients: string[];
   distributor: { firstName: string; lastName: string; email: string };
@@ -116,6 +123,16 @@ export class EmailService {
         approved: false,
       }),
       context: `account-rejected:${payload.email}`,
+    });
+  }
+
+  /** Envoie le code de réinitialisation de mot de passe (6 chiffres). */
+  async sendPasswordResetCode(payload: PasswordResetPayload): Promise<void> {
+    await this.send({
+      to: [payload.email],
+      subject: `Votre code de réinitialisation MolyScan — ${payload.code}`,
+      html: this.renderPasswordResetEmail(payload),
+      context: `password-reset:${payload.email}`,
     });
   }
 
@@ -237,6 +254,31 @@ export class EmailService {
         ${departmentName ? row('Département', escapeHtml(departmentName)) : ''}
       </table>
       ${fallbackNote}
+    `);
+  }
+
+  private renderPasswordResetEmail(payload: PasswordResetPayload): string {
+    const greeting = payload.firstName
+      ? `Bonjour ${escapeHtml(payload.firstName)},`
+      : 'Bonjour,';
+
+    return wrapLayout(`
+      <h1 style="${H1}">Réinitialisation du ${accent('mot de passe')}</h1>
+      <p style="${P}">${greeting}</p>
+      <p style="${P}">
+        Voici votre code de réinitialisation. Saisissez-le dans l'application
+        MolyScan pour choisir un nouveau mot de passe.
+      </p>
+      <div style="margin:24px 0;padding:22px;background:${RED_SOFT};border-radius:16px;text-align:center;">
+        <span style="font-family:${SERIF};font-size:38px;font-weight:bold;letter-spacing:10px;color:${RED};">${escapeHtml(payload.code)}</span>
+      </div>
+      <p style="${P}">
+        Ce code expire dans <strong>${payload.expiresMinutes} minutes</strong>.
+      </p>
+      <p style="${MUTED}">
+        Si vous n'êtes pas à l'origine de cette demande, ignorez cet email :
+        votre mot de passe reste inchangé.
+      </p>
     `);
   }
 
