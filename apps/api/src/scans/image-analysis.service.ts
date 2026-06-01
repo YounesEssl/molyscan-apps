@@ -579,7 +579,10 @@ Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser c
       : '';
 
     const response = await this.anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      // Haiku 4.5: measured equal-or-better than Sonnet on this structured
+      // selection task (pick from a constrained list) at ~3x lower cost.
+      // Override via SCAN_CLAUDE_MODEL.
+      model: process.env.SCAN_CLAUDE_MODEL ?? 'claude-haiku-4-5',
       max_tokens: 600,
       temperature: 0,
       system: `Molydal expert. Find the equivalent of ${identified.name} (${identified.brand}, ${identified.type}, ${identified.specs}).${constraintsBlock}
