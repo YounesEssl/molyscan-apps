@@ -40,6 +40,7 @@ export type ProductCategory =
   | 'vanishing_oil'
   | 'mold_release_paste'
   | 'petroleum_jelly'
+  | 'leak_detector'
   | 'general_lubricant_spray'
   | 'other';
 
@@ -377,7 +378,7 @@ If you see one, return a STRUCTURED JSON with these fields:
   "brand": "brand (Shell, Mobil, Klüber, Total, SKF, Fuchs, WD-40, CRC, Bardahl, Loctite, Molykote, INTERFLON, Bérulube, Igol, Jelt, …)",
   "type": "short free-text type for legacy display (e.g. \\"grease aerosol\\")",
   "specs": "free-text visible technical characteristics (viscosity, NLGI, temperature range, base oil, thickener, certifications, …)",
-  "category": "ONE of: grease | cutting_oil_neat | cutting_fluid_soluble | hydraulic_oil | degreaser_cleaner | contact_cleaner_electrical | brake_parts_cleaner | anti_spatter_welding | assembly_paste | chain_lubricant | vanishing_oil | mold_release_paste | petroleum_jelly | general_lubricant_spray | other",
+  "category": "ONE of: grease | cutting_oil_neat | cutting_fluid_soluble | hydraulic_oil | degreaser_cleaner | contact_cleaner_electrical | brake_parts_cleaner | anti_spatter_welding | assembly_paste | chain_lubricant | vanishing_oil | mold_release_paste | petroleum_jelly | leak_detector | general_lubricant_spray | other",
   "format": "ONE of: aerosol | spray_pump | liquid_bottle | liquid_drum | paste_tube | cartridge | bulk_drum | unknown",
   "applicationContext": ["welding" | "food_contact" | "marine" | "electrical" | "brake" | "chain" | "bearings" | "high_speed" | "high_temperature" | "automotive" | "pharmaceutical" | …],
   "certifications": ["NSF_H1" | "USDA" | "eco_responsible" | "biodegradable" | "halal" | "kosher" | …],
@@ -385,23 +386,51 @@ If you see one, return a STRUCTURED JSON with these fields:
   "isoViscosity": null | 32 | 46 | 68 | 100 | 150 | 220 | 320 | 460 | 680
 }
 
-Guidelines:
-- Pick category based on the PRIMARY use stated on packaging.
+METHOD — read the label carefully, then reason about the product's FUNCTION before classifying:
+1. Read every visible text: product name, brand, and especially the stated USE / purpose / "designed for…" line. Read French and English.
+2. The category is driven by what the product DOES (its function), NOT by its physical form. A spray can is NOT automatically a lubricant — a degreaser, a cleaner, a leak detector and a silicone lubricant all come in aerosol cans.
+3. Only fall back to "general_lubricant_spray" / "other" when the stated function is genuinely a generic multi-purpose lubricant or truly unclear. Prefer a specific category whenever the label states a specific purpose.
+
+CATEGORY DISAMBIGUATION (these are the common mistakes — apply strictly):
+- degreaser_cleaner: anything whose stated job is to CLEAN / DEGREASE / remove oil, grease, residues ("dégraissant", "cleaner", "nettoyant", "solvent cleaner", "DF" = dégraissant). A cleaning product is NEVER a lubricant, even in a spray can.
+- leak_detector: stated job is to DETECT LEAKS / "détecteur de fuite" / "leak detector" / "gas leak" / forms bubbles on pressurized circuits. This is NOT a cleaner and NOT a lubricant.
+- petroleum_jelly: white vaseline / "vaseline blanche" / petrolatum / "paraffinic white grease" / "white technical jelly". Classify as petroleum_jelly, NOT grease, even if the word "grease/graisse" appears.
+- cutting_oil_neat vs cutting_fluid_soluble: NEAT = pure oil used UNDILUTED on the tool/metal. SOLUBLE = mixes with WATER to form an emulsion/milk ("soluble", "émulsion", "miscible eau", "water-mixable"). When the label does not clearly say water-mixable, do not assume soluble.
+- chain_lubricant: ONLY when the label explicitly targets chains/conveyors. Do not use it for generic penetrating/maintenance sprays.
+- brake_parts_cleaner vs degreaser_cleaner: brake_parts_cleaner only when the label specifically mentions brakes; otherwise degreaser_cleaner.
+- contact_cleaner_electrical: stated for electrical/electronic contacts, relays, circuits.
+
+OTHER FIELDS:
 - format=aerosol when you see a metal can with a propellant valve. Even if "spray" is in the name, distinguish aerosol (compressed gas can) from spray_pump (trigger spray).
-- applicationContext = exact contexts shown on the label (e.g. "welding spray" → ["welding"], "for brake cleaning" → ["brake"], "food grade" → ["food_contact"]).
+- applicationContext = exact contexts shown on the label (e.g. "welding spray" → ["welding"], "for brake cleaning" → ["brake"], "food grade" → ["food_contact"], "silicone" → ["silicone"]).
 - certifications = ONLY what is visibly printed (NSF logo, USDA, eco label). Do not infer.
 - For non-grease products, set thickener to null.
-- Be conservative: if a field is not visible/inferable from the image, set it to null (or empty array).
+- Be conservative on specs/certifications: if a field is not visible/inferable from the image, set it to null (or empty array). But ALWAYS pick the most specific category the stated function supports.
+
+CATEGORY EXAMPLES (label → category):
+- "SOBEL DF — dégraissant industriel aérosol" → degreaser_cleaner (cleaning job, not a lubricant)
+- "Loctite SF 7100 Leak Detector / détecteur de fuite" → leak_detector
+- "Graisse de vaseline blanche / Paraffinic white grease" → petroleum_jelly
+- "Huile de coupe entière C5" → cutting_oil_neat ; "Huile soluble / émulsion de coupe" → cutting_fluid_soluble
+- "Nettoyant freins / brake cleaner" → brake_parts_cleaner
+- "Silicone lubricant spray" → general_lubricant_spray with applicationContext ["silicone"]
+- "WD-40 multi-usage" → general_lubricant_spray
 
 If the image does NOT contain an identifiable lubricant product, return ALL fields as null:
 {"name": null, "brand": null, "type": null, "specs": null, "category": null, "format": null, "applicationContext": null, "certifications": null, "thickener": null, "isoViscosity": null}
 
 Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser context: ${userMessage}` : ''}`;
 
-    // Greedy decoding — temperature 0, topP 0.1, topK 1 — eliminates the main
-    // source of variability in scan results (same image → same identification).
+    // Vision identification is the highest-leverage step of the scan pipeline:
+    // a wrong category sends the RAG query into the wrong catalog cluster.
+    // We use gemini-2.5-flash: measured against the May-2026 prod feedback it
+    // scored 74% vs 60% for gemini-2.5-pro on the same prompt — pro's more
+    // verbose `specs` text polluted the downstream RAG query and caused
+    // selection regressions. The accuracy gain comes from the PROMPT, not a
+    // bigger model. Greedy decoding (temperature 0, topP 0.1, topK 1) minimizes
+    // run-to-run variability. Override via VISION_MODEL for A/B experiments.
     const model = this.gemini.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: process.env.VISION_MODEL ?? 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0,
         topP: 0.1,
@@ -484,7 +513,8 @@ Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser c
       chain_lubricant: 'chain lubricant adhesive penetrating',
       vanishing_oil: 'vanishing evaporating oil stamping cutting light',
       mold_release_paste: 'mold release agent paste',
-      petroleum_jelly: 'petroleum jelly petrolatum technical pharmaceutical white grade',
+      petroleum_jelly: 'petroleum jelly petrolatum technical pharmaceutical white grade vaseline paraffinic white grease',
+      leak_detector: 'leak detector spray gas leak detection bubble forming foaming pressurized circuits',
       general_lubricant_spray:
         'multi-purpose lubricant aerosol spray penetrating maintenance',
       other: '',
@@ -552,6 +582,7 @@ ${ragContext}
 
 Selection rules:
 - The equivalent MUST respect the hard constraints above when present.
+- Match on PRIMARY FUNCTION first — what the product DOES (cleaning, lubricating, leak detection, anti-seize, …) — then secondary specs.
 - If the competitor is an AEROSOL, the equivalent must be an aerosol. If it's a paste, equivalent must be a paste.
 - If the application context says "welding", the equivalent must be a welding product (anti-spatter / protective coating).
 - Never recommend a product from a different family by default.
