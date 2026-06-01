@@ -127,10 +127,15 @@ export class AuthService {
   }
 
   async getMe(userId: string) {
-    const user = await this.prisma.user.findUniqueOrThrow({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { departments: { select: { id: true, name: true } } },
     });
+    // Token valide mais compte supprimé/inexistant → 401 (et non 500) pour que
+    // le client purge sa session et redirige vers la connexion.
+    if (!user) {
+      throw new UnauthorizedException('Compte introuvable.');
+    }
     const { passwordHash: _, ...result } = user;
     return result;
   }

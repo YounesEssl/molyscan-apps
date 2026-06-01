@@ -389,6 +389,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+    // Padding horizontal pour l'écran de succès où le bouton épouse son
+    // contenu (sinon le texte colle aux bords arrondis).
+    paddingHorizontal: 36,
   },
   primaryBtnText: {
     fontFamily: typography.fonts.sansSemibold,
