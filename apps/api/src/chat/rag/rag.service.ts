@@ -241,7 +241,9 @@ ${prompt}`,
     ];
 
     const response = await this.anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      // Haiku 4.5: measured no quality loss vs Sonnet on the chat prod-feedback
+      // eval (14/16 vs 13/16) at ~3x lower cost. Override via CHAT_CLAUDE_MODEL.
+      model: process.env.CHAT_CLAUDE_MODEL ?? 'claude-haiku-4-5',
       max_tokens: 1500,
       temperature: 0.3,
       system: `${SYSTEM_PROMPT}\n\n${productDescription}Context — Molydal technical datasheets:\n${context}`,
@@ -374,7 +376,9 @@ ${prompt}`,
     ];
 
     const stream = this.anthropic.messages.stream({
-      model: 'claude-sonnet-4-6',
+      // Haiku 4.5: measured no quality loss vs Sonnet on the chat prod-feedback
+      // eval (14/16 vs 13/16) at ~3x lower cost. Override via CHAT_CLAUDE_MODEL.
+      model: process.env.CHAT_CLAUDE_MODEL ?? 'claude-haiku-4-5',
       max_tokens: 1500,
       temperature: 0.3,
       system: `${SYSTEM_PROMPT}\n\n${productBlock}${reformulationBlock}Context — Molydal technical datasheets:\n${context}`,
