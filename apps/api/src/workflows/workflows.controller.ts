@@ -37,7 +37,7 @@ export class WorkflowsController {
   @Post()
   @ApiOperation({ summary: 'Create a price request workflow' })
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateWorkflowDto) {
-    return this.workflowsService.create(user.sub, dto);
+    return this.workflowsService.create(user.sub, user.role, dto);
   }
 
   @Get(':id')

@@ -1,21 +1,26 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { ApproveWorkflowDto, RejectWorkflowDto } from './dto/review-workflow.dto';
-import { WorkflowStatus, NotificationType } from '@prisma/client';
+import { WorkflowStatus, NotificationType, UserRole, UserStatus } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class WorkflowsService {
+  private readonly logger = new Logger(WorkflowsService.name);
+
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private emailService: EmailService,
   ) {}
 
   async findAll(userId: string, role: string, pagination: PaginationQueryDto, status?: WorkflowStatus) {
@@ -55,8 +60,16 @@ export class WorkflowsService {
     return this.formatWorkflow(wf);
   }
 
-  async create(userId: string, dto: CreateWorkflowDto) {
-    // Idempotency: a replayed offline sync must not create a duplicate.
+  async create(userId: string, role: string, dto: CreateWorkflowDto) {
+    // Seuls les distributeurs peuvent émettre une demande de prix.
+    if (role !== UserRole.distributor) {
+      throw new ForbiddenException(
+        'Seuls les distributeurs peuvent émettre une demande de prix.',
+      );
+    }
+
+    // Idempotency: a replayed offline sync must not create a duplicate
+    // (ni renvoyer un second email).
     if (dto.clientRequestId) {
       const existing = await this.prisma.priceWorkflow.findUnique({
         where: { clientRequestId: dto.clientRequestId },
@@ -65,7 +78,10 @@ export class WorkflowsService {
       if (existing) return this.formatWorkflow(existing);
     }
 
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      include: { departments: { select: { id: true, name: true } } },
+    });
 
     // The FK is optional: AI-identified equivalents are free-text names, not
     // catalog rows. Only resolve a MolydalProduct when an id is explicitly given.
@@ -77,6 +93,28 @@ export class WorkflowsService {
       });
       productName = productName ?? molydalProduct.name;
       molydalRef = molydalRef ?? molydalProduct.reference;
+    }
+
+    // Routage : commerciaux du/des département(s) du distributeur ; repli admins.
+    const departmentIds = user.departments.map((d) => d.id);
+    let recipients = departmentIds.length
+      ? await this.prisma.user.findMany({
+          where: {
+            role: UserRole.commercial,
+            status: UserStatus.approved,
+            departments: { some: { id: { in: departmentIds } } },
+          },
+          select: { id: true, email: true },
+        })
+      : [];
+
+    let routedToAdmins = false;
+    if (recipients.length === 0) {
+      routedToAdmins = true;
+      recipients = await this.prisma.user.findMany({
+        where: { role: UserRole.admin, status: UserStatus.approved },
+        select: { id: true, email: true },
+      });
     }
 
     const actorName = `${user.firstName} ${user.lastName}`;
@@ -95,6 +133,9 @@ export class WorkflowsService {
         requestedPrice: dto.requestedPrice,
         status: WorkflowStatus.submitted,
         userId,
+        routedDepartmentId: user.departments[0]?.id ?? null,
+        routedToAdmins,
+        recipients: { connect: recipients.map((r) => ({ id: r.id })) },
         steps: {
           create: [
             { status: WorkflowStatus.draft, actor: actorName, date: now },
@@ -105,7 +146,76 @@ export class WorkflowsService {
       include: { steps: { orderBy: { date: 'asc' } }, molydalProduct: true },
     });
 
+    // Notifications best-effort : ne jamais faire échouer la demande.
+    await this.notifyRecipients(wf.id, {
+      recipients,
+      distributor: user,
+      product: { name: productName ?? '', ref: molydalRef ?? '' },
+      quantity: dto.quantity,
+      unit: dto.unit || 'L',
+      clientName: dto.clientName,
+      departmentName: user.departments[0]?.name ?? null,
+      routedToAdmins,
+    });
+
     return this.formatWorkflow(wf);
+  }
+
+  /**
+   * Email aux destinataires + notification in-app. Best-effort : toute erreur
+   * est journalisée mais ne fait pas échouer la création de la demande.
+   */
+  private async notifyRecipients(
+    workflowId: string,
+    ctx: {
+      recipients: { id: string; email: string }[];
+      distributor: { firstName: string; lastName: string; email: string };
+      product: { name: string; ref: string };
+      quantity: number;
+      unit: string;
+      clientName?: string | null;
+      departmentName?: string | null;
+      routedToAdmins: boolean;
+    },
+  ): Promise<void> {
+    const productLabel = ctx.product.name || ctx.product.ref || 'un produit';
+    const distributorName =
+      `${ctx.distributor.firstName} ${ctx.distributor.lastName}`.trim();
+
+    try {
+      await this.emailService.sendPriceRequestToCommercials({
+        recipients: ctx.recipients.map((r) => r.email),
+        distributor: ctx.distributor,
+        product: ctx.product,
+        quantity: ctx.quantity,
+        unit: ctx.unit,
+        clientName: ctx.clientName,
+        departmentName: ctx.departmentName,
+        isFallback: ctx.routedToAdmins,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      this.logger.error(`Email demande de prix échoué (${workflowId}): ${message}`);
+    }
+
+    await Promise.all(
+      ctx.recipients.map((r) =>
+        this.notificationsService
+          .create(
+            r.id,
+            NotificationType.workflow_update,
+            'Nouvelle demande de prix',
+            `${distributorName} demande un prix pour ${productLabel}.`,
+            workflowId,
+          )
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            this.logger.error(
+              `Notification demande de prix échouée (${workflowId} → ${r.id}): ${message}`,
+            );
+          }),
+      ),
+    );
   }
 
   async approve(id: string, reviewerId: string, dto: ApproveWorkflowDto) {

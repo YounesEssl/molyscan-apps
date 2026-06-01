@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { UserCheck, Users, LogOut } from 'lucide-react';
+import { UserCheck, Users, Tag, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import type { AccessRequest } from '@/lib/types';
@@ -8,6 +8,7 @@ import type { AccessRequest } from '@/lib/types';
 const navItems = [
   { to: '/access-requests', label: "Demandes d'accès", icon: UserCheck },
   { to: '/users', label: 'Utilisateurs', icon: Users },
+  { to: '/price-requests', label: 'Demandes de prix', icon: Tag },
 ];
 
 export function Layout() {

@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { LoginPage } from './pages/LoginPage';
 import { AccessRequestsPage } from './pages/AccessRequestsPage';
 import { UsersPage } from './pages/UsersPage';
+import { PriceRequestsPage } from './pages/PriceRequestsPage';
 
 export function App() {
   return (
@@ -13,6 +14,7 @@ export function App() {
         <Route element={<Layout />}>
           <Route path="/access-requests" element={<AccessRequestsPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/price-requests" element={<PriceRequestsPage />} />
           <Route path="/" element={<Navigate to="/access-requests" replace />} />
         </Route>
       </Route>

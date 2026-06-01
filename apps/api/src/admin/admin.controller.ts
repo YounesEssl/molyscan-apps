@@ -81,4 +81,12 @@ export class AdminController {
   ) {
     return this.adminService.updateUser(adminId, id, dto);
   }
+
+  @Get('price-requests')
+  @ApiOperation({
+    summary: 'List price requests with distributor, department and recipients',
+  })
+  listPriceRequests() {
+    return this.adminService.listPriceRequests();
+  }
 }

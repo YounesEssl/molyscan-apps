@@ -22,6 +22,18 @@ export interface AccountDecisionPayload {
   email: string;
 }
 
+export interface PriceRequestPayload {
+  recipients: string[];
+  distributor: { firstName: string; lastName: string; email: string };
+  product: { name: string; ref: string };
+  quantity: number;
+  unit: string;
+  clientName?: string | null;
+  departmentName?: string | null;
+  // true = aucun commercial sur le département, repli sur les admins.
+  isFallback: boolean;
+}
+
 /**
  * Wrapper autour de Resend pour l'envoi d'emails transactionnels.
  *
@@ -107,6 +119,33 @@ export class EmailService {
     });
   }
 
+  /**
+   * Notifie le(s) commercial(aux) du département d'un distributeur qu'une
+   * demande de prix a été émise. L'email invite simplement à recontacter le
+   * distributeur pour le produit Molydal demandé.
+   */
+  async sendPriceRequestToCommercials(
+    payload: PriceRequestPayload,
+  ): Promise<void> {
+    if (payload.recipients.length === 0) {
+      this.logger.warn(
+        `Aucun destinataire pour la demande de prix de ${payload.distributor.email}.`,
+      );
+      return;
+    }
+
+    const fullName =
+      `${payload.distributor.firstName} ${payload.distributor.lastName}`.trim();
+    const product = payload.product.name || payload.product.ref || 'un produit';
+
+    await this.send({
+      to: payload.recipients,
+      subject: `Demande de prix — ${fullName} (${product})`,
+      html: this.renderPriceRequestEmail(payload, fullName, product),
+      context: `price-request:${payload.distributor.email}`,
+    });
+  }
+
   private async send(params: {
     to: string[];
     subject: string;
@@ -166,6 +205,38 @@ export class EmailService {
         Si vous n'attendiez pas cette demande, vous pouvez la refuser depuis la
         console d'administration.
       </p>
+    `);
+  }
+
+  private renderPriceRequestEmail(
+    payload: PriceRequestPayload,
+    fullName: string,
+    product: string,
+  ): string {
+    const { distributor, quantity, unit, clientName, departmentName } = payload;
+    const qty = Number.isFinite(quantity) ? `${quantity} ${escapeHtml(unit)}` : '—';
+
+    const fallbackNote = payload.isFallback
+      ? `<p style="${MUTED}">Aucun commercial n'est rattaché à ce département : cette demande vous est transmise en tant qu'administrateur, à router manuellement.</p>`
+      : '';
+
+    return wrapLayout(`
+      <h1 style="${H1}">Nouvelle demande de prix</h1>
+      <p style="${P}">
+        <strong>${escapeHtml(fullName)}</strong> (distributeur) souhaite obtenir
+        un prix pour le produit Molydal ci-dessous. Merci de le recontacter
+        directement à <a href="mailto:${escapeHtml(distributor.email)}">${escapeHtml(distributor.email)}</a>.
+      </p>
+      <table role="presentation" style="${TABLE}">
+        ${row('Distributeur', escapeHtml(fullName))}
+        ${row('Email', escapeHtml(distributor.email))}
+        ${row('Produit', escapeHtml(product))}
+        ${payload.product.ref ? row('Référence', escapeHtml(payload.product.ref)) : ''}
+        ${row('Quantité', qty)}
+        ${clientName ? row('Client final', escapeHtml(clientName)) : ''}
+        ${departmentName ? row('Département', escapeHtml(departmentName)) : ''}
+      </table>
+      ${fallbackNote}
     `);
   }
 

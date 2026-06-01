@@ -91,6 +91,7 @@ model User {
 
   scans                   Scan[]
   workflows               PriceWorkflow[]
+  receivedWorkflows       PriceWorkflow[]          @relation("WorkflowRecipients")
   conversations           AIConversation[]
   notifications           Notification[]
   voiceNotes              VoiceNote[]
@@ -110,7 +111,8 @@ model Department {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users User[] @relation("UserDepartments")
+  users           User[]          @relation("UserDepartments")
+  routedWorkflows PriceWorkflow[] @relation("WorkflowDepartment")
 
   @@map("departments")
 }
@@ -262,9 +264,17 @@ model PriceWorkflow {
   reviewComment    String?
   organizationId   String?
 
-  scan           Scan            @relation(fields: [scanId], references: [id])
-  molydalProduct MolydalProduct? @relation(fields: [molydalProductId], references: [id])
-  user           User            @relation(fields: [userId], references: [id])
+  // Routage : la demande d'un distributeur est envoyée aux commerciaux de son
+  // département (recipients). Si aucun commercial, repli sur les admins
+  // (routedToAdmins = true). Conservé pour traçabilité côté plateforme admin.
+  routedDepartmentId String?
+  routedToAdmins     Boolean @default(false)
+
+  scan             Scan            @relation(fields: [scanId], references: [id])
+  molydalProduct   MolydalProduct? @relation(fields: [molydalProductId], references: [id])
+  user             User            @relation(fields: [userId], references: [id])
+  routedDepartment Department?     @relation("WorkflowDepartment", fields: [routedDepartmentId], references: [id])
+  recipients       User[]          @relation("WorkflowRecipients")
 
   steps WorkflowStep[]
 

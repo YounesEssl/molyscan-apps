@@ -43,6 +43,29 @@ export interface AdminUser {
   _count: { scans: number; workflows: number };
 }
 
+export interface PriceRequestParty {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role?: UserRole;
+}
+
+export interface PriceRequest {
+  id: string;
+  productName: string | null;
+  molydalRef: string | null;
+  clientName: string;
+  quantity: number;
+  unit: string;
+  status: string;
+  routedToAdmins: boolean;
+  createdAt: string;
+  user: PriceRequestParty;
+  routedDepartment: Department | null;
+  recipients: PriceRequestParty[];
+}
+
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;

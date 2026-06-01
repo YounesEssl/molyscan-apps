@@ -214,6 +214,40 @@ export class AdminService {
     return updated;
   }
 
+  // ─── Demandes de prix ──────────────────────────────────────────────────
+
+  listPriceRequests() {
+    return this.prisma.priceWorkflow.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        productName: true,
+        molydalRef: true,
+        clientName: true,
+        quantity: true,
+        unit: true,
+        status: true,
+        routedToAdmins: true,
+        createdAt: true,
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        routedDepartment: {
+          select: { id: true, name: true, code: true },
+        },
+        recipients: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+  }
+
   // ─── Helpers ───────────────────────────────────────────────────────────
 
   private async findPendingUser(userId: string) {

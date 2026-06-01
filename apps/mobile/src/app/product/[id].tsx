@@ -19,6 +19,7 @@ import { LinkedConversationsList } from '@/components/product/LinkedConversation
 import { colors } from '@/design/tokens/colors';
 import { scanService, type ScanLinkedConversation } from '@/services/scan.service';
 import { chatFreeService } from '@/services/chatFree.service';
+import { useAuthStore } from '@/stores/auth.store';
 
 interface ScanDetail {
   id: string;
@@ -54,6 +55,8 @@ function buildSpecs(scan: ScanDetail | null): ProductSpec[] {
 export default function ProductDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  // Seuls les distributeurs peuvent émettre une demande de prix.
+  const isDistributor = useAuthStore((s) => s.user?.role) === 'distributor';
   const { t } = useTranslation();
   const [scan, setScan] = useState<ScanDetail | null>(null);
   const [conversations, setConversations] = useState<ScanLinkedConversation[]>([]);
@@ -170,9 +173,16 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
         <LinkedConversationsList conversations={conversations} />
 
-        <PriceRequestCTA
-          onPress={() => router.push('/workflow/price-request')}
-        />
+        {isDistributor ? (
+          <PriceRequestCTA
+            onPress={() =>
+              router.push({
+                pathname: '/workflow/price-request',
+                params: { scanId: id },
+              })
+            }
+          />
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
