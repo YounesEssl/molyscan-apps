@@ -5,7 +5,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { api, tokenStore } from './api';
+import { api, tokenStore, setUnauthorizedHandler } from './api';
 import type { AuthTokens, CurrentUser } from './types';
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
@@ -29,6 +29,17 @@ async function fetchMe(): Promise<CurrentUser> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<CurrentUser | null>(null);
+
+  // Déconnexion immédiate quand l'API renvoie 401 (token expiré/invalide) :
+  // bascule l'état vers « anonymous » → ProtectedRoute redirige vers /login
+  // sans qu'un refresh manuel soit nécessaire.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      setStatus('anonymous');
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   // Restauration de session au montage.
   useEffect(() => {
@@ -56,6 +67,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  // Revalidation de session au retour sur l'onglet : sans cela, un token expiré
+  // pendant que l'onglet était en arrière-plan n'est détecté qu'au prochain
+  // appel API (React Query n'a pas refetchOnWindowFocus). On revérifie /auth/me
+  // dès que l'onglet redevient visible ; un token expiré → 401 → déconnexion.
+  useEffect(() => {
+    const revalidate = (): void => {
+      if (document.visibilityState !== 'visible') return;
+      if (!tokenStore.get()) return; // déjà déconnecté
+      void fetchMe()
+        .then((me) => {
+          if (me.role !== 'admin') {
+            tokenStore.clear();
+            setUser(null);
+            setStatus('anonymous');
+          }
+        })
+        .catch(() => {
+          // 401 → traité par l'intercepteur (unauthorizedHandler) ;
+          // les autres erreurs (réseau…) ne déconnectent pas.
+        });
+    };
+    document.addEventListener('visibilitychange', revalidate);
+    window.addEventListener('focus', revalidate);
+    return () => {
+      document.removeEventListener('visibilitychange', revalidate);
+      window.removeEventListener('focus', revalidate);
     };
   }, []);
 

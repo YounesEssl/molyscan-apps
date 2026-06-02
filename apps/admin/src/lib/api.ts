@@ -11,6 +11,19 @@ export const tokenStore = {
   clear: (): void => localStorage.removeItem(TOKEN_KEY),
 };
 
+// Notifie l'app (AuthProvider) quand l'API renvoie 401 (token expiré/invalide),
+// pour basculer l'état d'auth vers « anonymous » sans attendre un refresh.
+// Registre de callback plutôt qu'un import direct d'auth.tsx, pour éviter un
+// cycle d'imports (auth.tsx dépend de api.ts, pas l'inverse).
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(
+  handler: UnauthorizedHandler | null,
+): void {
+  unauthorizedHandler = handler;
+}
+
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api',
   timeout: 15000,
@@ -42,6 +55,12 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       tokenStore.clear();
+      // Un 401 sur /auth/login = mauvais identifiants (géré par le formulaire),
+      // pas une session expirée — on ne déclenche pas la déconnexion globale.
+      const isLogin = error.config?.url?.includes('/auth/login');
+      if (!isLogin) {
+        unauthorizedHandler?.();
+      }
     }
     return Promise.reject(error);
   },
