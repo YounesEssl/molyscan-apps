@@ -10,7 +10,6 @@
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:seed:departments": "ts-node prisma/seed-departments.ts",
     "prisma:studio": "prisma studio",
     "test": "jest",
