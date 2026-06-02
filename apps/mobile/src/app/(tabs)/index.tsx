@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Aura } from '@/components/ui/Aura';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
@@ -28,16 +28,21 @@ export default function DashboardScreen(): React.JSX.Element {
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const { contentPaddingBottom } = useTabBarSpacing();
 
-  useEffect(() => {
-    scanService
-      .getHistory()
-      .then(setScans)
-      .catch(() => {});
-    workflowService
-      .getAll()
-      .then(setWorkflows)
-      .catch(() => {});
-  }, [setWorkflows]);
+  // Rafraîchit à chaque retour sur l'onglet Home (l'onglet reste monté en
+  // arrière-plan, donc un simple useEffect au montage figerait les données
+  // après un scan / une demande de prix).
+  useFocusEffect(
+    useCallback(() => {
+      scanService
+        .getHistory()
+        .then(setScans)
+        .catch(() => {});
+      workflowService
+        .getAll()
+        .then(setWorkflows)
+        .catch(() => {});
+    }, [setWorkflows]),
+  );
 
   const matchedCount = scans.filter((s) => s.status === 'matched').length;
   const matchRate =
