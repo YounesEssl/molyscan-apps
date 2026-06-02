@@ -24,6 +24,7 @@ import { radius } from '@/design/tokens/radius';
 import { typography } from '@/design/tokens/typography';
 import { chatFreeService } from '@/services/chatFree.service';
 import { scanService } from '@/services/scan.service';
+import { useAuthStore } from '@/stores/auth.store';
 import { haptic } from '@/lib/haptics';
 import { logger } from '@/lib/logger';
 
@@ -64,7 +65,10 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
   const hasMatch = result.equivalents.length > 0;
   const noProduct = !result.identified.name || result.identified.name === 'null';
 
-  const canSubmitFeedback = Boolean(result.id);
+  // Les distributeurs ne votent pas sur les équivalences.
+  const isDistributor =
+    useAuthStore((s) => s.user?.role) === 'distributor';
+  const canSubmitFeedback = Boolean(result.id) && !isDistributor;
 
   const handleVote = async (eqName: string, vote: Vote): Promise<void> => {
     if (!canSubmitFeedback || feedback[eqName]?.submitted) return;

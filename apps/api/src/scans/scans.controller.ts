@@ -58,6 +58,6 @@ export class ScansController {
     @Param('id') id: string,
     @Body() dto: EquivalentFeedbackDto,
   ) {
-    return this.scansService.submitEquivalentFeedback(id, user.sub, dto);
+    return this.scansService.submitEquivalentFeedback(id, user.sub, user.role, dto);
   }
 }

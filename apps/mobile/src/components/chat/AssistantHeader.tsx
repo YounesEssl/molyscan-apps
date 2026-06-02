@@ -47,26 +47,28 @@ export function AssistantHeader({
         {title}
       </RNText>
 
-      <TouchableOpacity
-        style={[styles.submitBtn, submitted && styles.submitBtnDone]}
-        onPress={onSubmitForAnalysis}
-        disabled={submitDisabled}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel={
-          submitted ? t('chat.submitA11yDone') : t('chat.submitA11yPending')
-        }
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        {submitting ? (
-          <ActivityIndicator size="small" color={colors.ink} />
-        ) : (
-          <Flag
-            size={16}
-            color={submitted ? colors.purple : colors.ink}
-          />
-        )}
-      </TouchableOpacity>
+      {onSubmitForAnalysis ? (
+        <TouchableOpacity
+          style={[styles.submitBtn, submitted && styles.submitBtnDone]}
+          onPress={onSubmitForAnalysis}
+          disabled={submitDisabled}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={
+            submitted ? t('chat.submitA11yDone') : t('chat.submitA11yPending')
+          }
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {submitting ? (
+            <ActivityIndicator size="small" color={colors.ink} />
+          ) : (
+            <Flag size={16} color={submitted ? colors.purple : colors.ink} />
+          )}
+        </TouchableOpacity>
+      ) : (
+        // Spacer pour garder le titre centré (largeur du bouton retour).
+        <View style={styles.submitBtnPlaceholder} />
+      )}
     </View>
   );
 }
@@ -111,5 +113,9 @@ const styles = StyleSheet.create({
   submitBtnDone: {
     backgroundColor: 'rgba(91,45,255,0.10)',
     borderColor: 'rgba(91,45,255,0.30)',
+  },
+  submitBtnPlaceholder: {
+    width: 38,
+    height: 38,
   },
 });

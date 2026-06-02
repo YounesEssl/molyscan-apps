@@ -111,7 +111,7 @@ export class ChatController {
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
   ) {
-    return this.chatService.submitConversationForAnalysis(id, user.sub);
+    return this.chatService.submitConversationForAnalysis(id, user.sub, user.role);
   }
 
   // ── Messages ───────────────────────────────────────────────────

@@ -27,11 +27,15 @@ import {
   type ScanContext,
 } from '@/services/chatFree.service';
 import { useFileAttachment } from '@/hooks/useFileAttachment';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function ChatDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { t } = useTranslation();
+  // Les distributeurs ne peuvent pas remonter de conversation pour analyse.
+  const isDistributor =
+    useAuthStore((s) => s.user?.role) === 'distributor';
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessageModel>>(null);
 
@@ -186,7 +190,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
         <AssistantHeader
           title={title}
           onBack={() => router.back()}
-          onSubmitForAnalysis={handleSubmitForAnalysis}
+          onSubmitForAnalysis={isDistributor ? undefined : handleSubmitForAnalysis}
           submitting={submitting}
           submitted={submitted}
         />

@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from './rag/rag.service';
@@ -159,7 +164,12 @@ export class ChatService {
     return { deleted: true };
   }
 
-  async submitConversationForAnalysis(id: string, userId: string) {
+  async submitConversationForAnalysis(id: string, userId: string, role: string) {
+    // Les distributeurs ne peuvent pas remonter de conversation pour analyse.
+    if (role === 'distributor') {
+      throw new ForbiddenException('Action réservée aux commerciaux Molydal.');
+    }
+
     const conv = await this.prisma.aIConversation.findFirst({
       where: { id, userId },
     });

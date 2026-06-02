@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from '../products/products.service';
 import { StorageService } from '../storage/storage.service';
@@ -115,8 +121,16 @@ export class ScansService {
   async submitEquivalentFeedback(
     scanId: string,
     userId: string,
+    role: string,
     dto: EquivalentFeedbackDto,
   ) {
+    // Les distributeurs ne votent pas sur les équivalences.
+    if (role === 'distributor') {
+      throw new ForbiddenException(
+        'Action réservée aux commerciaux Molydal.',
+      );
+    }
+
     const scan = await this.prisma.scan.findFirst({
       where: { id: scanId, userId },
       select: { id: true },
