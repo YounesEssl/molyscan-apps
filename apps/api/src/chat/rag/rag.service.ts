@@ -1,8 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ExpertEquivalence } from '@prisma/client';
 import { VectorStoreService, RetrievalFilters } from './vector-store.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import {
+  equivalenceKey,
+  normalizeProductText,
+} from '../../common/utils/normalize';
 import type { AttachmentEntry } from '../attachment.store';
 
 interface RagInput {
@@ -119,6 +125,9 @@ export class RagService {
   constructor(
     private configService: ConfigService,
     private vectorStore: VectorStoreService,
+    // Optional so the eval test modules (which don't provide Prisma) still work;
+    // present in the real app via the global PrismaModule.
+    @Optional() private prisma?: PrismaService,
   ) {
     this.anthropic = new Anthropic({
       apiKey: this.configService.getOrThrow<string>('ANTHROPIC_API_KEY'),
@@ -126,6 +135,70 @@ export class RagService {
     this.gemini = new GoogleGenerativeAI(
       this.configService.getOrThrow<string>('GEMINI_API_KEY'),
     );
+  }
+
+  /**
+   * Find an expert-validated equivalence for the competitor product the user is
+   * asking about — scan-linked (exact normalized key) or free chat (match the
+   * question text against the curated table) — and return an authoritative
+   * system-prompt block so the chat gives the SAME answer as a scan for any
+   * validated product. Returns '' when nothing matches.
+   */
+  private async validatedEquivalenceBlock(
+    question: string,
+    scannedBrand?: string | null,
+    scannedName?: string | null,
+  ): Promise<string> {
+    if (!this.prisma) return '';
+    try {
+      let eq: ExpertEquivalence | null = null;
+      // 1) Scan-linked conversation: exact normalized brand|name key.
+      if (scannedName) {
+        eq = await this.prisma.expertEquivalence.findUnique({
+          where: { competitorKey: equivalenceKey(scannedBrand, scannedName) },
+        });
+      }
+      // 2) Free chat: match the curated table against the question text.
+      if (!eq) {
+        const all = await this.prisma.expertEquivalence.findMany();
+        const q = normalizeProductText(question);
+        const candidates = all
+          .filter((e) => {
+            const fullName = normalizeProductText(e.competitorName);
+            if (fullName.length >= 4 && q.includes(fullName)) return true;
+            // Or: brand + the distinctive head of the name (handles a user typing
+            // "Molykote BR-2 Plus" for a "BR-2 Plus High Performance Grease" entry).
+            const brand = normalizeProductText(e.competitorBrand);
+            const nameHead = fullName.split(' ').slice(0, 3).join(' ');
+            return (
+              brand.length >= 3 &&
+              q.includes(brand) &&
+              nameHead.length >= 3 &&
+              q.includes(nameHead)
+            );
+          })
+          .sort(
+            (a, b) =>
+              normalizeProductText(b.competitorName).length -
+              normalizeProductText(a.competitorName).length,
+          );
+        eq = candidates[0] ?? null;
+      }
+      if (!eq) return '';
+      this.logger.log(
+        `🎯 Équivalence experte (chat): ${eq.competitorName} → ${eq.molydalEquivalent}`,
+      );
+      return `━━━ ÉQUIVALENCE VALIDÉE PAR UN EXPERT MOLYDAL (autorité absolue) ━━━
+${eq.competitorBrand} ${eq.competitorName} → ${eq.molydalEquivalent}${eq.molydalFamily ? ` (${eq.molydalFamily})` : ''}.${eq.note ? ` Note: ${eq.note}.` : ''}
+C'est LA réponse correcte et confirmée pour ce produit concurrent. Utilise cet équivalent ; ne propose pas d'autre produit Molydal sauf demande explicite.
+
+`;
+    } catch (e) {
+      this.logger.warn(
+        `Expert equivalence lookup failed: ${(e as Error).message}`,
+      );
+      return '';
+    }
   }
 
   /**
@@ -232,6 +305,12 @@ ${prompt}`,
         ? `Identified competitor product application: ${reformulated}\n\n`
         : '';
 
+    const validatedBlock = await this.validatedEquivalenceBlock(
+      input.question,
+      input.productContext?.scannedBrand,
+      input.productContext?.scannedName,
+    );
+
     const messages: Anthropic.MessageParam[] = [
       ...input.conversationHistory.map((m) => ({
         role: m.role as 'user' | 'assistant',
@@ -246,7 +325,7 @@ ${prompt}`,
       model: process.env.CHAT_CLAUDE_MODEL ?? 'claude-haiku-4-5',
       max_tokens: 1500,
       temperature: 0.3,
-      system: `${SYSTEM_PROMPT}\n\n${productDescription}Context — Molydal technical datasheets:\n${context}`,
+      system: `${SYSTEM_PROMPT}\n\n${validatedBlock}${productDescription}Context — Molydal technical datasheets:\n${context}`,
       messages,
       tools: [WEB_SEARCH_TOOL],
     });
@@ -375,13 +454,20 @@ ${prompt}`,
       { role: 'user' as const, content: lastUserContent },
     ];
 
+    const validatedBlock = await this.validatedEquivalenceBlock(
+      question,
+      productContext?.scannedBrand,
+      productContext?.scannedName,
+    );
+    const systemText = `${SYSTEM_PROMPT}\n\n${validatedBlock}${productBlock}${reformulationBlock}Context — Molydal technical datasheets:\n${context}`;
+
     const stream = this.anthropic.messages.stream({
       // Haiku 4.5: measured no quality loss vs Sonnet on the chat prod-feedback
       // eval (14/16 vs 13/16) at ~3x lower cost. Override via CHAT_CLAUDE_MODEL.
       model: process.env.CHAT_CLAUDE_MODEL ?? 'claude-haiku-4-5',
       max_tokens: 1500,
       temperature: 0.3,
-      system: `${SYSTEM_PROMPT}\n\n${productBlock}${reformulationBlock}Context — Molydal technical datasheets:\n${context}`,
+      system: systemText,
       messages,
       tools: [WEB_SEARCH_TOOL],
     });
