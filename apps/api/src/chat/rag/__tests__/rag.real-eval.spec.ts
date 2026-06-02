@@ -2,13 +2,13 @@
  * RAG Real Integration Eval
  *
  * Reproduit les conversations cassées en appelant la vraie stack :
- *   Gemini (reformulation) → Supabase (vecteurs réels) → Anthropic (réponse)
+ *   Gemini (reformulation) → Supabase (vecteurs réels) → Gemini (réponse)
  *
  * Aucun mock — on teste ce que l'utilisateur voit vraiment.
  * Les sources Supabase sont loguées pour diagnostiquer les problèmes de retrieval.
  *
  * Run: npm run test:eval:real
- * Requires: ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY
+ * Requires: GEMINI_API_KEY, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY
  */
 
 import * as dotenv from 'dotenv';
@@ -105,7 +105,6 @@ describe('RAG Real Eval — stack complète sans mock', () => {
   let vectorStore: VectorStoreService;
 
   const requiredEnvVars = [
-    'ANTHROPIC_API_KEY',
     'GEMINI_API_KEY',
     'OPENAI_API_KEY',
     'SUPABASE_URL',
@@ -154,7 +153,7 @@ describe('RAG Real Eval — stack complète sans mock', () => {
         const retrievedSources = [...new Set(chunks.map((c) => c.product_name))];
         console.log(`  Sources Supabase   : ${retrievedSources.join(', ') || '(aucune)'}`);
 
-        // ── 2. Génération (Anthropic réel) ──
+        // ── 2. Génération (Gemini réel) ──
         const result = await ragService.generateResponse({
           question: evalCase.query,
           conversationHistory: [],

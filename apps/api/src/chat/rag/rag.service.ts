@@ -1,6 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ExpertEquivalence } from '@prisma/client';
 import { VectorStoreService, RetrievalFilters } from './vector-store.service';
@@ -36,7 +35,7 @@ Detect the language of the FIRST user message in the conversation and respond in
 
 ━━━ INFORMATION SOURCES (STRICT) ━━━
 - **MOLYDAL PRODUCTS**: ONLY the technical datasheets provided in the context below. Never invent anything, never rely on general knowledge. If a Molydal product is not in the context, it does not exist for you.
-- **COMPETITOR PRODUCTS**: if you need to identify a competitor product or obtain its characteristics (viscosity, additives, certifications, application), use the \`web_search\` tool. **Never guess**, NEVER rely on your general knowledge. If the web search returns nothing usable, say so explicitly.
+- **COMPETITOR PRODUCTS**: if you need to identify a competitor product or obtain its characteristics (viscosity, additives, certifications, application), use Google Search. **Never guess**, NEVER rely on your general knowledge. If the web search returns nothing usable, say so explicitly.
 - **ABSOLUTE RULE**: zero hallucination. Any information about a competitor lubricant must come from a verified web search; any information about a Molydal product must come from the RAG context.
 - **ONLY USE WEB SEARCH FOR**: identifying/documenting a competitor product. Never for answering other questions (lubricant generalities, Molydal, professional advice) — answer using the RAG context alone.
 
@@ -101,25 +100,9 @@ Use only the constraints the user actually mentioned. Do not invent extra requir
 The relevance score (%) is a raw vector similarity, not business relevance — ignore it.
 You are precise, concise, and professional. You cite exact technical values.`;
 
-/**
- * Anthropic's native web search tool. Claude decides autonomously when to
- * invoke it — the system prompt restricts usage to identifying / documenting
- * competitor products only.
- *
- * Cast: the tool is a server-side Anthropic capability. TS types in the
- * current SDK (@anthropic-ai/sdk v0.90) don't yet include it but the wire
- * format is correct.
- */
-const WEB_SEARCH_TOOL = {
-  type: 'web_search_20250305',
-  name: 'web_search',
-  max_uses: 3,
-} as unknown as Anthropic.ToolUnion;
-
 @Injectable()
 export class RagService {
   private readonly logger = new Logger(RagService.name);
-  private readonly anthropic: Anthropic;
   private readonly gemini: GoogleGenerativeAI;
 
   constructor(
@@ -129,9 +112,6 @@ export class RagService {
     // present in the real app via the global PrismaModule.
     @Optional() private prisma?: PrismaService,
   ) {
-    this.anthropic = new Anthropic({
-      apiKey: this.configService.getOrThrow<string>('ANTHROPIC_API_KEY'),
-    });
     this.gemini = new GoogleGenerativeAI(
       this.configService.getOrThrow<string>('GEMINI_API_KEY'),
     );
@@ -311,37 +291,36 @@ ${prompt}`,
       input.productContext?.scannedName,
     );
 
-    const messages: Anthropic.MessageParam[] = [
+    const systemText = `${SYSTEM_PROMPT}\n\n${validatedBlock}${productDescription}Context — Molydal technical datasheets:\n${context}`;
+
+    const contents = [
       ...input.conversationHistory.map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.text,
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.text }],
       })),
-      { role: 'user' as const, content: input.question },
+      { role: 'user' as const, parts: [{ text: input.question }] },
     ];
 
-    const response = await this.anthropic.messages.create({
-      // Haiku 4.5: measured no quality loss vs Sonnet on the chat prod-feedback
-      // eval (14/16 vs 13/16) at ~3x lower cost. Override via CHAT_CLAUDE_MODEL.
-      model: process.env.CHAT_CLAUDE_MODEL ?? 'claude-haiku-4-5',
-      max_tokens: 1500,
-      temperature: 0.3,
-      system: `${SYSTEM_PROMPT}\n\n${validatedBlock}${productDescription}Context — Molydal technical datasheets:\n${context}`,
-      messages,
-      tools: [WEB_SEARCH_TOOL],
+    const model = this.gemini.getGenerativeModel({
+      model: process.env.CHAT_MODEL ?? 'gemini-3-flash-preview',
+      systemInstruction: systemText,
+      tools: [{ googleSearch: {} }] as any,
+      generationConfig: { temperature: 0.3, maxOutputTokens: 2048 } as any,
     });
 
-    // When Claude uses the web_search tool, the final text is in the last
-    // `text` block of the response content.
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('\n');
+    const result = await model.generateContent({ contents } as any);
+    let text = '';
+    try {
+      text = result.response.text() ?? '';
+    } catch {
+      // Gemini can throw when a chunk has no text part (e.g. grounding-only).
+    }
     return { text, sources };
   }
 
   /**
    * Streaming response for the free chat endpoint.
-   * Returns an Anthropic MessageStream.
+   * Returns an async iterable of text deltas.
    *
    * `retrievalFilters` allow the caller (typically the scan flow with structured
    * identification) to enforce hard catalog filters on format / certification /
@@ -363,7 +342,7 @@ ${prompt}`,
     attachment?: AttachmentEntry,
     retrievalFilters?: RetrievalFilters,
   ): Promise<{
-    stream: ReturnType<Anthropic['messages']['stream']>;
+    stream: AsyncIterable<string>;
     sources: string[];
   }> {
     // When the conversation is attached to a scan, bias retrieval toward the
@@ -431,27 +410,24 @@ ${prompt}`,
 
     const validHistory = conversationHistory.filter((m) => m.text.trim());
 
-    const lastUserContent: Anthropic.ContentBlockParam[] = attachment
+    const lastUserParts = attachment
       ? [
           {
-            type: 'document',
-            source: {
-              type: 'base64',
-              media_type: 'application/pdf',
+            inlineData: {
+              mimeType: 'application/pdf',
               data: attachment.base64,
             },
-            title: attachment.filename,
-          } satisfies Anthropic.DocumentBlockParam,
-          { type: 'text', text: question },
+          },
+          { text: question },
         ]
-      : [{ type: 'text', text: question }];
+      : [{ text: question }];
 
-    const messages: Anthropic.MessageParam[] = [
+    const contents = [
       ...validHistory.map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.text,
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.text }],
       })),
-      { role: 'user' as const, content: lastUserContent },
+      { role: 'user' as const, parts: lastUserParts },
     ];
 
     const validatedBlock = await this.validatedEquivalenceBlock(
@@ -461,16 +437,25 @@ ${prompt}`,
     );
     const systemText = `${SYSTEM_PROMPT}\n\n${validatedBlock}${productBlock}${reformulationBlock}Context — Molydal technical datasheets:\n${context}`;
 
-    const stream = this.anthropic.messages.stream({
-      // Haiku 4.5: measured no quality loss vs Sonnet on the chat prod-feedback
-      // eval (14/16 vs 13/16) at ~3x lower cost. Override via CHAT_CLAUDE_MODEL.
-      model: process.env.CHAT_CLAUDE_MODEL ?? 'claude-haiku-4-5',
-      max_tokens: 1500,
-      temperature: 0.3,
-      system: systemText,
-      messages,
-      tools: [WEB_SEARCH_TOOL],
+    const model = this.gemini.getGenerativeModel({
+      model: process.env.CHAT_MODEL ?? 'gemini-3-flash-preview',
+      systemInstruction: systemText,
+      tools: [{ googleSearch: {} }] as any,
+      generationConfig: { temperature: 0.3, maxOutputTokens: 2048 } as any,
     });
+
+    const result = await model.generateContentStream({ contents } as any);
+
+    const stream = (async function* () {
+      for await (const chunk of result.stream) {
+        try {
+          const t = chunk.text();
+          if (t) yield t;
+        } catch {
+          // A chunk with no text part (e.g. grounding metadata) throws — skip it.
+        }
+      }
+    })();
 
     return { stream, sources };
   }

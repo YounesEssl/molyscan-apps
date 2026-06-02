@@ -4,7 +4,6 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from './rag/rag.service';
 import { StorageService } from '../storage/storage.service';
@@ -209,7 +208,7 @@ export class ChatService {
     if (!conversation) throw new NotFoundException('Conversation not found');
 
     // Fetch history BEFORE saving the current user message to avoid duplicating
-    // it in the messages array sent to Anthropic (history + explicit question)
+    // it in the messages array sent to the LLM (history + explicit question)
     const history = await this.prisma.aIMessage.findMany({
       where: { conversationId },
       orderBy: { timestamp: 'asc' },
@@ -257,7 +256,7 @@ export class ChatService {
     text: string,
     attachment?: AttachmentEntry,
   ): Promise<{
-    stream: ReturnType<Anthropic['messages']['stream']>;
+    stream: AsyncIterable<string>;
     sources: string[];
   }> {
     const conversation = await this.prisma.aIConversation.findFirst({
@@ -281,7 +280,7 @@ export class ChatService {
     await this.updateConversationMeta(conversationId, text, conversation.title);
 
     // For product-linked conversations, inject the full scan context into the
-    // RAG system prompt so Claude knows exactly what was scanned and why each
+    // RAG system prompt so the LLM knows exactly what was scanned and why each
     // equivalent was proposed — same data shown in the UI toggle card.
     let productContext: Parameters<typeof this.ragService.generateStreamingResponse>[2] | undefined;
 

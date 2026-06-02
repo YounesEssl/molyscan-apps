@@ -162,14 +162,12 @@ export class ChatController {
 
       let fullContent = '';
 
-      stream.on('text', (text: string) => {
-        fullContent += text;
+      for await (const delta of stream) {
+        fullContent += delta;
         res.write(
-          `data: ${JSON.stringify({ type: 'text', content: text })}\n\n`,
+          `data: ${JSON.stringify({ type: 'text', content: delta })}\n\n`,
         );
-      });
-
-      await stream.finalMessage();
+      }
 
       // Persist the AI response after streaming completes
       await this.chatService.saveAssistantMessage(id, fullContent, sources);

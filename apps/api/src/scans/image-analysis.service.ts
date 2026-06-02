@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from '../chat/rag/rag.service';
@@ -74,7 +73,7 @@ export interface ImageAnalysisResult {
     compatibility: number;
     reason: string;
   }>;
-  /** Full analysis text from Claude */
+  /** Full analysis text from the LLM */
   analysis: string;
   /** Source product names from RAG */
   sources: string[];
@@ -83,7 +82,6 @@ export interface ImageAnalysisResult {
 @Injectable()
 export class ImageAnalysisService {
   private readonly logger = new Logger(ImageAnalysisService.name);
-  private readonly anthropic: Anthropic;
   private readonly gemini: GoogleGenerativeAI;
 
   constructor(
@@ -93,9 +91,6 @@ export class ImageAnalysisService {
     private vectorStore: VectorStoreService,
     private storage: StorageService,
   ) {
-    this.anthropic = new Anthropic({
-      apiKey: this.configService.getOrThrow<string>('ANTHROPIC_API_KEY'),
-    });
     this.gemini = new GoogleGenerativeAI(
       this.configService.getOrThrow<string>('GEMINI_API_KEY'),
     );
@@ -112,7 +107,7 @@ export class ImageAnalysisService {
     const t0 = Date.now();
 
     // Idempotency: a replayed offline sync returns the existing scan instead of
-    // re-running the (costly) Gemini + RAG + Claude pipeline.
+    // re-running the (costly) Gemini + RAG + selection pipeline.
     if (clientRequestId) {
       const existing = await this.prisma.scan.findUnique({ where: { clientRequestId } });
       if (existing) {
@@ -305,7 +300,7 @@ export class ImageAnalysisService {
     );
     // Keep the top 15 chunks: enough to surface the right spec-specific product
     // (e.g. a calcium-sulfonate grease that ranks ~13th behind generic calcium
-    // greases) without flooding Claude's context. Was 8 — raised after prod
+    // greases) without flooding the model's context. Was 8 — raised after prod
     // feedback showed correct equivalents getting cut just below the threshold.
     const chunks = allChunks.slice(0, 15);
     this.logger.log(`✅ Step 2b — RAG search (Supabase): ${Date.now() - t2b}ms → ${allChunks.length} chunks, kept ${chunks.length}`);
@@ -319,7 +314,7 @@ export class ImageAnalysisService {
     const sources = [...new Set(chunks.map((c) => c.product_name))];
     this.logger.log(`   Sources: ${sources.join(', ')}`);
 
-    // Step 3: Claude — generate equivalence analysis with compatibility scores
+    // Step 3: Gemini — generate equivalence analysis with compatibility scores
     const t3 = Date.now();
     const analysis = await this.generateEquivalenceAnalysis(
       identification,
@@ -327,7 +322,7 @@ export class ImageAnalysisService {
       sources,
       userMessage,
     );
-    this.logger.log(`✅ Step 3 — Analyse équivalence (Sonnet): ${Date.now() - t3}ms → ${analysis.equivalents.length} équivalent(s)`);
+    this.logger.log(`✅ Step 3 — Analyse équivalence (Gemini): ${Date.now() - t3}ms → ${analysis.equivalents.length} équivalent(s)`);
 
     // Step 4: Persist scan to database
     const bestEquiv = analysis.equivalents[0];
@@ -606,7 +601,7 @@ Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser c
       : '(no product found)';
 
     // Build hard constraints from the structured identification. These are
-    // emphasized in the system prompt so Claude does not propose a product
+    // emphasized in the system prompt so the model does not propose a product
     // from the wrong format/application/certification family.
     const constraints: string[] = [];
     if (identified.category) constraints.push(`category=${identified.category}`);
@@ -621,14 +616,7 @@ Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser c
       ? `\nHARD CONSTRAINTS (the equivalent MUST match these): ${constraints.join(' | ')}\n`
       : '';
 
-    const response = await this.anthropic.messages.create({
-      // Haiku 4.5: measured equal-or-better than Sonnet on this structured
-      // selection task (pick from a constrained list) at ~3x lower cost.
-      // Override via SCAN_CLAUDE_MODEL.
-      model: process.env.SCAN_CLAUDE_MODEL ?? 'claude-haiku-4-5',
-      max_tokens: 600,
-      temperature: 0,
-      system: `Molydal expert. Find the equivalent of ${identified.name} (${identified.brand}, ${identified.type}, ${identified.specs}).${constraintsBlock}
+    const systemPrompt = `Molydal expert. Find the equivalent of ${identified.name} (${identified.brand}, ${identified.type}, ${identified.specs}).${constraintsBlock}
 Available products: ${productList}
 Technical datasheets:
 ${ragContext}
@@ -643,11 +631,30 @@ Selection rules:
 
 Return ONLY a JSON without markdown:
 {"equivalents":[{"name":"...","family":"...","compatibility":0-100,"reason":"1 sentence"}],"analysis":"1 comparative paragraph"}
-Max 3 equivalents sorted by compatibility. Do not invent any product. Respond in English.`,
-      messages: [{ role: 'user', content: userMessage || 'Molydal equivalent?' }],
-    });
+Max 3 equivalents sorted by compatibility. Do not invent any product. Respond in English.`;
 
-    const text = response.content[0].type === 'text' ? response.content[0].text : '{}';
+    const userMsg = userMessage || 'Molydal equivalent?';
+
+    // gemini-3-flash-preview has thinking ON by default and thinking tokens
+    // consume maxOutputTokens. For this large-prompt / small-output selection
+    // call that starves the response, so we disable thinking explicitly.
+    const model = this.gemini.getGenerativeModel({
+      model: process.env.SCAN_SELECT_MODEL ?? 'gemini-3-flash-preview',
+      systemInstruction: systemPrompt,
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: 1500,
+        responseMimeType: 'application/json',
+        thinkingConfig: { thinkingBudget: 0 },
+      } as any,
+    });
+    const r = await model.generateContent(userMsg);
+    let text = '';
+    try {
+      text = r.response.text() ?? '{}';
+    } catch {
+      text = '{}';
+    }
     try {
       let jsonStr = text.trim();
       if (jsonStr.startsWith('```')) {

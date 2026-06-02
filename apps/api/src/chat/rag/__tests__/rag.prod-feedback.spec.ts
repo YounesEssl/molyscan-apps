@@ -2,12 +2,12 @@
  * Prod feedback eval — replays the 19 conversation_submissions extracted from
  * production (minus 3 out-of-scope cases) against the real stack.
  *
- * No mocks: Gemini reformulation → Supabase vectors → Anthropic generation.
+ * No mocks: Gemini reformulation → Supabase vectors → Gemini generation.
  * Each case reports whether retrieval recalled the expected product and whether
- * Claude selected it as the recommendation.
+ * the model selected it as the recommendation.
  *
  * Run: npm run test:prod-feedback
- * Requires: ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY
+ * Requires: GEMINI_API_KEY, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY
  */
 
 import * as dotenv from 'dotenv';
@@ -70,7 +70,7 @@ afterAll(() => {
   console.log(`  PROD FEEDBACK EVAL — ${passed}/${total} passed`);
   console.log('━'.repeat(78));
   console.log(`  Retrieval misses (produit attendu absent de Supabase) : ${retrievalMisses}`);
-  console.log(`  Selection misses (produit récupéré mais ignoré par Claude) : ${selectionMisses}`);
+  console.log(`  Selection misses (produit récupéré mais ignoré par le LLM) : ${selectionMisses}`);
   console.log('━'.repeat(78));
 
   for (const r of results) {
@@ -89,7 +89,7 @@ afterAll(() => {
         console.log(`   ❌ RETRIEVAL : aucun produit attendu n'a été récupéré par Supabase`);
         console.log(`      → CSV / réindexation à vérifier`);
       } else if (r.diagnosis === 'selection') {
-        console.log(`   ❌ SELECTION : Claude n'a pas sélectionné le bon produit malgré récupération OK`);
+        console.log(`   ❌ SELECTION : le LLM n'a pas sélectionné le bon produit malgré récupération OK`);
         console.log(`      → System prompt / règles de priorité à ajuster`);
       }
       console.log(`   Réponse  : ${r.responseHead}`);
@@ -106,7 +106,6 @@ describe('RAG Prod Feedback Eval — 19 retours conversations remontés (16 test
   let vectorStore: VectorStoreService;
 
   const requiredEnvVars = [
-    'ANTHROPIC_API_KEY',
     'GEMINI_API_KEY',
     'OPENAI_API_KEY',
     'SUPABASE_URL',
@@ -145,7 +144,7 @@ describe('RAG Prod Feedback Eval — 19 retours conversations remontés (16 test
           [],
         );
         // Build the SAME filters the streaming call will use, so the diagnostic
-        // `retrievedSources` reflects what Claude actually sees.
+        // `retrievedSources` reflects what the model actually sees.
         const filtersForDisplay = testCase.simulatedScan
           ? {
               ...(testCase.simulatedScan.format
@@ -169,7 +168,7 @@ describe('RAG Prod Feedback Eval — 19 retours conversations remontés (16 test
         const retrievedSources = [...new Set(chunks.map((c) => c.product_name))];
 
         // Use streaming endpoint to mirror the actual prod code path. We consume
-        // the stream synchronously via finalMessage() to assemble the text.
+        // the async iterable of text deltas to assemble the full response.
         const { stream, sources } = await ragService.generateStreamingResponse(
           testCase.query,
           [],
@@ -186,11 +185,8 @@ describe('RAG Prod Feedback Eval — 19 retours conversations remontés (16 test
             ? filtersForDisplay
             : undefined,
         );
-        const finalMessage = await stream.finalMessage();
-        const resultText = finalMessage.content
-          .filter((b: any) => b.type === 'text')
-          .map((b: any) => b.text as string)
-          .join('\n');
+        let resultText = '';
+        for await (const delta of stream) resultText += delta;
         void sources;
 
         const found = matchAny(resultText, testCase.expectedProducts);
