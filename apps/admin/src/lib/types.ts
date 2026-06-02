@@ -70,3 +70,29 @@ export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
 }
+
+export type EquivalenceSource = 'expert' | 'feedback';
+
+export interface ExpertEquivalence {
+  id: string;
+  competitorBrand: string;
+  competitorName: string;
+  competitorKey: string;
+  molydalEquivalent: string;
+  molydalFamily: string | null;
+  confidence: number;
+  note: string | null;
+  validatedBy: string | null;
+  source: EquivalenceSource;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PendingEquivalence {
+  competitorBrand: string;
+  competitorName: string;
+  currentGuess: string | null;
+  compatibility: number | null;
+  scanCount: number;
+  lastScanAt: string;
+}

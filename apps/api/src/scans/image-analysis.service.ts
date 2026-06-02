@@ -6,23 +6,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from '../chat/rag/rag.service';
 import { VectorStoreService, RetrievalFilters } from '../chat/rag/vector-store.service';
 import { StorageService } from '../storage/storage.service';
-
-/**
- * Canonical form of a product name/brand for cache lookups.
- * Prevents "MOLYKOTE BR-2" / "Molykote BR 2" / "molykote br2" from
- * being treated as different products.
- */
-function normalize(s: string | null | undefined): string {
-  if (!s) return '';
-  return s
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // strip accents
-    .replace(/[-_\s]+/g, ' ')         // collapse separators
-    .replace(/\s+/g, ' ')             // collapse whitespace
-    .trim();
-}
+import {
+  normalizeProductText as normalize,
+  equivalenceKey,
+} from '../common/utils/normalize';
 
 // Structured taxonomy aligned with Molydal catalog families. Used to build a
 // targeted RAG search query and (later) to drive metadata filters.
@@ -225,6 +212,62 @@ export class ImageAnalysisService {
         identified: identification,
         equivalents: cached,
         analysis: cachedScan.analysisText || '',
+        sources: [],
+      };
+    }
+
+    // EXPERT EQUIVALENCE — authoritative mapping curated by Molydal experts in
+    // the admin platform. Keyed on the normalized brand+name (Vision reliably
+    // reads those). When present it short-circuits the RAG guess with the
+    // expert's confirmed answer — deterministic, no LLM, no retrieval drift.
+    const expertEquiv = await this.prisma.expertEquivalence.findUnique({
+      where: { competitorKey: equivalenceKey(identification.brand, identification.name) },
+    });
+    if (expertEquiv) {
+      this.logger.log(
+        `🎯 Équivalence experte: "${identification.name}" → ${expertEquiv.molydalEquivalent} (confiance ${expertEquiv.confidence}%)`,
+      );
+      const equivalents = [
+        {
+          name: expertEquiv.molydalEquivalent,
+          family: expertEquiv.molydalFamily || '',
+          compatibility: expertEquiv.confidence,
+          reason:
+            expertEquiv.note ||
+            'Équivalence validée par un expert Molydal.',
+        },
+      ];
+      const analysis = `Équivalent validé par un expert Molydal${
+        expertEquiv.note ? ` : ${expertEquiv.note}` : '.'
+      }`;
+      const photoKey = await photoUploadPromise;
+      const scan = await this.prisma.scan.create({
+        data: {
+          clientRequestId,
+          status: (expertEquiv.confidence >= 70 ? 'matched' : 'partial') as any,
+          scanMethod: 'image' as any,
+          userId,
+          locationLat: location?.lat,
+          locationLng: location?.lng,
+          locationLabel: location?.label,
+          identifiedName: identification.name,
+          identifiedBrand: identification.brand,
+          identifiedType: identification.type,
+          identifiedSpecs: identification.specs,
+          molydalEquivalent: expertEquiv.molydalEquivalent,
+          equivalentFamily: expertEquiv.molydalFamily,
+          compatibility: expertEquiv.confidence,
+          analysisText: analysis,
+          equivalentsJson: equivalents as any,
+          photoKey,
+        },
+      });
+      this.logger.log(`🏁 Analyse (équivalence experte) terminée en ${Date.now() - t0}ms`);
+      return {
+        id: scan.id,
+        identified: identification,
+        equivalents,
+        analysis,
         sources: [],
       };
     }

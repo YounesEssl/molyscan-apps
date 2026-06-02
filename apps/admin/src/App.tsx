@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { AccessRequestsPage } from './pages/AccessRequestsPage';
 import { UsersPage } from './pages/UsersPage';
 import { PriceRequestsPage } from './pages/PriceRequestsPage';
+import { EquivalencesPage } from './pages/EquivalencesPage';
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
           <Route path="/access-requests" element={<AccessRequestsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/price-requests" element={<PriceRequestsPage />} />
+          <Route path="/equivalences" element={<EquivalencesPage />} />
           <Route path="/" element={<Navigate to="/access-requests" replace />} />
         </Route>
       </Route>

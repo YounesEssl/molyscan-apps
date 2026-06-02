@@ -196,6 +196,38 @@ model ProductEquivalence {
   @@map("product_equivalences")
 }
 
+enum EquivalenceSource {
+  expert
+  feedback
+}
+
+/// Expert-validated mapping from a scanned competitor product to its Molydal
+/// equivalent. Keyed on the NORMALIZED "brand|name" so a scan can look it up
+/// deterministically (Vision reliably reads brand+name). When present it
+/// short-circuits the RAG pipeline with the expert's authoritative answer.
+/// Curated in the admin platform; seeded/grown from scan feedback.
+model ExpertEquivalence {
+  id                String            @id @default(uuid())
+  competitorBrand   String
+  competitorName    String
+  /// normalize(brand) + '|' + normalize(name) — unique lookup key
+  competitorKey     String            @unique
+  /// Molydal product name (free text, as it appears in the catalog / scan result)
+  molydalEquivalent String
+  molydalFamily     String?
+  confidence        Int               @default(100)
+  note              String?
+  /// Admin who validated this entry (email), for traceability
+  validatedBy       String?
+  source            EquivalenceSource @default(expert)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([competitorBrand])
+  @@map("expert_equivalences")
+}
+
 model Scan {
   id                  String     @id @default(uuid())
   barcode             String?
