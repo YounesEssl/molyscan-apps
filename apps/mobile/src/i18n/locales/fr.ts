@@ -135,13 +135,13 @@ const fr = {
     a11yOpenWorkflow: 'Ouvrir la demande {{product}} pour {{client}}',
     heroPill: 'Action principale',
     heroTitleLine1: 'Scanner un\nproduit',
-    heroTitleItalic: 'concurrent',
+    heroTitleItalic: ' concurrent',
     heroSubtitle: 'Photo · Vocal',
   },
   scanner: {
     cameraRequired: 'Accès caméra requis',
     cameraDescription:
-      "MolyScan utilise votre caméra pour scanner les codes-barres des produits concurrents et identifier l'équivalent Molydal.",
+      "Molyscan utilise votre caméra pour scanner les codes-barres des produits concurrents et identifier l'équivalent Molydal.",
     authorizeCamera: 'Autoriser la caméra',
     barcodeInstruction: 'Placez le code-barres dans le cadre',
     modeBarcode: 'Code',
@@ -241,7 +241,7 @@ const fr = {
     pillScanCount_one: '{{count}} scan',
     pillScanCount_other: '{{count}} scans',
     pillMatchRate: '{{percent}}% match',
-    appVersion: 'MolyScan v{{version}}',
+    appVersion: 'Molyscan v{{version}}',
   },
   product: {
     detail: 'Détail',

@@ -143,7 +143,7 @@ const en: TranslationKeys = {
   scanner: {
     cameraRequired: 'Camera access required',
     cameraDescription:
-      'MolyScan uses your camera to scan competitor product barcodes and identify the Molydal equivalent.',
+      'Molyscan uses your camera to scan competitor product barcodes and identify the Molydal equivalent.',
     authorizeCamera: 'Authorize camera',
     barcodeInstruction: 'Place the barcode in the frame',
     modeBarcode: 'Barcode',
@@ -242,7 +242,7 @@ const en: TranslationKeys = {
     pillScanCount_one: '{{count}} scan',
     pillScanCount_other: '{{count}} scans',
     pillMatchRate: '{{percent}}% match',
-    appVersion: 'MolyScan v{{version}}',
+    appVersion: 'Molyscan v{{version}}',
   },
   product: {
     detail: 'Detail',

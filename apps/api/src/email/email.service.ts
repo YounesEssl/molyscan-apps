@@ -89,7 +89,7 @@ export class EmailService {
 
     const fullName =
       `${payload.applicant.firstName} ${payload.applicant.lastName}`.trim();
-    const subject = `Nouvelle demande d'accès MolyScan — ${fullName}`;
+    const subject = `Nouvelle demande d'accès Molyscan — ${fullName}`;
     const html = this.renderAccessRequestEmail(payload, fullName);
 
     await this.send({
@@ -104,7 +104,7 @@ export class EmailService {
   async sendAccountApproved(payload: AccountDecisionPayload): Promise<void> {
     await this.send({
       to: [payload.email],
-      subject: 'Votre compte MolyScan a été approuvé',
+      subject: 'Votre compte Molyscan a été approuvé',
       html: this.renderDecisionEmail({
         firstName: payload.firstName,
         approved: true,
@@ -117,7 +117,7 @@ export class EmailService {
   async sendAccountRejected(payload: AccountDecisionPayload): Promise<void> {
     await this.send({
       to: [payload.email],
-      subject: 'Votre demande de compte MolyScan',
+      subject: 'Votre demande de compte Molyscan',
       html: this.renderDecisionEmail({
         firstName: payload.firstName,
         approved: false,
@@ -130,7 +130,7 @@ export class EmailService {
   async sendPasswordResetCode(payload: PasswordResetPayload): Promise<void> {
     await this.send({
       to: [payload.email],
-      subject: `Votre code de réinitialisation MolyScan — ${payload.code}`,
+      subject: `Votre code de réinitialisation Molyscan — ${payload.code}`,
       html: this.renderPasswordResetEmail(payload),
       context: `password-reset:${payload.email}`,
     });
@@ -207,7 +207,7 @@ export class EmailService {
     return wrapLayout(`
       <h1 style="${H1}">Nouvelle demande d'${accent('accès')}</h1>
       <p style="${P}">
-        Un utilisateur souhaite créer un compte sur <strong>MolyScan</strong>.
+        Un utilisateur souhaite créer un compte sur <strong>Molyscan</strong>.
         Ouvrez la console d'administration pour vérifier la demande, lui
         attribuer un ou plusieurs départements, puis l'approuver ou la refuser.
       </p>
@@ -267,7 +267,7 @@ export class EmailService {
       <p style="${P}">${greeting}</p>
       <p style="${P}">
         Voici votre code de réinitialisation. Saisissez-le dans l'application
-        MolyScan pour choisir un nouveau mot de passe.
+        Molyscan pour choisir un nouveau mot de passe.
       </p>
       <div style="margin:24px 0;padding:22px;background:${RED_SOFT};border-radius:16px;text-align:center;">
         <span style="font-family:${SERIF};font-size:38px;font-weight:bold;letter-spacing:10px;color:${RED};">${escapeHtml(payload.code)}</span>
@@ -293,7 +293,7 @@ export class EmailService {
         <h1 style="${H1}">Compte ${accent('approuvé')}</h1>
         <p style="${P}">${greeting}</p>
         <p style="${P}">
-          Votre demande d'accès à <strong>MolyScan</strong> a été approuvée.
+          Votre demande d'accès à <strong>Molyscan</strong> a été approuvée.
           Vous pouvez désormais vous connecter à l'application avec votre email
           et le mot de passe choisis lors de l'inscription.
         </p>
@@ -304,7 +304,7 @@ export class EmailService {
       <h1 style="${H1}">Demande ${accent('non retenue')}</h1>
       <p style="${P}">${greeting}</p>
       <p style="${P}">
-        Votre demande d'accès à <strong>MolyScan</strong> n'a pas été retenue.
+        Votre demande d'accès à <strong>Molyscan</strong> n'a pas été retenue.
         Pour toute question, rapprochez-vous de votre administrateur Molydal.
       </p>
     `);
@@ -369,7 +369,7 @@ function wrapLayout(content: string): string {
               </td>
             </tr>
           </table>
-          <p style="margin:20px 0 0;font-size:11px;color:${INK_3};font-family:${SANS};letter-spacing:0.4px;">Molydal · MolyScan</p>
+          <p style="margin:20px 0 0;font-size:11px;color:${INK_3};font-family:${SANS};letter-spacing:0.4px;">Molydal · Molyscan</p>
         </td>
       </tr>
     </table>

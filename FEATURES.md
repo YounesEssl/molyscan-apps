@@ -1,4 +1,4 @@
-# MolyScan — Synthese fonctionnelle
+# Molyscan — Synthese fonctionnelle
 
 > Application mobile B2B pour **Molydal** (lubrifiants industriels).
 > Permet aux commerciaux et distributeurs de scanner des produits concurrents, trouver l'equivalent Molydal, demander des prix et gerer leur activite terrain — meme hors ligne.

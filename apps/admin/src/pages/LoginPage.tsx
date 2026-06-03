@@ -39,7 +39,7 @@ export function LoginPage() {
       <div className="relative w-full max-w-sm">
         <div className="mb-10">
           <span className="font-display text-2xl font-semibold tracking-tight text-ink">
-            MolyScan
+            Molyscan
           </span>
           <span className="ml-2 align-middle text-[11px] font-medium uppercase tracking-[0.2em] text-ink-3">
             Admin

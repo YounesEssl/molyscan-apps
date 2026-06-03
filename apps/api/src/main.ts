@@ -33,8 +33,8 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('MolyScan API')
-    .setDescription('API Backend pour MolyScan - Molydal')
+    .setTitle('Molyscan API')
+    .setDescription('API Backend pour Molyscan - Molydal')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

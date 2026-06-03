@@ -33,7 +33,7 @@ export function Layout() {
         <div className="px-7 pb-10 pt-8">
           <div className="flex items-baseline gap-2">
             <span className="font-display text-xl font-semibold tracking-tight text-ink">
-              MolyScan
+              Molyscan
             </span>
             <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-red">
               Admin

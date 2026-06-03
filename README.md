@@ -1,4 +1,4 @@
-# MolyScan
+# Molyscan
 
 Application mobile B2B pour **Molydal** (lubrifiants industriels). Permet aux commerciaux et distributeurs de photographier un produit concurrent, trouver l'équivalent Molydal via IA, et gérer leur activité terrain — y compris hors ligne.
 

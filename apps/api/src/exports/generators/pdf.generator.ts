@@ -13,7 +13,7 @@ export class PdfGenerator {
       doc.on('error', reject);
 
       // Header
-      doc.fontSize(20).fillColor('#1B3A5C').text('MolyScan — Rapport de Scans', { align: 'center' });
+      doc.fontSize(20).fillColor('#1B3A5C').text('Molyscan — Rapport de Scans', { align: 'center' });
       doc.moveDown();
       doc.fontSize(10).fillColor('#64748B').text(`Généré le ${new Date().toLocaleDateString('fr-FR')}`, { align: 'center' });
       doc.moveDown(2);

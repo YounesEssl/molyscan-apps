@@ -188,7 +188,7 @@ EXPO_PUSH_ACCESS_TOKEN=<token>
 
 # Emails transactionnels (Resend) + plateforme d'administration
 RESEND_API_KEY=re_...
-RESEND_FROM_EMAIL="MolyScan <noreply@molyscan.fr>"
+RESEND_FROM_EMAIL="Molyscan <noreply@molyscan.fr>"
 ADMIN_WEB_URL="https://admin.molyscan.fr"
 ```
 

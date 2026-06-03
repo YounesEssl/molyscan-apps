@@ -64,7 +64,7 @@ Voir [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) pour le guide complet.
 
 ## Architecture
 
-**MolyScan** — Application mobile B2B pour Molydal (lubrifiants industriels). Les commerciaux photographient un produit concurrent et l'IA identifie l'équivalent Molydal.
+**Molyscan** — Application mobile B2B pour Molydal (lubrifiants industriels). Les commerciaux photographient un produit concurrent et l'IA identifie l'équivalent Molydal.
 
 ### Monorepo
 

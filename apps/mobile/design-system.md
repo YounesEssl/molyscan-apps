@@ -1,4 +1,4 @@
-# MolyScan Design System — Bold & Modern (Gradients)
+# Molyscan Design System — Bold & Modern (Gradients)
 
 ## Tech Stack
 React Native + TypeScript + StyleSheet (Expo SDK 54)
