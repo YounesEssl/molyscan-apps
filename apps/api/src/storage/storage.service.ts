@@ -18,8 +18,14 @@ export class StorageService implements OnModuleInit {
     const accessKey = this.configService.get<string>('MINIO_ACCESS_KEY', 'molyscan');
     const secretKey = this.configService.get<string>('MINIO_SECRET_KEY', 'molyscan_dev');
 
+    // Région forcée : sans elle, le SDK MinIO déclenche un appel réseau
+    // `getBucketRegion` (GET /<bucket>?location=) au moment de signer une URL.
+    // En prod le endpoint public (api.molyscan.fr) route ce chemin vers l'API
+    // Nest et non vers MinIO → S3Error, les photos de scans ne sont plus signables.
+    const region = this.configService.get<string>('MINIO_REGION', 'us-east-1');
+
     // Internal client — for uploads, direct localhost connection
-    this.client = new Minio.Client({ endPoint: endpoint, port, useSSL, accessKey, secretKey });
+    this.client = new Minio.Client({ endPoint: endpoint, port, useSSL, accessKey, secretKey, region });
 
     // Signing client — presigned URLs must be signed with the host/port/SSL
     // that the mobile client will use, otherwise the HMAC-SHA256 won't match.
@@ -35,6 +41,7 @@ export class StorageService implements OnModuleInit {
       useSSL: publicSSL,
       accessKey,
       secretKey,
+      region,
     });
   }
 
