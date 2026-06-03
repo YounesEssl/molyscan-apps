@@ -1,17 +1,19 @@
 export const typography = {
   fonts: {
-    // Display — Fraunces: variable modern serif, readable at all sizes
-    display:       'Fraunces_500Medium',
-    displayItalic: 'Fraunces_500Medium_Italic',
-    displayBold:   'Fraunces_700Bold',
+    // Display — Space Grotesk: grotesque technique, look industriel/pro
+    display:       'SpaceGrotesk_500Medium',
+    // Pas d'italique : l'emphase se fait par le poids + la couleur (plus de cursive).
+    // On garde le nom `displayItalic` pour ne pas casser les usages existants.
+    displayItalic: 'SpaceGrotesk_700Bold',
+    displayBold:   'SpaceGrotesk_700Bold',
 
-    // Sans — Geist
-    sans:          'Geist_400Regular',
-    sansMedium:    'Geist_500Medium',
-    sansSemibold:  'Geist_600SemiBold',
-    sansBold:      'Geist_700Bold',
+    // Sans — Inter
+    sans:          'Inter_400Regular',
+    sansMedium:    'Inter_500Medium',
+    sansSemibold:  'Inter_600SemiBold',
+    sansBold:      'Inter_700Bold',
 
-    // Mono — Geist Mono
+    // Mono — Geist Mono (rôle monospace : stats, valeurs techniques)
     mono:          'GeistMono_400Regular',
     monoMedium:    'GeistMono_500Medium',
     monoSemibold:  'GeistMono_600SemiBold',
