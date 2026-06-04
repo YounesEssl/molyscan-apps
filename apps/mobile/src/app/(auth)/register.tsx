@@ -86,12 +86,17 @@ export default function RegisterScreen(): React.JSX.Element {
   }, []);
 
   // Déclenche le chargement (une seule fois) dès qu'un distributeur est détecté.
+  // ⚠️ Ne PAS mettre `departmentsLoading` dans les dépendances : `loadDepartments`
+  // appelle `setDepartmentsLoading(true)`, ce qui re-render et, si loading était
+  // une dépendance, rejouerait le cleanup → `controller.abort()` annulerait la
+  // requête en vol, créant une boucle de requêtes avortées. `departmentsLoaded`
+  // (positionné une seule fois) suffit à empêcher les doublons.
   useEffect(() => {
-    if (!isDistributor || departmentsLoaded || departmentsLoading) return;
+    if (!isDistributor || departmentsLoaded) return;
     const controller = new AbortController();
     void loadDepartments(controller.signal);
     return () => controller.abort();
-  }, [isDistributor, departmentsLoaded, departmentsLoading, loadDepartments]);
+  }, [isDistributor, departmentsLoaded, loadDepartments]);
 
   const lastNameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
