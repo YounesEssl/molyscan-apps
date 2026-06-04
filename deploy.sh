@@ -56,6 +56,10 @@ step "Generate Prisma Client"
 npx prisma generate
 ok "Client Prisma généré"
 
+step "Seed départements (idempotent)"
+npm run prisma:seed:departments
+ok "Départements seedés"
+
 step "Build NestJS"
 npx nest build
 ok "Build OK"

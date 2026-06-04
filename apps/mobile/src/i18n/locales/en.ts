@@ -72,6 +72,7 @@ const en: TranslationKeys = {
     departmentSearch: 'Search (code or name)…',
     departmentNoResult: 'No department found',
     departmentRequired: 'Select your country and department',
+    departmentsLoadError: 'Could not load the list of departments.',
     confirmPassword: 'Confirm password',
     registerButton: 'Send request',
     registerButtonA11y: 'Send account creation request',

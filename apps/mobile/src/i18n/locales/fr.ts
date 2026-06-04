@@ -70,6 +70,7 @@ const fr = {
     departmentSearch: 'Rechercher (code ou nom)…',
     departmentNoResult: 'Aucun département trouvé',
     departmentRequired: 'Sélectionnez votre pays et votre département',
+    departmentsLoadError: 'Impossible de charger la liste des départements.',
     confirmPassword: 'Confirmer le mot de passe',
     registerButton: 'Envoyer la demande',
     registerButtonA11y: 'Envoyer la demande de création de compte',

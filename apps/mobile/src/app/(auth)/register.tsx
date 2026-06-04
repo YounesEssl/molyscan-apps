@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -55,25 +55,43 @@ export default function RegisterScreen(): React.JSX.Element {
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [departmentsError, setDepartmentsError] = useState(false);
+  const [departmentsLoaded, setDepartmentsLoaded] = useState(false);
   const [geo, setGeo] = useState<CountryDepartmentValue>({
     country: FRANCE,
     departmentId: null,
   });
 
-  // Charge la liste publique des départements dès qu'un distributeur est détecté.
-  useEffect(() => {
-    if (!isDistributor || departments.length > 0 || departmentsLoading) return;
-    const controller = new AbortController();
+  // Charge la liste publique des départements (sélection distributeur).
+  // Une liste vide est traitée comme une erreur récupérable : sans département,
+  // l'inscription distributeur est impossible — on doit donc le signaler et
+  // proposer un nouvel essai plutôt que de figer le formulaire silencieusement.
+  const loadDepartments = useCallback(async (signal?: AbortSignal) => {
     setDepartmentsLoading(true);
-    departmentsService
-      .list({ signal: controller.signal })
-      .then(setDepartments)
-      .catch(() => {
-        /* silencieux : l'utilisateur verra le bloc vide / pourra réessayer */
-      })
-      .finally(() => setDepartmentsLoading(false));
+    setDepartmentsError(false);
+    try {
+      const list = await departmentsService.list(signal ? { signal } : undefined);
+      setDepartments(list);
+      setDepartmentsError(list.length === 0);
+      setDepartmentsLoaded(true);
+    } catch {
+      // Annulation volontaire (l'email n'est plus distributeur) → on réessaiera.
+      if (!signal?.aborted) {
+        setDepartmentsError(true);
+        setDepartmentsLoaded(true);
+      }
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  }, []);
+
+  // Déclenche le chargement (une seule fois) dès qu'un distributeur est détecté.
+  useEffect(() => {
+    if (!isDistributor || departmentsLoaded || departmentsLoading) return;
+    const controller = new AbortController();
+    void loadDepartments(controller.signal);
     return () => controller.abort();
-  }, [isDistributor, departments.length, departmentsLoading]);
+  }, [isDistributor, departmentsLoaded, departmentsLoading, loadDepartments]);
 
   const lastNameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
@@ -268,6 +286,8 @@ export default function RegisterScreen(): React.JSX.Element {
                 <CountryDepartmentSelect
                   departments={departments}
                   loading={departmentsLoading}
+                  error={departmentsError}
+                  onRetry={() => void loadDepartments()}
                   value={geo}
                   onChange={setGeo}
                 />

@@ -27,6 +27,8 @@ export interface CountryDepartmentValue {
 interface Props {
   departments: Department[];
   loading: boolean;
+  error?: boolean;
+  onRetry?: () => void;
   value: CountryDepartmentValue;
   onChange: (next: CountryDepartmentValue) => void;
 }
@@ -36,6 +38,8 @@ interface Props {
 export function CountryDepartmentSelect({
   departments,
   loading,
+  error = false,
+  onRetry,
   value,
   onChange,
 }: Props) {
@@ -89,6 +93,22 @@ export function CountryDepartmentSelect({
           <ActivityIndicator size="small" color={colors.red} />
           <RNText style={styles.loadingText}>{t('common.loading')}</RNText>
         </View>
+      ) : error ? (
+        <View style={styles.errorRow}>
+          <RNText style={styles.errorText}>
+            {t('auth.departmentsLoadError')}
+          </RNText>
+          {onRetry && (
+            <TouchableOpacity
+              onPress={onRetry}
+              activeOpacity={0.85}
+              style={styles.retryBtn}
+              accessibilityRole="button"
+            >
+              <RNText style={styles.retryText}>{t('common.retry')}</RNText>
+            </TouchableOpacity>
+          )}
+        </View>
       ) : (
         <View style={styles.pills}>
           {countries.map((country) => {
@@ -110,7 +130,7 @@ export function CountryDepartmentSelect({
       )}
 
       {/* Département (France uniquement) */}
-      {value.country === FRANCE && !loading && (
+      {value.country === FRANCE && !loading && !error && (
         <View style={styles.deptBlock}>
           <RNText style={styles.label}>{t('auth.department')}</RNText>
           <TouchableOpacity
@@ -217,6 +237,32 @@ const styles = StyleSheet.create({
   },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   loadingText: { fontFamily: typography.fonts.sans, fontSize: 13, color: colors.ink2 },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontFamily: typography.fonts.sans,
+    fontSize: 13,
+    color: colors.red,
+  },
+  retryBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.red,
+    backgroundColor: colors.paper2,
+  },
+  retryText: {
+    fontFamily: typography.fonts.sansSemibold,
+    fontSize: 13,
+    color: colors.red,
+  },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pill: {
     paddingHorizontal: 16,
