@@ -14,7 +14,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "bundleIdentifier": "com.molyscan.app",
+      "bundleIdentifier": "com.molydal.molyscan",
       "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
@@ -25,7 +25,7 @@
       }
     },
     "android": {
-      "package": "com.molyscan.app",
+      "package": "com.molydal.molyscan",
       "versionCode": 21,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
