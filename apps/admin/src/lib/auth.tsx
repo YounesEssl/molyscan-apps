@@ -105,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     });
     tokenStore.set(data.accessToken);
+    if (data.refreshToken) tokenStore.setRefresh(data.refreshToken);
     try {
       const me = await fetchMe();
       if (me.role !== 'admin') {

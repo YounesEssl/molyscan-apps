@@ -4,17 +4,19 @@ import axios, {
 } from 'axios';
 
 const TOKEN_KEY = 'molyscan_admin_token';
+const REFRESH_KEY = 'molyscan_admin_refresh';
 
 export const tokenStore = {
   get: (): string | null => localStorage.getItem(TOKEN_KEY),
   set: (token: string): void => localStorage.setItem(TOKEN_KEY, token),
-  clear: (): void => localStorage.removeItem(TOKEN_KEY),
+  getRefresh: (): string | null => localStorage.getItem(REFRESH_KEY),
+  setRefresh: (token: string): void => localStorage.setItem(REFRESH_KEY, token),
+  clear: (): void => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+  },
 };
 
-// Notifie l'app (AuthProvider) quand l'API renvoie 401 (token expiré/invalide),
-// pour basculer l'état d'auth vers « anonymous » sans attendre un refresh.
-// Registre de callback plutôt qu'un import direct d'auth.tsx, pour éviter un
-// cycle d'imports (auth.tsx dépend de api.ts, pas l'inverse).
 type UnauthorizedHandler = () => void;
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 
@@ -37,8 +39,8 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// L'API NestJS emballe les réponses dans un enveloppe { data: ... }
-// (sauf réponses paginées qui ont aussi { meta }). On déballe pour simplifier.
+// L'API NestJS emballe les réponses dans une enveloppe { data: ... }.
+// On déballe pour simplifier, sauf pour les réponses paginées { data, meta }.
 api.interceptors.response.use(
   (response) => {
     const body = response.data;
@@ -52,16 +54,38 @@ api.interceptors.response.use(
     }
     return response;
   },
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
     if (error.response?.status === 401) {
-      tokenStore.clear();
-      // Un 401 sur /auth/login = mauvais identifiants (géré par le formulaire),
-      // pas une session expirée — on ne déclenche pas la déconnexion globale.
-      const isLogin = error.config?.url?.includes('/auth/login');
-      if (!isLogin) {
+      const isAuthEndpoint = originalRequest?.url?.includes('/auth/');
+
+      // Sur un endpoint d'auth (login, refresh…), on ne tente pas de refresh.
+      if (!isAuthEndpoint && !originalRequest._retry) {
+        const refreshToken = tokenStore.getRefresh();
+
+        if (refreshToken) {
+          originalRequest._retry = true;
+          try {
+            // Appel direct axios (hors intercepteur) pour éviter une boucle infinie.
+            const { data } = await axios.post(
+              `${api.defaults.baseURL}/auth/refresh`,
+              { refreshToken },
+            );
+            const newAccessToken: string = data?.data?.accessToken ?? data?.accessToken;
+            tokenStore.set(newAccessToken);
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            return api(originalRequest);
+          } catch {
+            // Refresh échoué (token révoqué ou expiré) → déconnexion.
+          }
+        }
+
+        tokenStore.clear();
         unauthorizedHandler?.();
       }
     }
+
     return Promise.reject(error);
   },
 );
