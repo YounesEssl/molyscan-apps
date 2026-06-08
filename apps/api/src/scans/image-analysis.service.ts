@@ -631,7 +631,7 @@ Selection rules:
 
 Return ONLY a JSON without markdown:
 {"equivalents":[{"name":"...","family":"...","compatibility":0-100,"reason":"1 sentence"}],"analysis":"1 comparative paragraph"}
-Max 3 equivalents sorted by compatibility. Do not invent any product. Respond in English.`;
+Max 2 equivalents sorted by compatibility. Do not invent any product. Respond in English.`;
 
     const userMsg = userMessage || 'Molydal equivalent?';
 
@@ -661,9 +661,14 @@ Max 3 equivalents sorted by compatibility. Do not invent any product. Respond in
         jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       }
       const parsed = JSON.parse(jsonStr);
+      const rawEquivalents: Array<{ name: string; family: string; compatibility: number; reason: string }> =
+        parsed.equivalents || [];
+      const equivalents = rawEquivalents
+        .slice(0, 2)
+        .filter((eq, i) => i === 0 || eq.compatibility >= 78);
       return {
         identified,
-        equivalents: parsed.equivalents || [],
+        equivalents,
         analysis: parsed.analysis || '',
         sources,
       };
