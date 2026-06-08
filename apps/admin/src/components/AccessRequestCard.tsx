@@ -114,7 +114,7 @@ export function AccessRequestCard({
         </div>
         {isDistributor && (
           <p className="mt-1.5 text-xs text-ink-3">
-            Choisi par le distributeur à l'inscription — modifiable avant
+            Choisi par le distributeur à l'inscription modifiable avant
             approbation.
           </p>
         )}
@@ -139,7 +139,7 @@ export function AccessRequestCard({
               setError(null);
               reject.mutate();
             }}
-            className="inline-flex items-center gap-2 rounded-full border border-ink-4 px-5 py-2.5 text-sm font-semibold text-ink-2 transition-colors hover:border-red-border hover:bg-red-soft hover:text-red disabled:opacity-50"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-ink-4 px-5 py-2.5 text-sm font-semibold text-ink-2 transition-colors hover:border-red-border hover:bg-red-soft hover:text-red disabled:cursor-not-allowed disabled:opacity-50"
           >
             {reject.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -155,7 +155,7 @@ export function AccessRequestCard({
               setError(null);
               approve.mutate();
             }}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-6 py-2.5 text-sm font-semibold text-white shadow-red transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-6 py-2.5 text-sm font-semibold text-white shadow-red transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
           >
             {approve.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

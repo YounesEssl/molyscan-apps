@@ -128,7 +128,7 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
     <div className="fixed inset-0 z-50 flex justify-end">
       <div
         onClick={close}
-        className={`absolute inset-0 bg-ink/30 backdrop-blur-[2px] transition-opacity duration-200 ${
+        className={`absolute inset-0 cursor-pointer bg-ink/30 backdrop-blur-[2px] transition-opacity duration-200 ${
           entered ? 'opacity-100' : 'opacity-0'
         }`}
       />
@@ -153,7 +153,7 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
           <button
             type="button"
             onClick={close}
-            className="shrink-0 rounded-full p-2 text-ink-3 transition-colors hover:bg-black/[0.04] hover:text-ink"
+            className="shrink-0 cursor-pointer rounded-full p-2 text-ink-3 transition-colors hover:bg-black/[0.04] hover:text-ink"
             aria-label="Fermer"
           >
             <X className="h-5 w-5" />
@@ -221,7 +221,7 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
                     disabled={busy}
                     onClick={() => setConfidence(opt.value)}
                     className={[
-                      'flex-1 rounded-full px-2 py-2 text-center text-sm font-medium transition-all',
+                      'flex-1 cursor-pointer rounded-full px-2 py-2 text-center text-sm font-medium transition-all disabled:cursor-not-allowed',
                       active
                         ? 'bg-gradient-to-br from-red-vivid to-red text-white shadow-red'
                         : 'text-ink-2 hover:text-ink',
@@ -260,7 +260,7 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
                 remove.mutate();
               }}
               disabled={busy}
-              className="inline-flex items-center gap-2 rounded-full border border-red-border px-4 py-2.5 text-sm font-semibold text-red transition-colors hover:bg-red-soft disabled:opacity-50"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-red-border px-4 py-2.5 text-sm font-semibold text-red transition-colors hover:bg-red-soft disabled:cursor-not-allowed disabled:opacity-50"
             >
               {remove.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -278,7 +278,7 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
               type="button"
               onClick={close}
               disabled={busy}
-              className="rounded-full border border-ink-4 px-5 py-2.5 text-sm font-semibold text-ink-2 transition-colors hover:bg-black/[0.03] hover:text-ink disabled:opacity-50"
+              className="cursor-pointer rounded-full border border-ink-4 px-5 py-2.5 text-sm font-semibold text-ink-2 transition-colors hover:bg-black/[0.03] hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
             >
               Annuler
             </button>
@@ -289,7 +289,7 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
                 save.mutate();
               }}
               disabled={busy || !canSave}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-6 py-2.5 text-sm font-semibold text-white shadow-red transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-6 py-2.5 text-sm font-semibold text-white shadow-red transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEdit ? 'Enregistrer' : 'Créer'}

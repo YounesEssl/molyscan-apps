@@ -110,13 +110,13 @@ export function EquivalencesPage() {
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
               Le jugement des experts Molydal, encodé. Une équivalence validée ici
-              devient la réponse déterministe d'un scan — sans IA, sans erreur.
+              devient la réponse déterministe d'un scan.
             </p>
           </div>
           <div className="flex items-center gap-2.5">
             <button
               onClick={refetchAll}
-              className="flex items-center gap-2 rounded-full border border-ink-4 bg-paper-2 px-4 py-2.5 text-sm font-medium text-ink-2 transition-colors hover:text-ink"
+              className="flex cursor-pointer items-center gap-2 rounded-full border border-ink-4 bg-paper-2 px-4 py-2.5 text-sm font-medium text-ink-2 transition-colors hover:text-ink"
             >
               <RefreshCw
                 className={`h-4 w-4 ${
@@ -129,7 +129,7 @@ export function EquivalencesPage() {
             </button>
             <button
               onClick={() => openCreate()}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-5 py-2.5 text-sm font-semibold text-white shadow-red transition-all hover:brightness-105"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-5 py-2.5 text-sm font-semibold text-white shadow-red transition-all hover:brightness-105"
             >
               <Plus className="h-4 w-4" />
               Nouvelle équivalence
@@ -199,7 +199,7 @@ function TabButton({
     <button
       onClick={onClick}
       className={[
-        'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all',
+        'flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all',
         active ? 'bg-red-soft text-red' : 'text-ink-2 hover:text-ink',
       ].join(' ')}
     >
@@ -413,7 +413,7 @@ function PendingTab({
 
           <button
             onClick={() => onValidate(p)}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-4 py-2 text-sm font-semibold text-white shadow-red transition-all hover:brightness-105"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-4 py-2 text-sm font-semibold text-white shadow-red transition-all hover:brightness-105"
           >
             <CheckCircle2 className="h-4 w-4" />
             Valider

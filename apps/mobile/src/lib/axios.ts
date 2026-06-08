@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger';
 // One-time startup log so you can confirm which backend the bundle was built
 // against. EXPO_PUBLIC_* vars are baked in at Metro start — reload isn't
 // enough, Metro must be restarted (ideally with --clear).
-const isLocal = API_CONFIG.baseURL.includes('localhost') || /192\.168|10\.|172\./.test(API_CONFIG.baseURL);
+const isLocal = API_CONFIG.baseURL.includes('localhost') || /192\.|10\.|172\./.test(API_CONFIG.baseURL);
 logger.info(
   `API → ${API_CONFIG.baseURL} ${isLocal ? '🟢 LOCAL DEV' : '🔴 PROD'}`,
 );

@@ -52,7 +52,7 @@ function FilterPills<T extends string>({
             type="button"
             onClick={() => onChange(opt.value)}
             className={[
-              'rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
+              'cursor-pointer rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
               active
                 ? 'bg-ink text-paper-2'
                 : 'border border-ink-4 bg-paper-2 text-ink-2 hover:text-ink',
@@ -154,7 +154,7 @@ export function UsersPage() {
           </div>
           <button
             onClick={() => usersQuery.refetch()}
-            className="flex items-center gap-2 rounded-full border border-ink-4 bg-paper-2 px-4 py-2 text-sm font-medium text-ink-2 transition-colors hover:text-ink"
+            className="flex cursor-pointer items-center gap-2 rounded-full border border-ink-4 bg-paper-2 px-4 py-2 text-sm font-medium text-ink-2 transition-colors hover:text-ink"
           >
             <RefreshCw
               className={`h-4 w-4 ${usersQuery.isFetching ? 'animate-spin' : ''}`}

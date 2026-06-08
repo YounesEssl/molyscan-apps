@@ -56,7 +56,7 @@ export function DepartmentMultiSelect({
                 type="button"
                 disabled={disabled}
                 onClick={() => onToggle(dept.id)}
-                className="rounded-full p-0.5 transition-colors hover:bg-white/25"
+                className="cursor-pointer rounded-full p-0.5 transition-colors hover:bg-white/25 disabled:cursor-not-allowed"
                 aria-label={`Retirer ${dept.name}`}
               >
                 <X className="h-3 w-3" />
@@ -101,7 +101,7 @@ export function DepartmentMultiSelect({
                       type="button"
                       disabled={disabled}
                       onClick={() => onToggle(dept.id)}
-                      className="flex w-full items-center gap-3 px-3.5 py-2 text-left text-sm transition-colors hover:bg-red-soft"
+                      className="flex w-full cursor-pointer items-center gap-3 px-3.5 py-2 text-left text-sm transition-colors hover:bg-red-soft disabled:cursor-not-allowed"
                     >
                       <span
                         className={[
