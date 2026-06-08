@@ -14,7 +14,13 @@ GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 step() { echo -e "\n${YELLOW}▶ $1${NC}"; }
 ok()   { echo -e "${GREEN}✓ $1${NC}"; }
 
-cd "$(dirname "$0")/apps/admin"
+cd "$(dirname "$0")"
+
+step "Push vers GitHub"
+git push origin main
+ok "Push OK"
+
+cd apps/admin
 
 step "Build admin (mode production)"
 npm install --silent
