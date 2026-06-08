@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text as RNText } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text as RNText } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -51,6 +51,12 @@ export default function ProfileScreen(): React.JSX.Element {
     router.replace('/(auth)/login');
   };
 
+  const handleSettingsPress = (key: string): void => {
+    if (key === 'privacy') {
+      void Linking.openURL('https://admin.molyscan.fr/privacy');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Aura
@@ -75,7 +81,7 @@ export default function ProfileScreen(): React.JSX.Element {
 
         {scans.length > 0 ? <ProfileStats items={stats} /> : null}
 
-        <ProfileSettings onLogout={handleLogout} />
+        <ProfileSettings onLogout={handleLogout} onItemPress={handleSettingsPress} />
 
         <RNText style={styles.version}>{t('profile.appVersion', { version: '1.0.0' })}</RNText>
       </ScrollView>

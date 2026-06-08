@@ -3,6 +3,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { LoginPage } from './pages/LoginPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { PrivacyPage } from './pages/PrivacyPage';
 import { AccessRequestsPage } from './pages/AccessRequestsPage';
 import { UsersPage } from './pages/UsersPage';
 import { PriceRequestsPage } from './pages/PriceRequestsPage';
@@ -13,6 +14,7 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route path="/access-requests" element={<AccessRequestsPage />} />
