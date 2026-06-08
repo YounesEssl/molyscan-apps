@@ -172,7 +172,9 @@ export class ImageAnalysisService {
 
     if (cachedScan?.equivalentsJson) {
       this.logger.log(`⚡ Cache hit pour "${identification.name}" — réutilisation des résultats`);
-      const cached = cachedScan.equivalentsJson as any[];
+      const cached = (cachedScan.equivalentsJson as any[])
+        .slice(0, 2)
+        .filter((eq: any, i: number) => i === 0 || eq.compatibility >= 78);
       const bestEquiv = cached[0];
       const status = bestEquiv
         ? bestEquiv.compatibility >= 70 ? 'matched' : 'partial'
