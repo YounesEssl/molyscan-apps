@@ -12,7 +12,10 @@ import { cleanupOrphans } from './imageStore';
 const SAFETY_INTERVAL_MS = 30_000;
 
 const isOnlineNow = (state: { isConnected: boolean | null; isInternetReachable: boolean | null }): boolean =>
-  !!state.isConnected && state.isInternetReachable !== false;
+  // isInternetReachable is unreliable on Android emulators (returns false even
+  // when connected). We rely on isConnected only — actual request failures will
+  // trigger the offline fallback naturally.
+  !!state.isConnected;
 
 function emitSyncNotification(count: number): void {
   const store = useNotificationStore.getState();
