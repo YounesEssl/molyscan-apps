@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { getApiErrorMessage } from '@/lib/api';
@@ -94,7 +94,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 flex h-[56px] w-full items-center justify-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red text-[15px] font-semibold text-white shadow-red transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 flex h-[56px] w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red text-[15px] font-semibold text-white shadow-red transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
             style={{ fontFamily: 'Geist, system-ui, sans-serif' }}
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -102,7 +102,16 @@ export function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-8 text-xs text-ink-3">Molydal · Réservé aux administrateurs</p>
+        <div className="mt-5 flex justify-center">
+          <Link
+            to="/forgot-password"
+            className="cursor-pointer text-sm font-medium text-red hover:underline"
+          >
+            Mot de passe oublié ?
+          </Link>
+        </div>
+
+        <p className="mt-6 text-xs text-ink-3">Molydal · Réservé aux administrateurs</p>
       </div>
     </div>
   );
