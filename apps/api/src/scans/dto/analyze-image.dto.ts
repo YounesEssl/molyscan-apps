@@ -35,4 +35,9 @@ export class AnalyzeImageDto {
   @IsString()
   @IsOptional()
   locationLabel?: string;
+
+  @ApiProperty({ required: false, description: 'UI language: "fr" or "en"', default: 'fr' })
+  @IsString()
+  @IsOptional()
+  language?: string;
 }

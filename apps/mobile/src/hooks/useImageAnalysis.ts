@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 import axios from 'axios';
+import i18n from '@/i18n';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '@/lib/axios';
@@ -97,6 +98,7 @@ export function useImageAnalysis(): UseImageAnalysis {
             locationLat: location?.lat,
             locationLng: location?.lng,
             locationLabel: location?.label,
+            language: i18n.language ?? 'fr',
           },
           { timeout: 90000 },
         );

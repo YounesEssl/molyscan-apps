@@ -103,6 +103,7 @@ export class ImageAnalysisService {
     userMessage?: string,
     location?: { lat?: number; lng?: number; label?: string },
     clientRequestId?: string,
+    language = 'fr',
   ): Promise<ImageAnalysisResult> {
     const t0 = Date.now();
 
@@ -323,6 +324,7 @@ export class ImageAnalysisService {
       context,
       sources,
       userMessage,
+      language,
     );
     this.logger.log(`✅ Step 3 — Analyse équivalence (Gemini): ${Date.now() - t3}ms → ${analysis.equivalents.length} équivalent(s)`);
 
@@ -597,6 +599,7 @@ Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser c
     ragContext: string,
     sources: string[],
     userMessage?: string,
+    language = 'fr',
   ): Promise<Omit<ImageAnalysisResult, 'id'>> {
     const productList = sources.length > 0
       ? sources.map((s) => `- ${s}`).join('\n')
@@ -633,7 +636,7 @@ Selection rules:
 
 Return ONLY a JSON without markdown:
 {"equivalents":[{"name":"...","family":"...","compatibility":0-100,"reason":"1 sentence"}],"analysis":"1 comparative paragraph"}
-Max 2 equivalents sorted by compatibility. Do not invent any product. Respond in English.`;
+Max 2 equivalents sorted by compatibility. Do not invent any product. Respond in ${language === 'en' ? 'English' : 'French'}.`;
 
     const userMsg = userMessage || 'Molydal equivalent?';
 

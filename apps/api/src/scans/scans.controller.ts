@@ -36,6 +36,7 @@ export class ScansController {
       dto.message,
       { lat: dto.locationLat, lng: dto.locationLng, label: dto.locationLabel },
       dto.clientRequestId,
+      dto.language ?? 'fr',
     );
   }
 
