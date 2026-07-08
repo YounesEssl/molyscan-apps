@@ -1,5 +1,5 @@
 export const API_CONFIG = {
-  baseURL: process.env.EXPO_PUBLIC_API_URL || 'http://192.0.0.2:3000/api',
+  baseURL: process.env.EXPO_PUBLIC_API_URL || 'http://10.101.16.216:3000/api',
   timeout: 10000,
 };
 
@@ -48,6 +48,13 @@ export const ENDPOINTS = {
     list: '/voice-notes',
     create: '/voice-notes',
     detail: (id: string) => `/voice-notes/${id}`,
+    resync: (id: string) => `/voice-notes/${id}/resync`,
+  },
+  crm: {
+    credentials: '/crm/credentials',
+    credentialsStatus: '/crm/credentials/status',
+    companies: '/crm/companies',
+    contacts: '/crm/contacts',
   },
   notifications: {
     list: '/notifications',

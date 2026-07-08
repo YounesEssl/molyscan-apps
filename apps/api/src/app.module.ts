@@ -15,6 +15,7 @@ import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ExportsModule } from './exports/exports.module';
 import { VoiceNotesModule } from './voice-notes/voice-notes.module';
+import { CrmModule } from './crm/crm.module';
 import { OcrModule } from './ocr/ocr.module';
 import { StorageModule } from './storage/storage.module';
 import { HealthModule } from './health/health.module';
@@ -37,6 +38,7 @@ import { HealthModule } from './health/health.module';
     NotificationsModule,
     ExportsModule,
     VoiceNotesModule,
+    CrmModule,
     OcrModule,
     StorageModule,
     HealthModule,

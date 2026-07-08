@@ -27,13 +27,6 @@ services:
     volumes:
       - minio_data:/data
 
-  ollama:
-    image: ollama/ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-
 volumes:
   postgres_data:
   minio_data:

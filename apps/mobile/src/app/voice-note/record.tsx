@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,44 +9,58 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
+import { useAudioRecorder, RecordingPresets, AudioModule, setAudioModeAsync } from 'expo-audio';
 import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
 import { StopCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { Document } from 'react-native-solar-icons/icons/bold-duotone';
+import { Shop2 } from 'react-native-solar-icons/icons/bold-duotone';
+import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
-import { Text, Button, Card } from '@/components/ui';
+import { Text, Button, Card, BottomSheet, SearchBar } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { voiceNoteService } from '@/services/voice-note.service';
+import { crmService, type CrmCompany, type CrmContact } from '@/services/crm.service';
+import { API_CONFIG } from '@/constants/api';
+import { storage } from '@/lib/storage';
 import { haptic } from '@/lib/haptics';
 import { logger } from '@/lib/logger';
 
-// Mock CRM extraction from transcription
-function extractCrmFields(transcription: string): CrmFields {
-  const clientMatch = transcription.match(/(?:chez|avec|de)\s+([A-ZÀ-Ü][a-zà-ü]+(?:\s+[A-ZÀ-Ü][a-zà-ü]+)*)/);
-  const productMatch = transcription.match(/(?:utilise|huile|graisse|produit)\s+(?:du\s+|de la\s+)?([A-Za-zÀ-ü0-9\s]+?)(?:\.|,|$)/);
-  const actionMatch = transcription.match(/(?:rappeler|confirmer|envoyer|recontacter|planifier)[^.]*\./i);
-
-  const tags: string[] = [];
-  if (/prospect|intéressé|potentiel/i.test(transcription)) tags.push('prospect-chaud');
-  if (/devis|prix|tarif/i.test(transcription)) tags.push('devis');
-  if (/hydraulique/i.test(transcription)) tags.push('hydraulique');
-  if (/graisse/i.test(transcription)) tags.push('graisses');
-  if (/contrat|renouvellement/i.test(transcription)) tags.push('contrat');
-  if (/urgence|urgent/i.test(transcription)) tags.push('urgent');
-  if (/salon|événement/i.test(transcription)) tags.push('salon');
-  if (/livraison|logistique/i.test(transcription)) tags.push('logistique');
-
-  return {
-    clientName: clientMatch?.[1]?.trim() ?? '',
-    contactName: '',
-    product: productMatch?.[1]?.trim() ?? '',
-    nextAction: actionMatch?.[0]?.trim() ?? '',
-    tags,
-  };
+/**
+ * Transcrit un enregistrement via POST /chat/transcribe (Whisper).
+ * XHR direct : en React Native, axios/fetch échouent sur l'upload de fichier
+ * par URI (voir useVoiceInput). Renvoie le texte transcrit (vide si échec).
+ */
+async function transcribeAudio(uri: string): Promise<string> {
+  const formData = new FormData();
+  formData.append('audio', { uri, type: 'audio/m4a', name: 'note.m4a' } as unknown as Blob);
+  const token = await storage.getToken();
+  return new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_CONFIG.baseURL}/chat/transcribe`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.timeout = 30000;
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const envelope = JSON.parse(xhr.responseText) as { data: { transcription: string } };
+          resolve((envelope.data?.transcription ?? '').trim());
+        } catch {
+          reject(new Error('Failed to parse transcription response'));
+        }
+      } else {
+        reject(new Error(`HTTP ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network request failed'));
+    xhr.ontimeout = () => reject(new Error('Transcription timed out'));
+    xhr.send(formData);
+  });
 }
 
 interface CrmFields {
@@ -54,7 +68,7 @@ interface CrmFields {
   contactName: string;
   product: string;
   nextAction: string;
-  tags: string[];
+  notes: string;
 }
 
 export default function VoiceNoteRecordScreen(): React.JSX.Element {
@@ -69,11 +83,109 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
     contactName: '',
     product: '',
     nextAction: '',
-    tags: [],
+    notes: '',
   });
   const [saving, setSaving] = useState(false);
+  // Sélecteur société CRM (alimente comm_companyid côté API).
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState('');
+  const [companies, setCompanies] = useState<CrmCompany[]>([]);
+  const [totalCompanies, setTotalCompanies] = useState(0);
+  const [companiesLoaded, setCompaniesLoaded] = useState(false);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [companySheetVisible, setCompanySheetVisible] = useState(false);
+  const [companyQuery, setCompanyQuery] = useState('');
+  const [contactId, setContactId] = useState<string | null>(null);
+  const [contacts, setContacts] = useState<CrmContact[]>([]);
+  const [totalContacts, setTotalContacts] = useState(0);
+  const [contactsLoaded, setContactsLoaded] = useState(false);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [contactSheetVisible, setContactSheetVisible] = useState(false);
+  const [contactQuery, setContactQuery] = useState('');
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Recherche société côté serveur (≤50 résultats parmi ~17k).
+  const loadCompanies = useCallback(async (q: string) => {
+    setLoadingCompanies(true);
+    try {
+      const res = await crmService.searchCompanies(q);
+      setCompanies(res.items);
+      setTotalCompanies(res.total);
+      setCompaniesLoaded(true);
+    } catch (e) {
+      logger.error('CRM companies load failed', e);
+      setCompanies([]);
+      setTotalCompanies(0);
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }, []);
+
+  const openCompanySheet = () => {
+    haptic.light();
+    setCompanyQuery('');
+    setCompanySheetVisible(true);
+  };
+
+  const loadContacts = useCallback(async (selectedCompanyId: string, q: string) => {
+    setLoadingContacts(true);
+    try {
+      const res = await crmService.searchContacts(selectedCompanyId, q);
+      setContacts(res.items);
+      setTotalContacts(res.total);
+      setContactsLoaded(true);
+    } catch (e) {
+      logger.error('CRM contacts load failed', e);
+      setContacts([]);
+      setTotalContacts(0);
+    } finally {
+      setLoadingContacts(false);
+    }
+  }, []);
+
+  const openContactSheet = () => {
+    if (!companyId) {
+      haptic.warning();
+      return;
+    }
+
+    haptic.light();
+    setContactQuery('');
+    setContactSheetVisible(true);
+  };
+
+  // Debounce : recharge la recherche quand la requête change (sheet ouverte).
+  useEffect(() => {
+    if (!companySheetVisible) return;
+    const id = setTimeout(() => loadCompanies(companyQuery), 300);
+    return () => clearTimeout(id);
+  }, [companyQuery, companySheetVisible, loadCompanies]);
+
+  useEffect(() => {
+    if (!contactSheetVisible || !companyId) return;
+    const id = setTimeout(() => loadContacts(companyId, contactQuery), 300);
+    return () => clearTimeout(id);
+  }, [companyId, contactQuery, contactSheetVisible, loadContacts]);
+
+  const selectCompany = (company: CrmCompany) => {
+    haptic.light();
+    setCompanyId(company.id);
+    setCompanyName(company.name);
+    setContactId(null);
+    setContacts([]);
+    setTotalContacts(0);
+    setContactsLoaded(false);
+    setCrmFields((f) => ({ ...f, clientName: company.name, contactName: '' }));
+    setCompanySheetVisible(false);
+  };
+
+  const selectContact = (contact: CrmContact) => {
+    haptic.light();
+    setContactId(contact.id);
+    setCrmFields((f) => ({ ...f, contactName: contact.name }));
+    setContactSheetVisible(false);
+  };
 
   useEffect(() => {
     return () => {
@@ -94,6 +206,13 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         haptic.warning();
         return;
       }
+
+      // iOS refuse l'enregistrement tant que le mode audio ne l'autorise pas
+      // explicitement (playsInSilentMode requis pour capter en mode silencieux).
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      // Indispensable : initialise le fichier de sortie, sinon recorder.uri
+      // pointe vers un fichier inexistant après stop (erreur "no such file").
+      await recorder.prepareToRecordAsync();
 
       haptic.medium();
       recorder.record();
@@ -119,22 +238,27 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
     setIsRecording(false);
     setPhase('transcribing');
 
+    let uri: string | null = null;
     try {
       await recorder.stop();
-    } catch {
-      // Ignore errors on stop
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: false });
+      uri = recorder.uri ?? null;
+    } catch (error) {
+      logger.error('VoiceNote stop failed', error);
     }
 
-    // Move straight to review with an empty transcription —
-    // the user can type the note manually until real transcription is wired.
-    setTranscription('');
-    setCrmFields({
-      clientName: '',
-      contactName: '',
-      product: '',
-      nextAction: '',
-      tags: [],
-    });
+    // Transcription Whisper via /chat/transcribe avant l'écran de review.
+    // On garde le résultat modifiable ; en cas d'échec, saisie manuelle.
+    let text = '';
+    if (uri && duration >= 1) {
+      try {
+        text = await transcribeAudio(uri);
+      } catch (error) {
+        logger.error('VoiceNote transcription failed', error);
+      }
+    }
+
+    setTranscription(text);
     setPhase('review');
   };
 
@@ -145,7 +269,12 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       formData.append('duration', String(duration));
       formData.append('transcription', transcription);
       formData.append('clientName', crmFields.clientName || t('voiceNote.unknownClient'));
-      crmFields.tags.forEach((tag) => formData.append('tags', tag));
+      formData.append('contactName', crmFields.contactName);
+      if (contactId) formData.append('contactId', contactId);
+      formData.append('productMentioned', crmFields.product);
+      formData.append('nextAction', crmFields.nextAction);
+      formData.append('notes', crmFields.notes);
+      if (companyId) formData.append('companyId', companyId);
       if (recorder.uri) {
         formData.append('audio', {
           uri: recorder.uri,
@@ -155,12 +284,14 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       }
       await voiceNoteService.create(formData);
       haptic.success();
+      router.back();
     } catch (e) {
       haptic.error();
+      Alert.alert(t('voiceNote.saveErrorTitle'), t('voiceNote.saveErrorBody'));
       if (__DEV__) console.error('[VoiceNote] Save failed:', e);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    router.back();
   };
 
   return (
@@ -261,6 +392,35 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
               />
             </Card>
 
+            {/* Company picker (CRM) */}
+            <Card style={styles.reviewCard}>
+              <Text variant="label">{t('voiceNote.company')}</Text>
+              <TouchableOpacity
+                style={styles.companyPicker}
+                onPress={openCompanySheet}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('voiceNote.company')}
+              >
+                <View style={styles.companyPickerLeft}>
+                  <Shop2 size={18} color={companyId ? COLORS.primary : COLORS.textMuted} />
+                  <Text
+                    variant="body"
+                    color={companyId ? COLORS.text : COLORS.textMuted}
+                    numberOfLines={1}
+                  >
+                    {companyName || t('voiceNote.companyPlaceholder')}
+                  </Text>
+                </View>
+                <AltArrowRight size={14} color={COLORS.textMuted} />
+              </TouchableOpacity>
+              {!companyId && (
+                <Text variant="caption" color={COLORS.textMuted}>
+                  {t('voiceNote.companyHint')}
+                </Text>
+              )}
+            </Card>
+
             {/* CRM Fields */}
             <Card style={styles.reviewCard}>
               <Text variant="label">{t('voiceNote.crmFields')}</Text>
@@ -283,18 +443,31 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
               <View style={styles.fieldRow}>
                 <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.contact')}</Text>
-                <TextInput
-                  style={styles.fieldInput}
-                  value={crmFields.contactName}
-                  onChangeText={(v) => setCrmFields((f) => ({ ...f, contactName: v }))}
-                  placeholder={t('voiceNote.contactPlaceholder')}
-                  placeholderTextColor={COLORS.textMuted}
-                  autoCapitalize="words"
-                  autoComplete="name"
-                  textContentType="name"
-                  returnKeyType="next"
+                <TouchableOpacity
+                  style={[styles.companyPicker, !companyId && styles.disabledPicker]}
+                  onPress={openContactSheet}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
                   accessibilityLabel={t('voiceNote.contact')}
-                />
+                  accessibilityState={{ disabled: !companyId }}
+                >
+                  <View style={styles.companyPickerLeft}>
+                    <Shop2 size={18} color={contactId ? COLORS.primary : COLORS.textMuted} />
+                    <Text
+                      variant="body"
+                      color={contactId ? COLORS.text : COLORS.textMuted}
+                      numberOfLines={1}
+                    >
+                      {crmFields.contactName || t('voiceNote.contactPlaceholder')}
+                    </Text>
+                  </View>
+                  <AltArrowRight size={14} color={COLORS.textMuted} />
+                </TouchableOpacity>
+                {!companyId && (
+                  <Text variant="caption" color={COLORS.textMuted}>
+                    {t('voiceNote.contactHint')}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.fieldRow}>
@@ -324,22 +497,20 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                   accessibilityLabel={t('voiceNote.nextAction')}
                 />
               </View>
-            </Card>
 
-            {/* Tags */}
-            <Card style={styles.reviewCard}>
-              <Text variant="label">{t('voiceNote.detectedTags')}</Text>
-              <View style={styles.tagsRow}>
-                {crmFields.tags.map((tag) => (
-                  <View key={tag} style={styles.tag}>
-                    <Text variant="caption" color={COLORS.primary} style={styles.tagText}>
-                      #{tag}
-                    </Text>
-                  </View>
-                ))}
-                {crmFields.tags.length === 0 && (
-                  <Text variant="caption" color={COLORS.textMuted}>{t('voiceNote.noTags')}</Text>
-                )}
+              <View style={styles.fieldRow}>
+                <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.notes')}</Text>
+                <TextInput
+                  style={[styles.fieldInput, styles.notesInput]}
+                  value={crmFields.notes}
+                  onChangeText={(v) => setCrmFields((f) => ({ ...f, notes: v }))}
+                  placeholder={t('voiceNote.notesPlaceholder')}
+                  placeholderTextColor={COLORS.textMuted}
+                  autoCapitalize="sentences"
+                  multiline
+                  textAlignVertical="top"
+                  accessibilityLabel={t('voiceNote.notes')}
+                />
               </View>
             </Card>
 
@@ -361,6 +532,19 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                   setPhase('idle');
                   setDuration(0);
                   setTranscription('');
+                  setCompanyId(null);
+                  setCompanyName('');
+                  setContactId(null);
+                  setContacts([]);
+                  setTotalContacts(0);
+                  setContactsLoaded(false);
+                  setCrmFields({
+                    clientName: '',
+                    contactName: '',
+                    product: '',
+                    nextAction: '',
+                    notes: '',
+                  });
                 }}
                 style={styles.actionButton}
               />
@@ -370,6 +554,98 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       </View>
       </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      <BottomSheet visible={companySheetVisible} onClose={() => setCompanySheetVisible(false)}>
+        <Text variant="label" style={styles.sheetTitle}>{t('voiceNote.selectCompany')}</Text>
+        <SearchBar
+          value={companyQuery}
+          onChangeText={setCompanyQuery}
+          placeholder={t('voiceNote.searchCompany')}
+          style={styles.sheetSearch}
+        />
+        {loadingCompanies ? (
+          <ActivityIndicator color={COLORS.primary} style={styles.sheetLoader} />
+        ) : companies.length === 0 ? (
+          <Text variant="caption" color={COLORS.textMuted} style={styles.sheetEmpty}>
+            {companiesLoaded ? t('voiceNote.noCompany') : t('voiceNote.companyLoadError')}
+          </Text>
+        ) : (
+          <>
+            {companies.map((company) => (
+              <TouchableOpacity
+                key={company.id}
+                style={styles.companyRow}
+                onPress={() => selectCompany(company)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={company.name}
+              >
+                <Shop2
+                  size={18}
+                  color={company.id === companyId ? COLORS.primary : COLORS.textMuted}
+                />
+                <Text variant="body" numberOfLines={1} style={styles.flex}>
+                  {company.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            {totalCompanies > companies.length && (
+              <Text variant="caption" color={COLORS.textMuted} style={styles.sheetEmpty}>
+                {t('voiceNote.companyTruncated', {
+                  shown: companies.length,
+                  total: totalCompanies,
+                })}
+              </Text>
+            )}
+          </>
+        )}
+      </BottomSheet>
+
+      <BottomSheet visible={contactSheetVisible} onClose={() => setContactSheetVisible(false)}>
+        <Text variant="label" style={styles.sheetTitle}>{t('voiceNote.selectContact')}</Text>
+        <SearchBar
+          value={contactQuery}
+          onChangeText={setContactQuery}
+          placeholder={t('voiceNote.searchContact')}
+          style={styles.sheetSearch}
+        />
+        {loadingContacts ? (
+          <ActivityIndicator color={COLORS.primary} style={styles.sheetLoader} />
+        ) : contacts.length === 0 ? (
+          <Text variant="caption" color={COLORS.textMuted} style={styles.sheetEmpty}>
+            {contactsLoaded ? t('voiceNote.noContact') : t('voiceNote.contactLoadError')}
+          </Text>
+        ) : (
+          <>
+            {contacts.map((contact) => (
+              <TouchableOpacity
+                key={contact.id}
+                style={styles.companyRow}
+                onPress={() => selectContact(contact)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={contact.name}
+              >
+                <Shop2
+                  size={18}
+                  color={contact.id === contactId ? COLORS.primary : COLORS.textMuted}
+                />
+                <Text variant="body" numberOfLines={1} style={styles.flex}>
+                  {contact.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            {totalContacts > contacts.length && (
+              <Text variant="caption" color={COLORS.textMuted} style={styles.sheetEmpty}>
+                {t('voiceNote.contactTruncated', {
+                  shown: contacts.length,
+                  total: totalContacts,
+                })}
+              </Text>
+            )}
+          </>
+        )}
+      </BottomSheet>
     </ScreenWrapper>
   );
 }
@@ -457,6 +733,45 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     lineHeight: 20,
   },
+  companyPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+  },
+  disabledPicker: {
+    opacity: 0.55,
+  },
+  companyPickerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  sheetTitle: {
+    marginBottom: SPACING.md,
+  },
+  sheetSearch: {
+    marginBottom: SPACING.md,
+  },
+  sheetLoader: {
+    paddingVertical: SPACING.xl,
+  },
+  sheetEmpty: {
+    textAlign: 'center',
+    paddingVertical: SPACING.xl,
+  },
+  companyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
   fieldRow: {
     gap: SPACING.xs,
   },
@@ -472,20 +787,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.text,
   },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.xs,
-  },
-  tag: {
-    backgroundColor: COLORS.primary + '10',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.full,
-  },
-  tagText: {
-    fontSize: 11,
-    fontWeight: '600',
+  notesInput: {
+    minHeight: 76,
   },
   actions: {
     gap: SPACING.sm,

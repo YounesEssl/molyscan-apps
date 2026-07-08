@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 
 export class UpdateVoiceNoteDto {
   @ApiPropertyOptional()
@@ -20,6 +20,11 @@ export class UpdateVoiceNoteDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  contactId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   productMentioned?: string;
 
   @ApiPropertyOptional()
@@ -31,10 +36,4 @@ export class UpdateVoiceNoteDto {
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
 }

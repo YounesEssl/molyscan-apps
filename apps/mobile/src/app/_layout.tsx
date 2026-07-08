@@ -89,6 +89,7 @@ function RootContent(): React.JSX.Element {
           <Stack.Screen name="workflow" />
           <Stack.Screen name="export" />
           <Stack.Screen name="voice-note" />
+          <Stack.Screen name="crm-credentials" />
           <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
         </Stack>
       </AuthGuard>

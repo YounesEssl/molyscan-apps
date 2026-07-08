@@ -101,6 +101,7 @@ model User {
   conversationSubmissions ConversationSubmission[]
   equivalentFeedbacks     ScanEquivalentFeedback[]
   departments             Department[]             @relation("UserDepartments")
+  crmCredential           CrmCredential?
 
   @@map("users")
 }
@@ -438,12 +439,18 @@ model VoiceNote {
   audioKey         String?
   transcription    String?
   clientName       String?
+  // GUID de la société dans le CRM Innovation (renseigné via le sélecteur société).
+  companyId        String?
+  // GUID de la personne/contact dans le CRM Innovation.
+  contactId        String?
   contactName      String?
   productMentioned String?
   nextAction       String?
   notes            String?
-  tags             String[]
+  // pending | synced | failed — état de la pousse vers le CRM (communication).
   syncStatus       String   @default("pending")
+  // ID de la communication créée côté CRM (comm_communicationid).
+  crmCommunicationId String?
   relatedScanId    String?
   userId           String
 
@@ -453,6 +460,26 @@ model VoiceNote {
   createdAt DateTime @default(now())
 
   @@map("voice_notes")
+}
+
+/// Identifiants Innovation CRM (icyapi) propres à chaque commercial.
+/// Le mot de passe est chiffré au repos (AES-256-GCM, clé CRM_ENCRYPTION_KEY).
+/// idToken/tokenExpiresAt mettent en cache le Bearer renvoyé par /Connection/Login.
+model CrmCredential {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  login          String
+  passwordEnc    String
+  // Id de l'utilisateur côté CRM (renvoyé au login) → propriétaire des communications.
+  crmUserId      String?
+  idToken        String?
+  tokenExpiresAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("crm_credentials")
 }
 
 model DocumentEmbedding {

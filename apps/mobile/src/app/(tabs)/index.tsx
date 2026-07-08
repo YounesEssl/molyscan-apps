@@ -11,6 +11,7 @@ import { StatRow, type StatItem } from '@/components/dashboard/StatRow';
 import { RecentScansSection } from '@/components/dashboard/RecentScansSection';
 import { PendingWorkflowsSection } from '@/components/dashboard/PendingWorkflowsSection';
 import { AIEntryCard } from '@/components/dashboard/AIEntryCard';
+import { VoiceNoteEntryCard } from '@/components/dashboard/VoiceNoteEntryCard';
 import { colors } from '@/design/tokens/colors';
 import { useAuthStore } from '@/stores/auth.store';
 import { useWorkflowStore } from '@/stores/workflow.store';
@@ -18,6 +19,7 @@ import { scanService } from '@/services/scan.service';
 import { workflowService } from '@/services/workflow.service';
 import { useTabBarSpacing } from '@/hooks/useTabBarSpacing';
 import type { ScanRecord } from '@/schemas/scan.schema';
+import { PERMISSIONS } from '@/constants/roles';
 
 export default function DashboardScreen(): React.JSX.Element {
   const router = useRouter();
@@ -50,6 +52,7 @@ export default function DashboardScreen(): React.JSX.Element {
   const pendingWorkflows = workflows.filter(
     (w) => w.status === 'submitted' || w.status === 'under_review',
   );
+  const canUpdateCRM = user ? PERMISSIONS[user.role].canUpdateCRM : false;
 
   const stats: StatItem[] = [
     { label: t('dashboard.scans'), value: String(scans.length) },
@@ -74,11 +77,18 @@ export default function DashboardScreen(): React.JSX.Element {
       />
 
       <SafeAreaView edges={['top']}>
-        <DashboardHeader onBellPress={() => router.push('/notifications')} />
+        <DashboardHeader />
         <DashboardGreeting firstName={user?.firstName} />
       </SafeAreaView>
 
       <HeroScanCard onPress={() => router.push('/(tabs)/scanner')} />
+
+      {canUpdateCRM && (
+        <VoiceNoteEntryCard
+          onPress={() => router.push('/voice-note/record')}
+          onHistoryPress={() => router.push('/voice-note')}
+        />
+      )}
 
       <StatRow items={stats} />
 

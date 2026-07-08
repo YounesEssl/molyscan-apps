@@ -5,8 +5,15 @@ export const VoiceNoteSchema = z.object({
   duration: z.number(),
   transcription: z.string().nullable(),
   clientName: z.string(),
+  contactId: z.string().nullable().optional(),
+  contactName: z.string().optional(),
+  productMentioned: z.string().optional(),
+  nextAction: z.string().optional(),
+  notes: z.string().optional(),
+  companyId: z.string().nullable().optional(),
   relatedScanId: z.string().optional(),
-  tags: z.array(z.string()),
+  syncStatus: z.string().optional(),
+  crmCommunicationId: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
 });
 export type VoiceNote = z.infer<typeof VoiceNoteSchema>;

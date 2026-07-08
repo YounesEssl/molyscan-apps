@@ -1,20 +1,32 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, FlatList, StyleSheet, type ViewStyle } from 'react-native';
+import { Alert, View, FlatList, StyleSheet } from 'react-native';
 import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Card, Badge, Button, EmptyState } from '@/components/ui';
-import { COLORS, SPACING, RADIUS, SHADOW } from '@/constants/theme';
+import { COLORS, SPACING } from '@/constants/theme';
 import { voiceNoteService } from '@/services/voice-note.service';
 import type { VoiceNote } from '@/schemas/voice-note.schema';
 import { formatRelativeDate } from '@/utils/date';
+import { haptic } from '@/lib/haptics';
+import { logger } from '@/lib/logger';
+
+type SyncBadgeVariant = 'success' | 'danger' | 'pending' | 'neutral';
+
+function syncBadgeVariant(status?: string): SyncBadgeVariant {
+  if (status === 'synced') return 'success';
+  if (status === 'failed') return 'danger';
+  if (status === 'pending') return 'pending';
+  return 'neutral';
+}
 
 export default function VoiceNoteScreen(): React.JSX.Element {
   const router = useRouter();
   const { t } = useTranslation();
   const [notes, setNotes] = useState<VoiceNote[]>([]);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   // Reload notes when screen is focused (after recording)
   useFocusEffect(
@@ -27,6 +39,21 @@ export default function VoiceNoteScreen(): React.JSX.Element {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleResync = async (id: string): Promise<void> => {
+    setRetryingId(id);
+    try {
+      const updated = await voiceNoteService.resync(id);
+      setNotes((current) => current.map((note) => (note.id === id ? updated : note)));
+      haptic.success();
+    } catch (error) {
+      haptic.error();
+      logger.error('Voice note resync failed', error);
+      Alert.alert(t('voiceNote.resyncErrorTitle'), t('voiceNote.resyncErrorBody'));
+    } finally {
+      setRetryingId(null);
+    }
   };
 
   return (
@@ -47,33 +74,42 @@ export default function VoiceNoteScreen(): React.JSX.Element {
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
-          <Card style={styles.card}>
-            <View style={styles.topRow}>
-              <View style={styles.clientRow}>
-                <Microphone2 size={18} color={COLORS.accent} />
-                <Text variant="body" style={styles.clientName}>{item.clientName}</Text>
-              </View>
-              <Text variant="caption" color={COLORS.textMuted}>
-                {formatDuration(item.duration)}
-              </Text>
-            </View>
-            {item.transcription && (
-              <Text variant="caption" color={COLORS.textSecondary} numberOfLines={3}>
-                {item.transcription}
-              </Text>
-            )}
-            <View style={styles.tagsRow}>
-              {item.tags.map((tag) => (
-                <View key={tag} style={styles.tag}>
-                  <Text variant="caption" color={COLORS.primary} style={styles.tagText}>
-                    #{tag}
-                  </Text>
+          <Card>
+            <View style={styles.noteContent}>
+              <View style={styles.topRow}>
+                <View style={styles.clientRow}>
+                  <Microphone2 size={18} color={COLORS.accent} />
+                  <Text variant="body" style={styles.clientName}>{item.clientName}</Text>
                 </View>
-              ))}
+                <Text variant="caption" color={COLORS.textMuted}>
+                  {formatDuration(item.duration)}
+                </Text>
+              </View>
+              {item.transcription && (
+                <Text variant="caption" color={COLORS.textSecondary} numberOfLines={3}>
+                  {item.transcription}
+                </Text>
+              )}
+              <Text variant="caption" color={COLORS.textMuted}>
+                {formatRelativeDate(item.createdAt)}
+              </Text>
+              <View style={styles.syncRow}>
+                <Badge
+                  label={t(`voiceNote.syncStatus.${item.syncStatus ?? 'pending'}`)}
+                  variant={syncBadgeVariant(item.syncStatus)}
+                />
+                {item.syncStatus === 'failed' && (
+                  <Button
+                    title={t('voiceNote.resync')}
+                    variant="secondary"
+                    size="sm"
+                    loading={retryingId === item.id}
+                    disabled={retryingId !== null && retryingId !== item.id}
+                    onPress={() => void handleResync(item.id)}
+                  />
+                )}
+              </View>
             </View>
-            <Text variant="caption" color={COLORS.textMuted}>
-              {formatRelativeDate(item.createdAt)}
-            </Text>
           </Card>
         )}
         ListEmptyComponent={
@@ -99,7 +135,7 @@ const styles = StyleSheet.create({
   separator: {
     height: SPACING.sm,
   },
-  card: {
+  noteContent: {
     gap: SPACING.sm,
   },
   topRow: {
@@ -115,19 +151,10 @@ const styles = StyleSheet.create({
   clientName: {
     fontWeight: '700',
   },
-  tagsRow: {
+  syncRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.xs,
-  },
-  tag: {
-    backgroundColor: COLORS.primary + '10',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.full,
-  },
-  tagText: {
-    fontSize: 11,
-    fontWeight: '600',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
   },
 });

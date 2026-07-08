@@ -1,3 +1,11 @@
+import i18n from '@/i18n';
+
+function getDateLocale(): string {
+  return i18n.resolvedLanguage?.startsWith('fr') || i18n.language?.startsWith('fr')
+    ? 'fr-FR'
+    : 'en-US';
+}
+
 export function formatRelativeDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -6,12 +14,12 @@ export function formatRelativeDate(dateString: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return "À l'instant";
-  if (diffMins < 60) return `Il y a ${diffMins} min`;
-  if (diffHours < 24) return `Il y a ${diffHours}h`;
-  if (diffDays < 7) return `Il y a ${diffDays}j`;
+  if (diffMins < 1) return i18n.t('common.justNow');
+  if (diffMins < 60) return i18n.t('common.minutesAgo', { count: diffMins });
+  if (diffHours < 24) return i18n.t('common.hoursAgo', { count: diffHours });
+  if (diffDays < 7) return i18n.t('common.daysAgo', { count: diffDays });
 
-  return date.toLocaleDateString('fr-FR', {
+  return date.toLocaleDateString(getDateLocale(), {
     day: '2-digit',
     month: 'short',
   });
@@ -19,7 +27,7 @@ export function formatRelativeDate(dateString: string): string {
 
 export function formatFullDate(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleDateString('fr-FR', {
+  return date.toLocaleDateString(getDateLocale(), {
     day: '2-digit',
     month: 'long',
     year: 'numeric',

@@ -17,6 +17,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useAuth } from '@/hooks/useAuth';
 import { scanService } from '@/services/scan.service';
 import type { ScanRecord } from '@/schemas/scan.schema';
+import { PERMISSIONS } from '@/constants/roles';
 
 export default function ProfileScreen(): React.JSX.Element {
   const router = useRouter();
@@ -39,6 +40,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const initials =
     `${user?.firstName?.[0] ?? '?'}${user?.lastName?.[0] ?? ''}`.toUpperCase();
   const fullName = user ? `${user.firstName} ${user.lastName}` : '';
+  const canUpdateCRM = user ? PERMISSIONS[user.role].canUpdateCRM : false;
 
   const stats: ProfileStatItem[] = [
     { label: t('profile.scans'), value: String(scans.length) },
@@ -54,6 +56,8 @@ export default function ProfileScreen(): React.JSX.Element {
   const handleSettingsPress = (key: string): void => {
     if (key === 'privacy') {
       void Linking.openURL('https://admin.molyscan.fr/privacy');
+    } else if (key === 'crmCredentials') {
+      router.push('/crm-credentials');
     }
   };
 
@@ -81,7 +85,11 @@ export default function ProfileScreen(): React.JSX.Element {
 
         {scans.length > 0 ? <ProfileStats items={stats} /> : null}
 
-        <ProfileSettings onLogout={handleLogout} onItemPress={handleSettingsPress} />
+        <ProfileSettings
+          canUpdateCRM={canUpdateCRM}
+          onLogout={handleLogout}
+          onItemPress={handleSettingsPress}
+        />
 
         <RNText style={styles.version}>{t('profile.appVersion', { version: '1.0.0' })}</RNText>
       </ScrollView>

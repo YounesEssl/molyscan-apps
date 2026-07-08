@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import { Alert } from 'react-native';
 import axios from 'axios';
 import i18n from '@/i18n';
 import * as Haptics from 'expo-haptics';
@@ -123,17 +122,8 @@ export function useImageAnalysis(): UseImageAnalysis {
       logger.debug('[gallery] already analyzing, skip');
       return;
     }
-    logger.debug('[gallery] requesting permission…');
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      logger.warn('[gallery] permission denied');
-      Alert.alert(
-        'Permission required',
-        'Please allow access to your photo library in settings.',
-      );
-      return;
-    }
-
+    // Android Photo Picker / iOS limited picker : accès ponctuel sans permission
+    // de médiathèque (évite READ_MEDIA_IMAGES, rejeté par Google Play).
     logger.debug('[gallery] opening picker…');
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],

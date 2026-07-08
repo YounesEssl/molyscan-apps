@@ -7,9 +7,9 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Bell } from 'react-native-solar-icons/icons/bold-duotone';
 import { Settings } from 'react-native-solar-icons/icons/bold-duotone';
 import { Eye } from 'react-native-solar-icons/icons/bold-duotone';
+import { Shop2 } from 'react-native-solar-icons/icons/bold-duotone';
 import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
 import { Logout2 } from 'react-native-solar-icons/icons/bold';
 import { shadows } from '@/design/tokens/shadows';
@@ -36,6 +36,7 @@ interface SettingsItem {
 interface ProfileSettingsProps {
   onLogout: () => void;
   onItemPress?: (key: string) => void;
+  canUpdateCRM?: boolean;
 }
 
 const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
@@ -46,6 +47,7 @@ const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
 export function ProfileSettings({
   onLogout,
   onItemPress,
+  canUpdateCRM = true,
 }: ProfileSettingsProps): React.JSX.Element {
   const { t, i18n } = useTranslation();
   const currentLang: SupportedLanguage = i18n.language === 'fr' ? 'fr' : 'en';
@@ -57,10 +59,10 @@ export function ProfileSettings({
 
   const items: Omit<SettingsItem, 'onPress' | 'danger'>[] = [
     {
-      key: 'notifications',
-      label: t('profile.settingsNotifications'),
-      sub: t('profile.settingsNotificationsSub'),
-      icon: Bell,
+      key: 'crmCredentials',
+      label: t('profile.crmCredentials'),
+      sub: t('profile.crmCredentialsSub'),
+      icon: Shop2,
     },
     {
       key: 'language',
@@ -74,7 +76,7 @@ export function ProfileSettings({
       sub: t('profile.settingsPrivacySub'),
       icon: Eye,
     },
-  ];
+  ].filter((item) => canUpdateCRM || item.key !== 'crmCredentials');
 
   return (
     <View style={styles.section}>

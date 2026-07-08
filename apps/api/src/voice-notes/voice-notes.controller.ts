@@ -51,4 +51,10 @@ export class VoiceNotesController {
   ) {
     return this.voiceNotesService.update(id, user.sub, dto);
   }
+
+  @Post(':id/resync')
+  @ApiOperation({ summary: 'Retry pushing a voice note to the CRM' })
+  resync(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.voiceNotesService.resync(id, user.sub);
+  }
 }

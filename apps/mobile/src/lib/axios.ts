@@ -71,6 +71,9 @@ api.interceptors.response.use(
 
     logger.error('API error', {
       url: error.config?.url,
+      baseURL: error.config?.baseURL,
+      message: error.message,
+      code: error.code,
       status: error.response?.status,
       data: error.response?.data,
     });
