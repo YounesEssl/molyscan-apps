@@ -9,6 +9,7 @@ export interface CrmCompany {
 export interface CrmContact {
   id: string;
   companyId: string | null;
+  companyName?: string | null;
   name: string;
 }
 
@@ -47,11 +48,11 @@ export const crmService = {
   },
 
   async searchContacts(
-    companyId: string,
+    companyId?: string | null,
     q = '',
   ): Promise<{ items: CrmContact[]; total: number }> {
     const response = await api.get(ENDPOINTS.crm.contacts, {
-      params: { companyId, q },
+      params: { ...(companyId ? { companyId } : {}), q },
       timeout: 120000,
     });
     return response.data;

@@ -44,14 +44,14 @@ export class CrmController {
   }
 
   @Get('contacts')
-  @ApiOperation({ summary: 'Search CRM contacts for a selected company' })
+  @ApiOperation({ summary: 'Search CRM contacts, optionally filtered by company' })
   getContacts(
     @CurrentUser() user: JwtPayload,
-    @Query('companyId') companyId: string,
+    @Query('companyId') companyId?: string,
     @Query('q') q?: string,
     @Query('limit') limit?: string,
   ) {
     const parsedLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
-    return this.crmService.searchContacts(user.sub, companyId, q ?? '', parsedLimit);
+    return this.crmService.searchContacts(user.sub, companyId ?? '', q ?? '', parsedLimit);
   }
 }

@@ -444,6 +444,8 @@ model VoiceNote {
   // GUID de la personne/contact dans le CRM Innovation.
   contactId        String?
   contactName      String?
+  // Date/heure du rendez-vous à utiliser comme date de communication CRM.
+  meetingAt        DateTime?
   productMentioned String?
   nextAction       String?
   notes            String?

@@ -25,6 +25,7 @@ export interface CrmCompany {
 export interface CrmContact {
   id: string;
   companyId: string | null;
+  companyName?: string | null;
   name: string;
 }
 
@@ -214,18 +215,55 @@ export class CrmService implements OnModuleInit {
     query: string,
     limit = 50,
   ): Promise<{ items: CrmContact[]; total: number }> {
-    if (!companyId) {
-      throw new BadRequestException('companyId is required');
-    }
-
     const all = await this.getPersons(userId);
     const q = query.trim().toLowerCase();
-    const companyPersons = all.filter((p) => p.companyId === companyId);
+    const companyPersons = companyId
+      ? all.filter((p) => p.companyId === companyId)
+      : all;
+
+    let companyNameById = new Map<string, string>();
+    if (!companyId && q) {
+      try {
+        const companies = await this.getCompanies(userId);
+        companyNameById = new Map(
+          companies.map((company) => [company.id, company.name.toLowerCase()]),
+        );
+      } catch (error) {
+        this.logger.warn(`CRM company lookup for global contact search failed: ${error}`);
+      }
+    }
+
     const filtered = q
-      ? companyPersons.filter((p) => p.name.toLowerCase().includes(q))
+      ? companyPersons.filter((p) => {
+          const companyName = p.companyId ? companyNameById.get(p.companyId) : null;
+          return p.name.toLowerCase().includes(q) || Boolean(companyName?.includes(q));
+        })
       : companyPersons;
 
-    return { items: filtered.slice(0, limit), total: filtered.length };
+    const items = await this.enrichContactsWithCompanyNames(
+      userId,
+      filtered.slice(0, limit),
+    );
+    return { items, total: filtered.length };
+  }
+
+  private async enrichContactsWithCompanyNames(
+    userId: string,
+    contacts: CrmContact[],
+  ): Promise<CrmContact[]> {
+    if (!contacts.some((contact) => contact.companyId)) return contacts;
+
+    try {
+      const companies = await this.getCompanies(userId);
+      const byId = new Map(companies.map((company) => [company.id, company.name]));
+      return contacts.map((contact) => ({
+        ...contact,
+        companyName: contact.companyId ? byId.get(contact.companyId) ?? null : null,
+      }));
+    } catch (error) {
+      this.logger.warn(`CRM contact company enrichment failed: ${error}`);
+      return contacts;
+    }
   }
 
   private async getPersons(userId: string): Promise<CrmContact[]> {

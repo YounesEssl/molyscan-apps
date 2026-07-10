@@ -68,6 +68,7 @@ export class VoiceNotesService {
         clientName: dto.clientName,
         contactId: dto.contactId,
         contactName: dto.contactName,
+        meetingAt: dto.meetingAt ? new Date(dto.meetingAt) : null,
         productMentioned: dto.productMentioned,
         nextAction: dto.nextAction,
         notes: dto.notes,
@@ -93,6 +94,7 @@ export class VoiceNotesService {
     clientName: string | null;
     contactId?: string | null;
     contactName?: string | null;
+    meetingAt?: Date | null;
     productMentioned?: string | null;
     nextAction?: string | null;
     notes?: string | null;
@@ -113,7 +115,7 @@ export class VoiceNotesService {
           contactName: note.contactName,
           subject: note.clientName || 'Note vocale',
           note: this.buildCrmNote(note),
-          datetime: note.createdAt,
+          datetime: note.meetingAt ?? note.createdAt,
         },
       );
       return this.prisma.voiceNote.update({
@@ -140,8 +142,12 @@ export class VoiceNotesService {
       data: {
         ...(dto.transcription !== undefined && { transcription: dto.transcription }),
         ...(dto.clientName !== undefined && { clientName: dto.clientName }),
+        ...(dto.companyId !== undefined && { companyId: dto.companyId }),
         ...(dto.contactId !== undefined && { contactId: dto.contactId }),
         ...(dto.contactName !== undefined && { contactName: dto.contactName }),
+        ...(dto.meetingAt !== undefined && {
+          meetingAt: dto.meetingAt ? new Date(dto.meetingAt) : null,
+        }),
         ...(dto.productMentioned !== undefined && { productMentioned: dto.productMentioned }),
         ...(dto.nextAction !== undefined && { nextAction: dto.nextAction }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
@@ -193,6 +199,7 @@ export class VoiceNotesService {
       clientName: note.clientName || '',
       contactId: note.contactId || null,
       contactName: note.contactName || '',
+      meetingAt: note.meetingAt ? note.meetingAt.toISOString() : null,
       productMentioned: note.productMentioned || '',
       nextAction: note.nextAction || '',
       notes: note.notes || '',
@@ -207,12 +214,14 @@ export class VoiceNotesService {
   private buildCrmNote(note: {
     transcription: string | null;
     contactName?: string | null;
+    meetingAt?: Date | null;
     productMentioned?: string | null;
     nextAction?: string | null;
     notes?: string | null;
   }): string {
     const parts = [
       note.transcription?.trim(),
+      note.meetingAt ? `Date du RDV : ${note.meetingAt.toLocaleString('fr-FR')}` : null,
       note.contactName?.trim() ? `Contact : ${note.contactName.trim()}` : null,
       note.productMentioned?.trim() ? `Produit : ${note.productMentioned.trim()}` : null,
       note.nextAction?.trim() ? `Prochaine action : ${note.nextAction.trim()}` : null,

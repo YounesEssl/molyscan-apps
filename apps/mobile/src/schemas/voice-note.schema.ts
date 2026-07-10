@@ -7,6 +7,7 @@ export const VoiceNoteSchema = z.object({
   clientName: z.string(),
   contactId: z.string().nullable().optional(),
   contactName: z.string().optional(),
+  meetingAt: z.string().datetime().nullable().optional(),
   productMentioned: z.string().optional(),
   nextAction: z.string().optional(),
   notes: z.string().optional(),

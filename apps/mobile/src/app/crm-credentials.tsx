@@ -122,7 +122,7 @@ export default function CrmCredentialsScreen(): React.JSX.Element {
           </View>
 
           {configured && savedLogin && !editing && (
-            <Card style={styles.statusCard}>
+            <Card variant="outlined" style={styles.statusCard}>
               <View style={styles.statusContent}>
                 <View style={styles.statusHeader}>
                   <View style={styles.statusIcon}>
@@ -267,8 +267,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   statusCard: {
-    borderColor: COLORS.success + '25',
-    backgroundColor: COLORS.success + '08',
+    backgroundColor: colors.paper2,
   },
   statusContent: {
     gap: SPACING.md,

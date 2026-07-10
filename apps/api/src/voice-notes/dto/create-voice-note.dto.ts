@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsDateString } from 'class-validator';
 
 export class CreateVoiceNoteDto {
   @ApiProperty()
@@ -25,6 +25,11 @@ export class CreateVoiceNoteDto {
   @IsOptional()
   @IsString()
   contactId?: string;
+
+  @ApiPropertyOptional({ description: 'Date/heure du rendez-vous à synchroniser dans le CRM' })
+  @IsOptional()
+  @IsDateString()
+  meetingAt?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
