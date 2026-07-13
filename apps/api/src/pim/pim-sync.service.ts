@@ -20,13 +20,20 @@ export class PimSyncService {
   ) {}
 
   async status() {
-    const [activeIndex, latestRun, recentRuns, counts] = await Promise.all([
+    const [activeIndex, latestRun, recentRuns, counts, indexedText] = await Promise.all([
       this.prisma.ragIndexVersion.findFirst({ where: { status: RagIndexStatus.active }, orderBy: { activatedAt: 'desc' } }),
       this.prisma.ragSyncRun.findFirst({ orderBy: { createdAt: 'desc' } }),
       this.prisma.ragSyncRun.findMany({ orderBy: { createdAt: 'desc' }, take: 20 }),
       Promise.all([this.prisma.pimProduct.count({ where: { active: true } }), this.prisma.pimReference.count({ where: { active: true } })]),
+      this.prisma.$queryRaw<Array<{ characters: bigint }>>`SELECT COALESCE(SUM(length(c."content")), 0)::bigint AS characters FROM "rag_chunks" c JOIN "rag_index_versions" i ON i."id" = c."indexId" WHERE i."status" = 'active'`,
     ]);
-    return { activeIndex, latestRun, recentRuns, productCount: counts[0], referenceCount: counts[1], running: this.running };
+    // Public price for text-embedding-3-small: $0.02 / 1M tokens. We use a
+    // conservative character-to-token ratio, add the validation queries and a
+    // 20% margin. This is a maximum full-refresh estimate; unchanged products
+    // reuse their existing vectors and therefore cost less.
+    const estimatedTokens = Number(indexedText[0]?.characters ?? 0n) / 3.5 + 500;
+    const estimatedMaxCostEur = estimatedTokens * 0.02 / 1_000_000 * 0.92 * 1.2;
+    return { activeIndex, latestRun, recentRuns, productCount: counts[0], referenceCount: counts[1], running: this.running, estimatedMaxCostEur };
   }
 
   async requestSync(trigger: RagSyncTrigger, requestedBy?: string) {
