@@ -10,8 +10,7 @@ type SyncRun = {
   startedAt?: string | null; finishedAt?: string | null; createdAt: string;
 };
 type RagStatus = {
-  running: boolean; productCount: number; referenceCount: number;
-  estimatedMaxCostEur: number;
+  running: boolean; productCount: number; referenceCount: number; assistantProductCount: number;
   activeIndex?: { version: number; embeddingModel: string; chunkCount: number; activatedAt?: string | null } | null;
   latestRun?: SyncRun | null; recentRuns: SyncRun[];
 };
@@ -40,20 +39,16 @@ export function RagManagementPage() {
             <h1 className="mt-2 font-display text-[2.1rem] font-medium tracking-tight text-ink">Mettre à jour les <span className="italic text-red">produits Molydal</span></h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">Récupérez les dernières informations produits enregistrées dans Sellbase pour que l’assistant Molyscan utilise un catalogue à jour.</p>
           </div>
-          <div className="text-right">
-            <button disabled={busy} onClick={() => sync.mutate()} className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-5 py-2.5 text-sm font-semibold text-white shadow-red disabled:cursor-not-allowed disabled:opacity-50">
-              <RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
-              {busy ? 'Mise à jour en cours…' : 'Mettre à jour maintenant'}
-            </button>
-            <p className="mt-2 text-xs text-ink-3">Coût maximum estimé : {formatEstimatedCost(data?.estimatedMaxCostEur)}</p>
-            <p className="mt-0.5 text-[11px] text-ink-3">Le coût réel dépend du nombre de produits modifiés.</p>
-          </div>
+          <button disabled={busy} onClick={() => sync.mutate()} className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-5 py-2.5 text-sm font-semibold text-white shadow-red disabled:cursor-not-allowed disabled:opacity-50">
+            <RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
+            {busy ? 'Mise à jour en cours…' : 'Mettre à jour maintenant'}
+          </button>
         </header>
 
         {sync.isError && <div className="mt-6 rounded-2xl border border-red-border bg-red-soft p-4 text-sm text-red">Impossible de lancer la mise à jour. Veuillez réessayer dans quelques minutes.</div>}
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
-          <Metric label="Produits disponibles dans Molyscan" value={data?.productCount ?? '—'} icon={PackageSearch} />
+          <Metric label="Produits utilisés par l’assistant" value={data?.assistantProductCount ?? '—'} icon={PackageSearch} />
           <Metric label="Dernière mise à jour réussie" value={formatDate(data?.activeIndex?.activatedAt)} icon={CheckCircle2} />
           <Metric label="Prochaine mise à jour automatique" value="1er du mois" icon={CalendarClock} />
         </div>
@@ -90,4 +85,3 @@ function Metric({ label, value, icon: Icon }: { label: string; value: string | n
 function Info({ label, value }: { label: string; value: string }) { return <div><p className="text-xs uppercase tracking-wide text-ink-3">{label}</p><p className="mt-1 font-medium text-ink">{value}</p></div>; }
 function Status({ status }: { status: string }) { const ok = status === 'completed' || status === 'active'; const bad = status === 'failed'; const Icon = ok ? CheckCircle2 : bad ? AlertTriangle : Clock3; return <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${ok ? 'bg-ok-bg text-ok' : bad ? 'bg-red-soft text-red' : 'bg-black/[0.05] text-ink-2'}`}><Icon className="h-3.5 w-3.5" />{({ completed:'À jour', failed:'À réessayer', queued:'Démarrage…', running:'Récupération des produits…', validating:'Vérification…', skipped:'Aucun changement', loading:'Chargement…', idle:'Pas encore mise à jour' } as Record<string,string>)[status] ?? status}</span>; }
 function formatDate(value?: string | null) { return value ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—'; }
-function formatEstimatedCost(value?: number) { if (value === undefined) return '—'; if (value < 0.01) return 'moins de 0,01 €'; return `environ ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(value)}`; }
