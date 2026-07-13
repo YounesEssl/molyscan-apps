@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,6 +21,9 @@ import { colors } from '@/design/tokens/colors';
 import { scanService, type ScanLinkedConversation } from '@/services/scan.service';
 import { chatFreeService } from '@/services/chatFree.service';
 import { useAuthStore } from '@/stores/auth.store';
+import { productService, type PimDocument } from '@/services/product.service';
+import { TechnicalSheetCTA } from '@/components/product/TechnicalSheetCTA';
+import { getLocales } from 'expo-localization';
 
 interface ScanDetail {
   id: string;
@@ -64,6 +67,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const [conversations, setConversations] = useState<ScanLinkedConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingChat, setCreatingChat] = useState(false);
+  const [documents, setDocuments] = useState<PimDocument[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -88,6 +92,17 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const competitorName = scan?.scannedProduct?.name ?? t('product.competitorProductDefault');
   const hasEquivalent = productName.length > 0;
   const allEquivalents = scan?.equivalents ?? [];
+
+  useEffect(() => {
+    if (!productName) { setDocuments([]); return; }
+    void productService.getPimDocuments(productName).then(setDocuments).catch(() => setDocuments([]));
+  }, [productName]);
+
+  const technicalSheet = useMemo(() => {
+    const sheets = documents.filter((d) => d.kind === 'technical_sheet');
+    const language = getLocales()[0]?.languageCode ?? 'fr';
+    return sheets.find((d) => d.language === language) ?? sheets.find((d) => d.language === 'fr') ?? sheets.find((d) => d.language === 'en') ?? sheets[0];
+  }, [documents]);
 
   const handleAskAI = async (): Promise<void> => {
     if (!scan?.scannedProduct || creatingChat) return;
@@ -160,6 +175,14 @@ export default function ProductDetailScreen(): React.JSX.Element {
         )}
 
         <ProductSpecs specs={buildSpecs(scan)} />
+
+        {technicalSheet ? (
+          <TechnicalSheetCTA
+            label={t('product.technicalSheet')}
+            subtitle={technicalSheet.fileName}
+            onPress={() => router.push(`/document/${technicalSheet.id}`)}
+          />
+        ) : null}
 
         {allEquivalents.length > 0 ? (
           <ScanEquivalentsList equivalents={allEquivalents} />

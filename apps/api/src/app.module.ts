@@ -19,11 +19,14 @@ import { CrmModule } from './crm/crm.module';
 import { OcrModule } from './ocr/ocr.module';
 import { StorageModule } from './storage/storage.module';
 import { HealthModule } from './health/health.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { PimModule } from './pim/pim.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ScheduleModule.forRoot(),
     PrismaModule,
     EmailModule,
     AuthModule,
@@ -42,6 +45,7 @@ import { HealthModule } from './health/health.module';
     OcrModule,
     StorageModule,
     HealthModule,
+    PimModule,
   ],
 })
 export class AppModule {}

@@ -1,10 +1,33 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SearchProductDto } from './dto/search-product.dto';
+import { SellbaseClient } from '../pim/sellbase.client';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private sellbase: SellbaseClient) {}
+
+  async findPimDocumentsByName(name: string) {
+    const product = await this.prisma.pimProduct.findFirst({
+      where: { name: { equals: name, mode: 'insensitive' }, active: true },
+      include: { documents: { orderBy: [{ kind: 'asc' }, { language: 'asc' }] } },
+    });
+    if (!product) throw new NotFoundException('PIM product not found');
+    return {
+      product: { id: product.id, name: product.name },
+      documents: product.documents.map((d) => ({ id: d.id, kind: d.kind, language: d.language, fileName: d.fileName, updatedAt: d.sourceUpdatedAt })),
+    };
+  }
+
+  async downloadPimDocument(documentId: string) {
+    const document = await this.prisma.pimDocument.findUnique({ where: { id: documentId }, include: { product: true } });
+    if (!document || !document.product.active) throw new NotFoundException('Document not found');
+    let upstream: Response;
+    try { upstream = await this.sellbase.downloadDocument(document.fileName, { productInstanceId: document.product.sellbaseInstanceId, kind: document.kind, language: document.language }); }
+    catch (error) { throw new ServiceUnavailableException(`Sellbase document service is not configured: ${error instanceof Error ? error.message : error}`); }
+    if (!upstream.ok) throw new ServiceUnavailableException(`Sellbase document download failed (${upstream.status})`);
+    return { buffer: Buffer.from(await upstream.arrayBuffer()), fileName: document.fileName, contentType: upstream.headers.get('content-type') ?? 'application/pdf' };
+  }
 
   async findByBarcode(barcode: string) {
     const product = await this.prisma.competitorProduct.findUnique({

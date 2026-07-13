@@ -8,6 +8,7 @@ import { AccessRequestsPage } from './pages/AccessRequestsPage';
 import { UsersPage } from './pages/UsersPage';
 import { PriceRequestsPage } from './pages/PriceRequestsPage';
 import { EquivalencesPage } from './pages/EquivalencesPage';
+import { RagManagementPage } from './pages/RagManagementPage';
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
           <Route path="/users" element={<UsersPage />} />
           <Route path="/price-requests" element={<PriceRequestsPage />} />
           <Route path="/equivalences" element={<EquivalencesPage />} />
+          <Route path="/rag" element={<RagManagementPage />} />
           <Route path="/" element={<Navigate to="/access-requests" replace />} />
         </Route>
       </Route>

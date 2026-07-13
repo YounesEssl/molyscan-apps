@@ -71,6 +71,28 @@ enum PricingTier {
   enterprise
 }
 
+enum RagSyncStatus {
+  queued
+  running
+  validating
+  completed
+  failed
+  skipped
+}
+
+enum RagSyncTrigger {
+  manual
+  scheduled
+}
+
+enum RagIndexStatus {
+  building
+  validating
+  active
+  archived
+  failed
+}
+
 // ─── MODELS ───────────────────────────────────────
 
 model User {
@@ -493,6 +515,149 @@ model DocumentEmbedding {
   createdAt DateTime                     @default(now())
 
   @@map("document_embeddings")
+}
+
+/// Canonical, reproducible copy of a Sellbase level-4 product.
+model PimProduct {
+  id                String   @id @default(uuid())
+  sellbaseElementId Int      @unique
+  sellbaseInstanceId Int?
+  name              String
+  family            String?
+  subfamily         String?
+  shortDescription  String?
+  description       String?
+  usage             String?
+  baseOil           String?
+  thickener         String?
+  nlgiGrade         String?
+  viscosity40       Float?
+  baseOilViscosity40 Float?
+  temperatureMin    Float?
+  temperatureMax    Float?
+  dropPoint         Float?
+  dinClassification String?
+  isoClassification String?
+  foodGrade         Boolean  @default(false)
+  ecoResponsible    Boolean  @default(false)
+  moshMoahFree      Boolean  @default(false)
+  productType       String   @default("lubricant")
+  active            Boolean  @default(true)
+  sourceHash        String
+  sourceUpdatedAt   DateTime?
+  rawData           Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  references PimReference[]
+  documents  PimDocument[]
+  chunks     RagChunk[]
+
+  @@index([active, productType])
+  @@index([name])
+  @@map("pim_products")
+}
+
+/// Sellbase level-5 commercial/logistic reference belonging to a product.
+model PimReference {
+  id                String   @id @default(uuid())
+  sellbaseElementId Int      @unique
+  productId         String
+  code              String?
+  label             String?
+  packaging         String?
+  erpStatus         String?
+  active            Boolean  @default(true)
+  sourceHash        String
+  sourceUpdatedAt   DateTime?
+  rawData           Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  product PimProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("pim_references")
+}
+
+model PimDocument {
+  id              String   @id @default(uuid())
+  productId       String
+  sellbaseCaracId Int
+  kind            String
+  language        String
+  fileName        String
+  sourceUpdatedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  product PimProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, sellbaseCaracId])
+  @@index([productId, kind, language])
+  @@map("pim_documents")
+}
+
+model RagIndexVersion {
+  id             String         @id @default(uuid())
+  version        Int            @unique @default(autoincrement())
+  status         RagIndexStatus @default(building)
+  embeddingModel String
+  dimensions     Int
+  productCount   Int            @default(0)
+  chunkCount     Int            @default(0)
+  metrics        Json?
+  activatedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  chunks   RagChunk[]
+  syncRuns RagSyncRun[]
+
+  @@index([status])
+  @@map("rag_index_versions")
+}
+
+model RagChunk {
+  id          String                       @id @default(uuid())
+  indexId     String
+  productId   String
+  content     String
+  contentHash String
+  metadata    Json
+  embedding   Unsupported("vector(1536)")
+  createdAt   DateTime                     @default(now())
+
+  index   RagIndexVersion @relation(fields: [indexId], references: [id], onDelete: Cascade)
+  product PimProduct      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([indexId, productId, contentHash])
+  @@index([indexId, productId])
+  @@map("rag_chunks")
+}
+
+model RagSyncRun {
+  id             String         @id @default(uuid())
+  status         RagSyncStatus  @default(queued)
+  trigger        RagSyncTrigger
+  requestedBy    String?
+  indexId        String?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  productsSeen   Int            @default(0)
+  productsChanged Int           @default(0)
+  productsRemoved Int           @default(0)
+  referencesSeen Int            @default(0)
+  chunksCreated  Int            @default(0)
+  error          String?
+  details        Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  index RagIndexVersion? @relation(fields: [indexId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@map("rag_sync_runs")
 }
 
 model AuditLog {

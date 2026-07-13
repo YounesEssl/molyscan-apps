@@ -5,6 +5,6 @@ import { VectorStoreService } from './vector-store.service';
 
 @Module({
   providers: [RagService, EmbeddingService, VectorStoreService],
-  exports: [RagService, VectorStoreService],
+  exports: [RagService, VectorStoreService, EmbeddingService],
 })
 export class RagModule {}

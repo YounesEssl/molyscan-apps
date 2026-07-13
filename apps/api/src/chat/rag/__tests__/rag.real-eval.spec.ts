@@ -21,6 +21,7 @@ import { ConfigModule } from '@nestjs/config';
 import { RagService } from '../rag.service';
 import { VectorStoreService } from '../vector-store.service';
 import { EmbeddingService } from '../embedding.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 import { EVAL_CASES } from './eval.fixtures';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ afterAll(() => {
 
   console.log('\n');
   console.log('━'.repeat(72));
-  console.log(`  RAG REAL EVAL — ${passed}/${total} passed  (vrai Supabase, vrai LLM)`);
+  console.log(`  RAG REAL EVAL — ${passed}/${total} passed  (vrai index PIM, vrai LLM)`);
   console.log('━'.repeat(72));
 
   for (const r of results) {
@@ -77,7 +78,7 @@ afterAll(() => {
         );
         if (missing.length) {
           console.log(`   ❌ Absents du vector store  : ${missing.join(', ')}`);
-          console.log(`      → Vérifier le CSV / réindexer ces produits`);
+          console.log(`      → Vérifier le PIM / réindexer ces produits`);
         } else {
           console.log(`   ❌ Produits récupérés mais mal sélectionnés par le LLM`);
           console.log(`      → Ajuster le system prompt`);
@@ -90,7 +91,7 @@ afterAll(() => {
   console.log('\n' + '━'.repeat(72));
   if (passed < total) {
     console.log(`  ${total - passed} cas échoué(s).`);
-    console.log(`  Si "Absent du vector store" → corriger le CSV et réindexer.`);
+    console.log(`  Si "Absent du vector store" → vérifier le PIM et réindexer.`);
     console.log(`  Si "Mal sélectionné" → ajuster le system prompt puis relancer.`);
   } else {
     console.log('  Tous les cas passent en conditions réelles. 🎉');
@@ -126,7 +127,7 @@ describe('RAG Real Eval — stack complète sans mock', () => {
           envFilePath: path.resolve(__dirname, '../../../../.env'),
         }),
       ],
-      providers: [RagService, VectorStoreService, EmbeddingService],
+      providers: [RagService, VectorStoreService, EmbeddingService, PrismaService],
     }).compile();
 
     ragService = module.get<RagService>(RagService);
@@ -140,7 +141,7 @@ describe('RAG Real Eval — stack complète sans mock', () => {
     skipIfMissing(
       'retourne le bon équivalent avec le vrai vector store',
       async () => {
-        // ── 1. Reformulation (Gemini) + retrieval (Supabase réel) ──
+        // ── 1. Reformulation (Gemini) + retrieval (index PIM réel) ──
         const reformulated = await (ragService as any).reformulateQuery(
           evalCase.query,
           [],
@@ -151,7 +152,7 @@ describe('RAG Real Eval — stack complète sans mock', () => {
 
         const chunks = await vectorStore.dualSearch(evalCase.query, reformulated);
         const retrievedSources = [...new Set(chunks.map((c) => c.product_name))];
-        console.log(`  Sources Supabase   : ${retrievedSources.join(', ') || '(aucune)'}`);
+        console.log(`  Sources index PIM  : ${retrievedSources.join(', ') || '(aucune)'}`);
 
         // ── 2. Génération (Gemini réel) ──
         const result = await ragService.generateResponse({

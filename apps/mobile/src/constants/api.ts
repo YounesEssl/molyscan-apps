@@ -19,6 +19,8 @@ export const ENDPOINTS = {
     search: '/products/search',
     byBarcode: '/products/barcode',
     detail: (id: string) => `/products/${id}`,
+    pimDocumentsByName: (name: string) => `/products/pim/by-name/${encodeURIComponent(name)}/documents`,
+    pimDocumentContent: (id: string) => `/products/pim/documents/${id}/content`,
   },
   scans: {
     list: '/scans',

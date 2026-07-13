@@ -1,7 +1,8 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { EmbeddingService } from './embedding.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 interface ChunkResult {
   product_name: string;
@@ -80,13 +81,13 @@ function chunkMatchesFilters(
   if (!filters) return true;
   const meta = chunk.metadata as Record<string, unknown>;
   if (filters.format) {
-    const conds = (meta.conditionnements as string[] | undefined) ?? [];
+    const conds = ((meta.conditionnements ?? meta.packaging) as string[] | undefined) ?? [];
     const accepted = getAcceptedFormatTokens(filters.format);
     const ok = conds.some((c) => accepted.includes(c?.toString().toUpperCase()));
     if (!ok) return false;
   }
-  if (filters.alimentaire === true && meta.alimentaire !== true) return false;
-  if (filters.ecoResponsable === true && meta.eco_responsable !== true) return false;
+  if (filters.alimentaire === true && meta.alimentaire !== true && meta.food_grade !== true) return false;
+  if (filters.ecoResponsable === true && meta.eco_responsable !== true && meta.eco_responsible !== true) return false;
   if (filters.family && chunk.product_family !== filters.family) return false;
   return true;
 }
@@ -100,6 +101,7 @@ export class VectorStoreService implements OnModuleInit {
   constructor(
     private configService: ConfigService,
     private embeddingService: EmbeddingService,
+    @Optional() private prisma?: PrismaService,
   ) {}
 
   onModuleInit() {
@@ -177,6 +179,40 @@ export class VectorStoreService implements OnModuleInit {
     const embedding = await this.embeddingService.generateEmbedding(query);
     if (embedding.length === 0) return [];
 
+    // Prefer the versioned PIM index. The legacy Supabase store remains a
+    // temporary fallback until the first validated PIM synchronization.
+    if (this.prisma) {
+      const active = await this.prisma.ragIndexVersion.findFirst({
+        where: { status: 'active' },
+        orderBy: { activatedAt: 'desc' },
+      });
+      if (active) {
+        const vector = `[${embedding.join(',')}]`;
+        const rows = await this.prisma.$queryRawUnsafe<Array<{
+          product_name: string;
+          product_family: string | null;
+          chunk_text: string;
+          similarity: number;
+          metadata: Record<string, unknown>;
+        }>>(
+          `SELECT p."name" AS product_name, p."family" AS product_family,
+                  c."content" AS chunk_text,
+                  (0.82 * (1 - (c."embedding" <=> $1::vector)) +
+                   0.18 * ts_rank_cd(to_tsvector('simple', c."content"), plainto_tsquery('simple', $2)))::float AS similarity,
+                  c."metadata" AS metadata
+             FROM "rag_chunks" c
+             JOIN "pim_products" p ON p."id" = c."productId"
+            WHERE c."indexId" = $3
+              AND p."active" = true
+              AND p."productType" = 'lubricant'
+            ORDER BY similarity DESC
+            LIMIT $4`,
+          vector, query, active.id, matchCount,
+        );
+        return rows.map((row) => ({ ...row, product_family: row.product_family ?? '' }));
+      }
+    }
+
     const { data, error } = await this.supabase.rpc('search_chunks', {
       query_embedding: embedding,
       match_threshold: matchThreshold,
@@ -229,20 +265,14 @@ export class VectorStoreService implements OnModuleInit {
       (a, b) => b.similarity - a.similarity,
     );
 
-    // Apply hard filters. If they wipe everything out we fall back to the
-    // unfiltered set so the user always gets *something* — better than nothing.
+    // Regulatory and physical filters are genuinely hard constraints. Returning
+    // no candidate is safer than silently recommending an incompatible product.
     if (filters) {
       const filtered = allChunks.filter((c) => chunkMatchesFilters(c, filters));
-      if (filtered.length > 0) {
-        this.logger.log(
-          `Filters applied (${JSON.stringify(filters)}): ${allChunks.length} → ${filtered.length} chunks`,
-        );
-        allChunks = filtered;
-      } else {
-        this.logger.warn(
-          `Filters ${JSON.stringify(filters)} matched 0 chunks — falling back to unfiltered`,
-        );
-      }
+      this.logger.log(
+        `Hard filters applied (${JSON.stringify(filters)}): ${allChunks.length} → ${filtered.length} chunks`,
+      );
+      allChunks = filtered;
     }
 
     // Diversity pass: keep one chunk per product so the reranker sees N
@@ -261,9 +291,10 @@ export class VectorStoreService implements OnModuleInit {
 
     const candidatesForRerank = Array.from(bestPerProduct.values()).slice(0, 40);
 
-    // Reranker (Cohere) — uses the user's original query for relevance scoring.
-    // The reformulated query is for retrieval; the rerank is for precision.
-    const reranked = await this.rerank(originalQuery, candidatesForRerank, 15);
+    // The PIM intentionally contains Molydal facts, not competitor aliases.
+    // Rerank against the normalized technical intent so a competitor name does
+    // not erase otherwise relevant candidates retrieved by their properties.
+    const reranked = await this.rerank(reformulatedQuery, candidatesForRerank, 15);
 
     return [
       ...reranked,
