@@ -10,7 +10,7 @@ const navItems = [
   { to: '/users', label: 'Utilisateurs', icon: Users },
   { to: '/price-requests', label: 'Demandes de prix', icon: Tag },
   { to: '/equivalences', label: 'Équivalences', icon: Link2 },
-  { to: '/rag', label: 'PIM & RAG', icon: DatabaseZap },
+  { to: '/catalogue', label: 'Catalogue produits', icon: DatabaseZap },
 ];
 
 export function Layout() {

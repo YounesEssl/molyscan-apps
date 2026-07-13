@@ -22,7 +22,8 @@ export function App() {
           <Route path="/users" element={<UsersPage />} />
           <Route path="/price-requests" element={<PriceRequestsPage />} />
           <Route path="/equivalences" element={<EquivalencesPage />} />
-          <Route path="/rag" element={<RagManagementPage />} />
+          <Route path="/catalogue" element={<RagManagementPage />} />
+          <Route path="/rag" element={<Navigate to="/catalogue" replace />} />
           <Route path="/" element={<Navigate to="/access-requests" replace />} />
         </Route>
       </Route>
