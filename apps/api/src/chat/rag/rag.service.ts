@@ -302,7 +302,7 @@ ${prompt}`,
     ];
 
     const model = this.gemini.getGenerativeModel({
-      model: process.env.CHAT_MODEL ?? 'gemini-3-flash-preview',
+      model: process.env.CHAT_MODEL ?? 'gemini-3.1-flash-lite',
       systemInstruction: systemText,
       tools: [{ googleSearch: {} }] as any,
       generationConfig: { temperature: 0.3, maxOutputTokens: 2048 } as any,
@@ -438,7 +438,7 @@ ${prompt}`,
     const systemText = `${SYSTEM_PROMPT}\n\n${validatedBlock}${productBlock}${reformulationBlock}Context — Molydal technical datasheets:\n${context}`;
 
     const model = this.gemini.getGenerativeModel({
-      model: process.env.CHAT_MODEL ?? 'gemini-3-flash-preview',
+      model: process.env.CHAT_MODEL ?? 'gemini-3.1-flash-lite',
       systemInstruction: systemText,
       tools: [{ googleSearch: {} }] as any,
       generationConfig: { temperature: 0.3, maxOutputTokens: 2048 } as any,

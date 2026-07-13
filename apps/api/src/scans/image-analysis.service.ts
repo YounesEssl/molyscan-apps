@@ -640,11 +640,10 @@ Max 2 equivalents sorted by compatibility. Do not invent any product. Respond in
 
     const userMsg = userMessage || 'Molydal equivalent?';
 
-    // gemini-3-flash-preview has thinking ON by default and thinking tokens
-    // consume maxOutputTokens. For this large-prompt / small-output selection
-    // call that starves the response, so we disable thinking explicitly.
+    // This is a large-prompt / small-output selection call, so extended
+    // thinking is disabled to keep the JSON response complete and predictable.
     const model = this.gemini.getGenerativeModel({
-      model: process.env.SCAN_SELECT_MODEL ?? 'gemini-3-flash-preview',
+      model: process.env.SCAN_SELECT_MODEL ?? 'gemini-3.1-flash-lite',
       systemInstruction: systemPrompt,
       generationConfig: {
         temperature: 0,
