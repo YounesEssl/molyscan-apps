@@ -69,7 +69,7 @@ export function RagManagementPage() {
               <div key={run.id} className="grid gap-3 px-6 py-4 text-sm md:grid-cols-[150px_130px_1fr_170px] md:items-center">
                 <Status status={run.status} />
                 <span className="text-ink-2">{run.trigger === 'scheduled' ? 'Mensuelle' : 'Manuelle'}</span>
-                <span className="text-ink-2">{run.productsSeen} produits consultés · {run.productsChanged} ajoutés ou modifiés{run.productsRemoved ? ` · ${run.productsRemoved} retirés` : ''}</span>
+                <span className="text-ink-2">{run.productsSeen} fiches trouvées · {run.productsChanged} ajoutées ou modifiées{run.productsRemoved ? ` · ${run.productsRemoved} retirées` : ''}</span>
                 <span className="text-right text-xs text-ink-3">{formatDate(run.createdAt)}</span>
               </div>
             ))}

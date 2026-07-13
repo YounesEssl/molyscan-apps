@@ -65,18 +65,25 @@ export class PimSyncService {
       const overrides = await this.sellbase.getPublishedData(allIds, this.sellbase.publicationId);
 
       const existing = new Map((await this.prisma.pimProduct.findMany()).map((p) => [p.sellbaseElementId, p]));
-      let changed = 0;
+      const changedProducts = new Set<number>();
       const seenProducts = new Set<number>();
-
+      // A product may occur several times in the publication tree. Import the
+      // last occurrence, matching the previous upsert behaviour, but count and
+      // process the product only once.
+      const uniqueProductRows = new Map<number, SellbaseElement>();
       for (const row of level4) {
         const elementId = Number(row.element_id_4);
-        if (!elementId) continue;
-        seenProducts.add(elementId);
+        if (elementId) uniqueProductRows.set(elementId, row);
+      }
+
+      for (const row of uniqueProductRows.values()) {
+        const elementId = Number(row.element_id_4);
         const data = mergeData(master[String(elementId)], overrides[String(elementId)]);
         const familyData = mergeData(master[String(Number(row.element_id_2))], overrides[String(Number(row.element_id_2))]);
         const subfamilyData = mergeData(master[String(Number(row.element_id_3))], overrides[String(Number(row.element_id_3))]);
         const name = text(data, CARAC.productName);
         if (!name) continue;
+        seenProducts.add(elementId);
         const family = text(familyData, 10) ?? text(familyData, 15);
         const subfamily = text(subfamilyData, 13) ?? text(subfamilyData, 15);
         const payload = {
@@ -91,7 +98,7 @@ export class PimSyncService {
           productType: detectProductType(name, family), active: true, rawData: data as unknown as Prisma.InputJsonValue,
         };
         const sourceHash = hash(payload);
-        if (existing.get(elementId)?.sourceHash !== sourceHash) changed++;
+        if (existing.get(elementId)?.sourceHash !== sourceHash) changedProducts.add(elementId);
         const product = await this.prisma.pimProduct.upsert({
           where: { sellbaseElementId: elementId },
           create: { sellbaseElementId: elementId, ...payload, sourceHash, sourceUpdatedAt: latestDate(data) },
@@ -119,7 +126,7 @@ export class PimSyncService {
 
       const index = await this.prisma.ragIndexVersion.create({ data: { embeddingModel: this.embeddings.model, dimensions: this.embeddings.dimensions } });
       indexId = index.id;
-      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { indexId, status: RagSyncStatus.validating, productsSeen: seenProducts.size, productsChanged: changed, productsRemoved: removed.count, referencesSeen: seenReferences.size } });
+      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { indexId, status: RagSyncStatus.validating, productsSeen: seenProducts.size, productsChanged: changedProducts.size, productsRemoved: removed.count, referencesSeen: seenReferences.size } });
       const chunkCount = await this.buildIndex(index.id);
       const validation = await this.validateIndex(index.id);
       await this.activateIndex(index.id, chunkCount, chunkCount, validation);
