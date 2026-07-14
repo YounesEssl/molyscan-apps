@@ -203,7 +203,7 @@ C'est LA réponse correcte et confirmée pour ce produit concurrent. Utilise cet
       : `Customer question: ${question}`;
 
     const model = this.gemini.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: process.env.QUERY_REFORMULATION_MODEL ?? 'gemini-3.1-flash-lite',
       // Disable extended thinking for this simple reformulation task
       generationConfig: {
         maxOutputTokens: 400,

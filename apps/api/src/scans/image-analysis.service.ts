@@ -472,14 +472,12 @@ Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser c
 
     // Vision identification is the highest-leverage step of the scan pipeline:
     // a wrong category sends the RAG query into the wrong catalog cluster.
-    // We use gemini-2.5-flash: measured against the May-2026 prod feedback it
-    // scored 74% vs 60% for gemini-2.5-pro on the same prompt — pro's more
-    // verbose `specs` text polluted the downstream RAG query and caused
-    // selection regressions. The accuracy gain comes from the PROMPT, not a
-    // bigger model. Greedy decoding (temperature 0, topP 0.1, topK 1) minimizes
-    // run-to-run variability. Override via VISION_MODEL for A/B experiments.
+    // Vision identification is a high-volume structured extraction task, so use
+    // the stable Flash-Lite model by default. Greedy decoding (temperature 0,
+    // topP 0.1, topK 1) minimizes run-to-run variability. Override via
+    // VISION_MODEL for A/B experiments.
     const model = this.gemini.getGenerativeModel({
-      model: process.env.VISION_MODEL ?? 'gemini-2.5-flash',
+      model: process.env.VISION_MODEL ?? 'gemini-3.1-flash-lite',
       generationConfig: {
         temperature: 0,
         topP: 0.1,

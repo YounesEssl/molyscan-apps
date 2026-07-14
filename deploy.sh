@@ -3,7 +3,7 @@ set -e
 
 VPS_USER="ubuntu"
 VPS_IP="51.77.158.155"
-VPS_KEY="$HOME/.ssh/id_ed25519"
+VPS_KEY="$HOME/.ssh/molyscan_deploy"
 APP_DIR="$HOME/molyscan-apps"
 
 # ── Couleurs ──────────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ set -e
 
 VPS_USER="ubuntu"
 VPS_IP="51.77.158.155"
-VPS_KEY="$HOME/.ssh/id_ed25519"
+VPS_KEY="$HOME/.ssh/molyscan_deploy"
 WEB_ROOT="/var/www/admin.molyscan.fr"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
