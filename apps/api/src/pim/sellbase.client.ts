@@ -24,7 +24,11 @@ export class SellbaseClient {
   constructor(private readonly config: ConfigService) {}
 
   private get origin() {
-    return this.config.get('SELLBASE_API_URL', 'https://sellapi-preprod.sellbase-plateforme.com');
+    const origin = this.config.getOrThrow<string>('SELLBASE_API_URL').replace(/\/$/, '');
+    if (this.config.get('NODE_ENV') === 'production' && origin.includes('preprod')) {
+      throw new Error('SELLBASE_API_URL cannot target preproduction when NODE_ENV=production');
+    }
+    return origin;
   }
 
   private get apiBase() {
