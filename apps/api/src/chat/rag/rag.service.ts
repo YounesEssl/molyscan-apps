@@ -211,8 +211,9 @@ C'est LA réponse correcte et confirmée pour ce produit concurrent. Utilise cet
         thinkingConfig: { thinkingBudget: 0 },
       } as any,
     });
-    const response = await model.generateContent(
-      `You are an expert in industrial lubricants. Translate the competitor product name into a technical search query to find its Molydal equivalent.
+    try {
+      const response = await model.generateContent(
+        `You are an expert in industrial lubricants. Translate the competitor product name into a technical search query to find its Molydal equivalent.
 
 EXPECTED OUTPUT: only the search terms, no explanation, no trailing punctuation, in English.
 
@@ -246,9 +247,15 @@ Examples:
 - "Bérulube PV DAB 10" → petroleum jelly petrolatum technical pharmaceutical white grade
 
 ${prompt}`,
-    );
+      );
 
-    return response.response.text()?.trim() || question;
+      return response.response.text()?.trim() || question;
+    } catch (error) {
+      this.logger.warn(
+        `Query reformulation failed; using the original question: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return question;
+    }
   }
 
   /**

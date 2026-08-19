@@ -2,12 +2,17 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { setDefaultResultOrder } from 'node:dns';
 import { json } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
+  // Google currently classifies the VPS's OVH IPv6 as an unsupported location.
+  // Prefer IPv4 for outbound calls while keeping IPv6 as a DNS fallback.
+  setDefaultResultOrder('ipv4first');
+
   const app = await NestFactory.create(AppModule);
 
   // Allow large payloads for image uploads (base64)

@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Delete, Body, Param, Res, UseGuards,
-  UseInterceptors, UploadedFile, BadRequestException,
+  UseInterceptors, UploadedFile, BadRequestException, Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -22,6 +22,8 @@ import { UploadAttachmentDto } from './dto/upload-attachment.dto';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ChatController {
+  private readonly logger = new Logger(ChatController.name);
+
   constructor(
     private chatService: ChatService,
     private transcriptionService: TranscriptionService,
@@ -179,10 +181,17 @@ export class ChatController {
       res.write('data: [DONE]\n\n');
       res.end();
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Internal error';
-      res.write(
-        `data: ${JSON.stringify({ type: 'text', content: `Error: ${msg}` })}\n\n`,
+      this.logger.error(
+        'Chat stream generation failed',
+        error instanceof Error ? error.stack : String(error),
       );
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'text',
+          content: 'The AI assistant is temporarily unavailable. Please try again.',
+        })}\n\n`,
+      );
+      res.write('data: [DONE]\n\n');
       res.end();
     }
   }
