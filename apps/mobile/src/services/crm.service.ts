@@ -1,5 +1,16 @@
 import { api } from '@/lib/axios';
 import { ENDPOINTS } from '@/constants/api';
+import { z } from 'zod';
+
+const CrmOptionSchema = z.object({ value: z.string(), label: z.string() });
+const CrmCommunicationOptionsSchema = z.object({
+  actions: z.array(CrmOptionSchema),
+  objectives: z.array(CrmOptionSchema),
+  actionsAvailable: z.boolean(),
+  objectivesAvailable: z.boolean(),
+});
+export type CrmOption = z.infer<typeof CrmOptionSchema>;
+export type CrmCommunicationOptions = z.infer<typeof CrmCommunicationOptionsSchema>;
 
 export interface CrmCompany {
   id: string;
@@ -19,6 +30,10 @@ export interface CrmStatus {
 }
 
 export const crmService = {
+  async getCommunicationOptions(): Promise<CrmCommunicationOptions> {
+    const response = await api.get('/crm/communication-options', { timeout: 60000 });
+    return CrmCommunicationOptionsSchema.parse(response.data);
+  },
   async getStatus(): Promise<CrmStatus> {
     const response = await api.get(ENDPOINTS.crm.credentialsStatus);
     return response.data;

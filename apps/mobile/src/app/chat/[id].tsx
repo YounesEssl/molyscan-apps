@@ -28,6 +28,7 @@ import {
 } from '@/services/chatFree.service';
 import { useFileAttachment } from '@/hooks/useFileAttachment';
 import { useAuthStore } from '@/stores/auth.store';
+import { useAiDataConsent } from '@/providers/AiDataConsentProvider';
 
 export default function ChatDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,6 +48,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const fileAttachment = useFileAttachment();
+  const { requestConsent } = useAiDataConsent();
 
   useEffect(() => {
     if (!id) return;
@@ -73,6 +75,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
     const trimmed = text.trim();
     const hasAttachment = !!fileAttachment.attachment;
     if ((!trimmed && !hasAttachment) || isLoading || !id) return;
+    if (!(await requestConsent())) return;
     setInputText('');
 
     const displayContent = trimmed || (hasAttachment ? `📄 ${fileAttachment.attachment!.name}` : '');

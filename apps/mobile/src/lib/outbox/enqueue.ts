@@ -3,6 +3,8 @@ import { enqueue } from './repository';
 import { saveImage } from './imageStore';
 import { triggerSync } from './connectivity';
 import { createOutboxId, type WorkflowCreatePayload } from './types';
+import { removeByKind } from './repository';
+import { deleteImage } from './imageStore';
 
 export interface ScanLocation {
   lat?: number;
@@ -27,6 +29,7 @@ export async function enqueueScanAnalysis(args: {
     id,
     kind: 'scan_analysis',
     payload: {
+      aiConsentRecorded: true,
       message: args.message,
       locationLat: args.location?.lat,
       locationLng: args.location?.lng,
@@ -37,6 +40,13 @@ export async function enqueueScanAnalysis(args: {
   });
   await afterEnqueue();
   return id;
+}
+
+/** Drop scans that have not yet left the device when AI consent is withdrawn. */
+export async function purgeQueuedAiScans(): Promise<void> {
+  const imagePaths = await removeByKind('scan_analysis');
+  await Promise.all(imagePaths.map((path) => deleteImage(path)));
+  await useOutboxStore.getState().refreshCounts();
 }
 
 /** Queue a price-request (workflow) creation. Returns the outbox id. */

@@ -46,7 +46,9 @@ export function EquivalencesPage() {
   const validatedQuery = useQuery({
     queryKey: ['equivalences'],
     queryFn: async () => {
-      const { data } = await api.get<ExpertEquivalence[]>('/admin/equivalences');
+      const { data } = await api.get<ExpertEquivalence[]>(
+        '/admin/equivalences',
+      );
       return data;
     },
   });
@@ -96,7 +98,12 @@ export function EquivalencesPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <Aura size={420} color="#ff5b50" opacity={0.1} style={{ top: -170, right: -130 }} />
+      <Aura
+        size={420}
+        color="#ff5b50"
+        opacity={0.1}
+        style={{ top: -170, right: -130 }}
+      />
 
       <div className="relative mx-auto max-w-6xl px-8 py-12">
         {/* Header */}
@@ -109,8 +116,8 @@ export function EquivalencesPage() {
               Équivalences <span className="italic text-red">expert</span>
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
-              Le jugement des experts Molydal, encodé. Une équivalence validée ici
-              devient la réponse déterministe d'un scan.
+              Le jugement des experts Molydal, encodé. Une équivalence validée
+              ici devient la réponse déterministe d'un scan.
             </p>
           </div>
           <div className="flex items-center gap-2.5">
@@ -139,12 +146,18 @@ export function EquivalencesPage() {
 
         {/* Tabs */}
         <div className="mt-8 inline-flex gap-1 rounded-full border border-ink-4 bg-paper-2 p-1">
-          <TabButton active={tab === 'validated'} onClick={() => setTab('validated')}>
+          <TabButton
+            active={tab === 'validated'}
+            onClick={() => setTab('validated')}
+          >
             <CheckCircle2 className="h-4 w-4" />
             Validées
             <Count n={equivalences.length} active={tab === 'validated'} />
           </TabButton>
-          <TabButton active={tab === 'pending'} onClick={() => setTab('pending')}>
+          <TabButton
+            active={tab === 'pending'}
+            onClick={() => setTab('pending')}
+          >
             <Sparkles className="h-4 w-4" />
             À valider
             <Count n={pending.length} active={tab === 'pending'} highlight />
@@ -169,6 +182,13 @@ export function EquivalencesPage() {
                 competitorBrand: p.competitorBrand,
                 competitorName: p.competitorName,
                 molydalEquivalent: p.currentGuess ?? undefined,
+              })
+            }
+            onNoEquivalent={(p) =>
+              openCreate({
+                competitorBrand: p.competitorBrand,
+                competitorName: p.competitorName,
+                noEquivalent: true,
               })
             }
           />
@@ -275,7 +295,7 @@ function ValidatedTab({
         ) : filtered.length === 0 ? (
           <EmptyState hasAny={total > 0} />
         ) : (
-          <div className="overflow-hidden rounded-[22px] border border-ink-4 bg-paper-2 shadow-card">
+          <div className="overflow-x-auto rounded-[22px] border border-ink-4 bg-paper-2 shadow-card">
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-ink-4 text-xs font-semibold uppercase tracking-[0.1em] text-ink-3">
@@ -296,13 +316,22 @@ function ValidatedTab({
                       <p className="text-[13px] font-medium uppercase tracking-wide text-ink-3">
                         {e.competitorBrand}
                       </p>
-                      <p className="font-medium text-ink">{e.competitorName}</p>
+                      <button
+                        type="button"
+                        onClick={() => onEdit(e)}
+                        className="cursor-pointer text-left font-medium text-ink underline-offset-4 hover:underline focus-visible:underline"
+                        aria-label={`Modifier ${e.competitorBrand} ${e.competitorName}`}
+                      >
+                        {e.competitorName}
+                      </button>
                     </td>
                     <td className="px-5 py-4">
                       <span className="inline-flex items-center gap-2">
                         <ArrowRight className="h-3.5 w-3.5 text-red" />
                         <span className="font-display text-[15px] font-semibold text-ink">
-                          {e.molydalEquivalent}
+                          {e.noEquivalent
+                            ? 'Aucun équivalent'
+                            : e.molydalEquivalent}
                         </span>
                         {e.molydalFamily && (
                           <span className="text-xs text-ink-3">
@@ -312,7 +341,13 @@ function ValidatedTab({
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <ConfidenceBadge value={e.confidence} />
+                      {e.noEquivalent ? (
+                        <span className="text-sm text-ink-2">
+                          Absence confirmée
+                        </span>
+                      ) : (
+                        <ConfidenceBadge value={e.confidence} />
+                      )}
                     </td>
                     <td className="px-5 py-4 text-sm text-ink-2">
                       {e.validatedBy ?? '—'}
@@ -341,10 +376,12 @@ function PendingTab({
   query,
   pending,
   onValidate,
+  onNoEquivalent,
 }: {
   query: { isLoading: boolean; isError: boolean };
   pending: PendingEquivalence[];
   onValidate: (p: PendingEquivalence) => void;
+  onNoEquivalent: (p: PendingEquivalence) => void;
 }) {
   if (query.isLoading) {
     return (
@@ -379,8 +416,8 @@ function PendingTab({
   return (
     <div className="mt-6 space-y-2.5">
       <p className="text-sm text-ink-2">
-        Produits concurrents scannés sans équivalence validée. Valider une entrée
-        rend tous ses prochains scans déterministes.
+        Produits concurrents scannés sans équivalence validée. Valider une
+        entrée rend tous ses prochains scans déterministes.
       </p>
       {pending.map((p) => (
         <div
@@ -392,6 +429,13 @@ function PendingTab({
               {p.competitorBrand}
             </p>
             <p className="font-medium text-ink">{p.competitorName}</p>
+            <p className="mt-1 text-xs text-ink-2" title={p.requestedBy?.email}>
+              Dernier scan par{' '}
+              {p.requestedBy
+                ? `${p.requestedBy.firstName} ${p.requestedBy.lastName}`.trim() ||
+                  p.requestedBy.email
+                : 'Auteur inconnu'}
+            </p>
           </div>
 
           {p.currentGuess && (
@@ -410,6 +454,13 @@ function PendingTab({
             <Link2 className="h-3.5 w-3.5" />
             {p.scanCount} scan{p.scanCount > 1 ? 's' : ''}
           </span>
+
+          <button
+            onClick={() => onNoEquivalent(p)}
+            className="cursor-pointer rounded-full border border-ink-4 px-4 py-2 text-sm font-medium text-ink-2 transition-colors hover:bg-paper hover:text-ink"
+          >
+            Aucun équivalent
+          </button>
 
           <button
             onClick={() => onValidate(p)}

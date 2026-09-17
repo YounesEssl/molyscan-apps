@@ -61,4 +61,9 @@ export const authService = {
   logout: async (): Promise<void> => {
     await storage.clearTokens();
   },
+
+  deleteAccount: async (): Promise<void> => {
+    await api.delete(ENDPOINTS.auth.deleteAccount);
+    await storage.clearTokens();
+  },
 } as const;

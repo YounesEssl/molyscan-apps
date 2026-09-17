@@ -13,6 +13,12 @@ import { ApproveWorkflowDto, RejectWorkflowDto } from './dto/review-workflow.dto
 import { WorkflowStatus, NotificationType, UserRole, UserStatus } from '@prisma/client';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
 
+interface NotificationRecipient {
+  id: string;
+  email: string;
+  departments: { emailNotificationsDisabled: boolean }[];
+}
+
 @Injectable()
 export class WorkflowsService {
   private readonly logger = new Logger(WorkflowsService.name);
@@ -97,14 +103,20 @@ export class WorkflowsService {
 
     // Routage : commerciaux du/des département(s) du distributeur ; repli admins.
     const departmentIds = user.departments.map((d) => d.id);
-    let recipients = departmentIds.length
+    let recipients: NotificationRecipient[] = departmentIds.length
       ? await this.prisma.user.findMany({
           where: {
             role: UserRole.commercial,
             status: UserStatus.approved,
             departments: { some: { id: { in: departmentIds } } },
           },
-          select: { id: true, email: true },
+          select: {
+            id: true,
+            email: true,
+            departments: {
+              select: { emailNotificationsDisabled: true },
+            },
+          },
         })
       : [];
 
@@ -113,7 +125,13 @@ export class WorkflowsService {
       routedToAdmins = true;
       recipients = await this.prisma.user.findMany({
         where: { role: UserRole.admin, status: UserStatus.approved },
-        select: { id: true, email: true },
+        select: {
+          id: true,
+          email: true,
+          departments: {
+            select: { emailNotificationsDisabled: true },
+          },
+        },
       });
     }
 
@@ -168,7 +186,7 @@ export class WorkflowsService {
   private async notifyRecipients(
     workflowId: string,
     ctx: {
-      recipients: { id: string; email: string }[];
+      recipients: NotificationRecipient[];
       distributor: { firstName: string; lastName: string; email: string };
       product: { name: string; ref: string };
       quantity?: number | null;
@@ -183,8 +201,16 @@ export class WorkflowsService {
       `${ctx.distributor.firstName} ${ctx.distributor.lastName}`.trim();
 
     try {
+      const emailRecipients = ctx.recipients
+        .filter((recipient) =>
+          recipient.departments.every(
+            (department) => !department.emailNotificationsDisabled,
+          ),
+        )
+        .map((recipient) => recipient.email);
+
       await this.emailService.sendPriceRequestToCommercials({
-        recipients: ctx.recipients.map((r) => r.email),
+        recipients: emailRecipients,
         distributor: ctx.distributor,
         product: ctx.product,
         quantity: ctx.quantity,

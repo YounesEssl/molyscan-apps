@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, Trash2, ArrowRight } from 'lucide-react';
 import { api, getApiErrorMessage } from '@/lib/api';
@@ -8,6 +8,7 @@ export interface EquivalenceDraft {
   competitorBrand: string;
   competitorName: string;
   molydalEquivalent?: string;
+  noEquivalent?: boolean;
 }
 
 interface Props {
@@ -48,13 +49,25 @@ function Field({
 const inputClass =
   'w-full rounded-2xl border border-ink-4 bg-paper px-4 py-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-red-border focus:bg-paper-2';
 
-export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) {
+export function EquivalenceEditDrawer({
+  equivalence,
+  prefill,
+  onClose,
+}: Props) {
   const queryClient = useQueryClient();
   const isEdit = !!equivalence;
+  const dialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const current = dialog.current;
+    current?.showModal();
+    return () => current?.close();
+  }, []);
 
   const [competitorBrand, setCompetitorBrand] = useState('');
   const [competitorName, setCompetitorName] = useState('');
   const [molydalEquivalent, setMolydalEquivalent] = useState('');
+  const [noEquivalent, setNoEquivalent] = useState(false);
   const [molydalFamily, setMolydalFamily] = useState('');
   const [confidence, setConfidence] = useState(100);
   const [note, setNote] = useState('');
@@ -62,13 +75,22 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
   const [entered, setEntered] = useState(false);
 
   useEffect(() => {
-    setCompetitorBrand(equivalence?.competitorBrand ?? prefill?.competitorBrand ?? '');
-    setCompetitorName(equivalence?.competitorName ?? prefill?.competitorName ?? '');
+    setCompetitorBrand(
+      equivalence?.competitorBrand ?? prefill?.competitorBrand ?? '',
+    );
+    setCompetitorName(
+      equivalence?.competitorName ?? prefill?.competitorName ?? '',
+    );
     setMolydalEquivalent(
       equivalence?.molydalEquivalent ?? prefill?.molydalEquivalent ?? '',
     );
     setMolydalFamily(equivalence?.molydalFamily ?? '');
-    setConfidence(equivalence?.confidence ?? 100);
+    setNoEquivalent(
+      equivalence?.noEquivalent ?? prefill?.noEquivalent ?? false,
+    );
+    setConfidence(
+      equivalence?.noEquivalent ? 100 : (equivalence?.confidence ?? 100),
+    );
     setNote(equivalence?.note ?? '');
     setError(null);
     const id = requestAnimationFrame(() => setEntered(true));
@@ -90,10 +112,11 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
       const payload = {
         competitorBrand: competitorBrand.trim(),
         competitorName: competitorName.trim(),
-        molydalEquivalent: molydalEquivalent.trim(),
-        molydalFamily: molydalFamily.trim() || undefined,
-        confidence,
-        note: note.trim() || undefined,
+        noEquivalent,
+        molydalEquivalent: noEquivalent ? undefined : molydalEquivalent.trim(),
+        molydalFamily: noEquivalent ? '' : molydalFamily.trim(),
+        confidence: noEquivalent ? 0 : confidence,
+        note: note.trim(),
       };
       if (isEdit) {
         await api.patch(`/admin/equivalences/${equivalence.id}`, payload);
@@ -117,17 +140,31 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
       invalidate();
       close();
     },
-    onError: (err) => setError(getApiErrorMessage(err, 'Suppression impossible.')),
+    onError: (err) =>
+      setError(getApiErrorMessage(err, 'Suppression impossible.')),
   });
 
   const busy = save.isPending || remove.isPending;
   const canSave =
-    competitorBrand.trim() && competitorName.trim() && molydalEquivalent.trim();
+    competitorBrand.trim() &&
+    competitorName.trim() &&
+    (noEquivalent || molydalEquivalent.trim());
+  const requestClose = () => {
+    if (!busy) close();
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <dialog
+      ref={dialog}
+      aria-labelledby="equivalence-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        requestClose();
+      }}
+      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-transparent p-0 open:flex open:justify-end backdrop:bg-transparent"
+    >
       <div
-        onClick={close}
+        onClick={requestClose}
         className={`absolute inset-0 cursor-pointer bg-ink/30 backdrop-blur-[2px] transition-opacity duration-200 ${
           entered ? 'opacity-100' : 'opacity-0'
         }`}
@@ -144,7 +181,10 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-red">
               {isEdit ? 'Modifier' : 'Nouvelle équivalence'}
             </p>
-            <h2 className="mt-1 truncate font-display text-xl font-semibold tracking-tight text-ink">
+            <h2
+              id="equivalence-title"
+              className="mt-1 truncate font-display text-xl font-semibold tracking-tight text-ink"
+            >
               {competitorBrand || competitorName
                 ? `${competitorBrand} ${competitorName}`.trim()
                 : 'Équivalence'}
@@ -152,7 +192,8 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
           </div>
           <button
             type="button"
-            onClick={close}
+            onClick={requestClose}
+            disabled={busy}
             className="shrink-0 cursor-pointer rounded-full p-2 text-ink-3 transition-colors hover:bg-black/[0.04] hover:text-ink"
             aria-label="Fermer"
           >
@@ -165,6 +206,7 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Marque concurrent">
               <input
+                aria-label="Marque concurrent"
                 value={competitorBrand}
                 onChange={(e) => setCompetitorBrand(e.target.value)}
                 placeholder="Molykote"
@@ -173,6 +215,7 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
             </Field>
             <Field label="Nom concurrent">
               <input
+                aria-label="Nom concurrent"
                 value={competitorName}
                 onChange={(e) => setCompetitorName(e.target.value)}
                 placeholder="BR-2 Plus"
@@ -181,64 +224,99 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
             </Field>
           </div>
 
-          {/* Mapping arrow */}
-          <div className="flex items-center justify-center">
-            <span className="flex items-center gap-2 rounded-full bg-red-soft px-3 py-1 text-xs font-semibold text-red">
-              <ArrowRight className="h-3.5 w-3.5" />
-              équivaut à
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-ink-4 bg-paper p-4 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={noEquivalent}
+              disabled={busy}
+              onChange={(e) => setNoEquivalent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-red"
+            />
+            <span>
+              <span className="block font-semibold">
+                Aucun équivalent Molydal
+              </span>
+              <span className="mt-1 block text-ink-2">
+                Confirmer l’absence d’équivalent pour empêcher l’IA d’en
+                proposer un pour ce produit.
+              </span>
             </span>
-          </div>
+          </label>
 
-          <Field label="Équivalent Molydal" hint="Le nom exact du produit Molydal.">
-            <input
-              value={molydalEquivalent}
-              onChange={(e) => setMolydalEquivalent(e.target.value)}
-              placeholder="MO/3"
-              className={inputClass}
-            />
-          </Field>
+          {!noEquivalent && (
+            <>
+              {/* Mapping arrow */}
+              <div className="flex items-center justify-center">
+                <span className="flex items-center gap-2 rounded-full bg-red-soft px-3 py-1 text-xs font-semibold text-red">
+                  <ArrowRight className="h-3.5 w-3.5" />
+                  équivaut à
+                </span>
+              </div>
 
-          <Field label="Famille Molydal (optionnel)">
-            <input
-              value={molydalFamily}
-              onChange={(e) => setMolydalFamily(e.target.value)}
-              placeholder="GRAISSES"
-              className={inputClass}
-            />
-          </Field>
+              <Field
+                label="Équivalent Molydal"
+                hint="Le nom exact du produit Molydal."
+              >
+                <input
+                  aria-label="Équivalent Molydal"
+                  value={molydalEquivalent}
+                  onChange={(e) => setMolydalEquivalent(e.target.value)}
+                  placeholder="MO/3"
+                  className={inputClass}
+                />
+              </Field>
 
-          <Field
-            label="Confiance"
-            hint="Un scan affichera ce niveau de compatibilité."
-          >
-            <div className="flex gap-1.5 rounded-full border border-ink-4 bg-paper p-1">
-              {CONFIDENCE_OPTIONS.map((opt) => {
-                const active = opt.value === confidence;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setConfidence(opt.value)}
-                    className={[
-                      'flex-1 cursor-pointer rounded-full px-2 py-2 text-center text-sm font-medium transition-all disabled:cursor-not-allowed',
-                      active
-                        ? 'bg-gradient-to-br from-red-vivid to-red text-white shadow-red'
-                        : 'text-ink-2 hover:text-ink',
-                    ].join(' ')}
-                  >
-                    <span className="block text-[13px] font-semibold">
-                      {opt.value}%
-                    </span>
-                    <span className="block text-[10px] opacity-80">{opt.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
+              <Field label="Famille Molydal (optionnel)">
+                <input
+                  aria-label="Famille Molydal"
+                  value={molydalFamily}
+                  onChange={(e) => setMolydalFamily(e.target.value)}
+                  placeholder="GRAISSES"
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field
+                label="Confiance"
+                hint="Un scan affichera ce niveau de compatibilité."
+              >
+                <div
+                  role="group"
+                  aria-label="Confiance"
+                  className="flex gap-1.5 rounded-full border border-ink-4 bg-paper p-1"
+                >
+                  {CONFIDENCE_OPTIONS.map((opt) => {
+                    const active = opt.value === confidence;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setConfidence(opt.value)}
+                        className={[
+                          'flex-1 cursor-pointer rounded-full px-2 py-2 text-center text-sm font-medium transition-all disabled:cursor-not-allowed',
+                          active
+                            ? 'bg-gradient-to-br from-red-vivid to-red text-white shadow-red'
+                            : 'text-ink-2 hover:text-ink',
+                        ].join(' ')}
+                      >
+                        <span className="block text-[13px] font-semibold">
+                          {opt.value}%
+                        </span>
+                        <span className="block text-[10px] opacity-80">
+                          {opt.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+            </>
+          )}
 
           <Field label="Note (optionnel)">
             <textarea
+              aria-label="Note interne"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
@@ -251,11 +329,17 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 border-t border-ink-4 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-4 p-6">
           {isEdit ? (
             <button
               type="button"
               onClick={() => {
+                if (
+                  !window.confirm(
+                    `Supprimer la décision pour ${competitorBrand} ${competitorName} ? L’IA pourra à nouveau proposer une équivalence pour ce produit. Cette suppression est définitive.`,
+                  )
+                )
+                  return;
                 setError(null);
                 remove.mutate();
               }}
@@ -276,7 +360,7 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={close}
+              onClick={requestClose}
               disabled={busy}
               className="cursor-pointer rounded-full border border-ink-4 px-5 py-2.5 text-sm font-semibold text-ink-2 transition-colors hover:bg-black/[0.03] hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -297,6 +381,6 @@ export function EquivalenceEditDrawer({ equivalence, prefill, onClose }: Props) 
           </div>
         </div>
       </aside>
-    </div>
+    </dialog>
   );
 }

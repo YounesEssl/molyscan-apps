@@ -5,6 +5,7 @@
 import { api } from '@/lib/axios';
 import { storage } from '@/lib/storage';
 import { API_CONFIG } from '@/constants/api';
+import { createChatStreamParser } from '@/lib/chatStream';
 
 export interface ScanContext {
   id: string;
@@ -140,39 +141,29 @@ export const chatFreeService = {
         xhr.responseType = 'text';
 
         let lastIndex = 0;
+        const consume = createChatStreamParser((event) => {
+          if (event.type === 'text') callbacks.onToken(event.content);
+          else callbacks.onSources(event.sources);
+        });
 
         xhr.onprogress = () => {
           const newData = xhr.responseText.slice(lastIndex);
           lastIndex = xhr.responseText.length;
 
-          const lines = newData.split('\n');
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || !trimmed.startsWith('data: ')) continue;
-
-            const data = trimmed.slice(6);
-            if (data === '[DONE]') continue;
-
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.type === 'text') {
-                callbacks.onToken(parsed.content);
-              } else if (parsed.type === 'sources') {
-                callbacks.onSources(parsed.sources);
-              }
-            } catch {
-              // silent: malformed SSE chunk, it's ok to fail
-            }
-          }
+          consume(newData);
         };
 
         xhr.onload = () => {
+          if (xhr.status < 200 || xhr.status >= 300) {
+            reject(new Error(`Request failed (${xhr.status})`));
+            return;
+          }
+          consume(xhr.responseText.slice(lastIndex) + '\n\n');
           callbacks.onDone();
           resolve();
         };
 
         xhr.onerror = () => {
-          callbacks.onError(`Network error (${xhr.status})`);
           reject(new Error('Network error'));
         };
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text as RNText } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text as RNText } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,12 +18,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { scanService } from '@/services/scan.service';
 import type { ScanRecord } from '@/schemas/scan.schema';
 import { PERMISSIONS } from '@/constants/roles';
+import { useAiDataConsent } from '@/providers/AiDataConsentProvider';
 
 export default function ProfileScreen(): React.JSX.Element {
   const router = useRouter();
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
-  const { logout } = useAuth();
+  const { logout, deleteAccount } = useAuth();
+  const { consentGranted, requestConsent, revokeConsent } = useAiDataConsent();
   const { contentPaddingBottom } = useTabBarSpacing();
   const [scans, setScans] = useState<ScanRecord[]>([]);
 
@@ -53,9 +55,50 @@ export default function ProfileScreen(): React.JSX.Element {
     router.replace('/(auth)/login');
   };
 
+  const handleDeleteAccount = (): void => {
+    Alert.alert(
+      t('profile.deleteAccountTitle'),
+      t('profile.deleteAccountMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('profile.deleteAccountConfirm'),
+          style: 'destructive',
+          onPress: () => {
+            void deleteAccount()
+              .then(() => router.replace('/(auth)/login'))
+              .catch(() => {
+                Alert.alert(
+                  t('profile.deleteAccountErrorTitle'),
+                  t('profile.deleteAccountErrorMessage'),
+                );
+              });
+          },
+        },
+      ],
+    );
+  };
+
   const handleSettingsPress = (key: string): void => {
     if (key === 'privacy') {
       void Linking.openURL('https://admin.molyscan.fr/privacy');
+    } else if (key === 'aiDataSharing') {
+      if (!consentGranted) {
+        void requestConsent();
+        return;
+      }
+      Alert.alert(
+        t('profile.aiDataSharingManageTitle'),
+        t('profile.aiDataSharingManageMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('profile.aiDataSharingRevoke'),
+            style: 'destructive',
+            onPress: () => void revokeConsent(),
+          },
+        ],
+      );
     } else if (key === 'crmCredentials') {
       router.push('/crm-credentials');
     }
@@ -87,7 +130,9 @@ export default function ProfileScreen(): React.JSX.Element {
 
         <ProfileSettings
           canUpdateCRM={canUpdateCRM}
+          aiConsentGranted={consentGranted}
           onLogout={handleLogout}
+          onDeleteAccount={handleDeleteAccount}
           onItemPress={handleSettingsPress}
         />
 

@@ -15,6 +15,7 @@ import { authService } from '@/services/auth.service';
 import { storage } from '@/lib/storage';
 import { COLORS } from '@/constants/theme';
 import { ThemeProvider } from '@/providers/ThemeProvider';
+import { AiDataConsentProvider } from '@/providers/AiDataConsentProvider';
 function AppHooks(): null {
   useOutbox();
   usePushNotifications();
@@ -80,19 +81,21 @@ function RootContent(): React.JSX.Element {
     <View style={{ flex: 1 }}>
       <AppHooks />
       <OfflineBanner />
-      <AuthGuard>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="product/[id]" />
-          <Stack.Screen name="chat" />
-          <Stack.Screen name="workflow" />
-          <Stack.Screen name="export" />
-          <Stack.Screen name="voice-note" />
-          <Stack.Screen name="crm-credentials" />
-          <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
-        </Stack>
-      </AuthGuard>
+      <AiDataConsentProvider>
+        <AuthGuard>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="product/[id]" />
+            <Stack.Screen name="chat" />
+            <Stack.Screen name="workflow" />
+            <Stack.Screen name="export" />
+            <Stack.Screen name="voice-note" />
+            <Stack.Screen name="crm-credentials" />
+            <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
+          </Stack>
+        </AuthGuard>
+      </AiDataConsentProvider>
     </View>
   );
 }

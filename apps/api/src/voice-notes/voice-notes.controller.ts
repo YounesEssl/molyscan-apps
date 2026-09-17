@@ -9,6 +9,7 @@ import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decor
 import { VoiceNotesService } from './voice-notes.service';
 import { CreateVoiceNoteDto } from './dto/create-voice-note.dto';
 import { UpdateVoiceNoteDto } from './dto/update-voice-note.dto';
+import { ResyncVoiceNoteDto } from './dto/resync-voice-note.dto';
 
 @ApiTags('Voice Notes')
 @Controller('voice-notes')
@@ -53,8 +54,8 @@ export class VoiceNotesController {
   }
 
   @Post(':id/resync')
-  @ApiOperation({ summary: 'Retry pushing a voice note to the CRM' })
-  resync(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    return this.voiceNotesService.resync(id, user.sub);
+  @ApiOperation({ summary: 'Send the current voice note revision to the CRM' })
+  resync(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: ResyncVoiceNoteDto) {
+    return this.voiceNotesService.resync(id, user.sub, dto?.expectedRevision);
   }
 }

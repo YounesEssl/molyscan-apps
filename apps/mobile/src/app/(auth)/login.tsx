@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,12 +8,8 @@ import {
   Text as RNText,
   Alert,
   TextInput,
-  TouchableWithoutFeedback,
-  Keyboard,
+  ScrollView,
   useWindowDimensions,
-  Animated,
-  Easing,
-  type KeyboardEvent,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -42,48 +38,6 @@ export default function LoginScreen(): React.JSX.Element {
   // Responsive headline size: "instantanément" (14 chars) must fit on one
   // line across iPhone SE (320w) → iPhone 17 Pro Max (430w).
   const headlineFontSize = Math.min(48, Math.max(30, (width - 68) / 8));
-
-  // Smoothly collapse the hero (logo + headline + subtitle) when the keyboard
-  // appears so the form becomes the visual focus.
-  const heroAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const animateTo = (toValue: number, event?: KeyboardEvent) => {
-      const duration = event?.duration ?? 250;
-      Animated.timing(heroAnim, {
-        toValue,
-        duration,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
-      }).start();
-    };
-
-    const showSub = Keyboard.addListener(showEvt, (e) => animateTo(0, e));
-    const hideSub = Keyboard.addListener(hideEvt, (e) => animateTo(1, e));
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [heroAnim]);
-
-  const heroOpacity = heroAnim;
-  const heroScale = heroAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.92, 1],
-  });
-  const heroTranslate = heroAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-24, 0],
-  });
-  // Collapse height of hero section from its natural height down to 0
-  const heroHeight = heroAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
 
   const handleLogin = async (): Promise<void> => {
     if (!email.trim() || !password) {
@@ -128,135 +82,137 @@ export default function LoginScreen(): React.JSX.Element {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="height"
+        enabled={Platform.OS === 'android'}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <SafeAreaView style={styles.inner}>
-            <View style={styles.content}>
-              {/* Hero — collapses smoothly when keyboard appears */}
-              <Animated.View
-                style={[
-                  styles.hero,
-                  {
-                    opacity: heroOpacity,
-                    transform: [
-                      { scale: heroScale },
-                      { translateY: heroTranslate },
-                    ],
-                    // scaleY of the whole section via height multiplier
-                    maxHeight: heroHeight.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, 400],
-                    }),
-                  },
-                ]}
-              >
-                <Logo3 size={52} />
-                <View style={styles.headlineWrap}>
-                  <RNText
-                    style={[
-                      styles.headline,
-                      {
-                        fontSize: headlineFontSize,
-                        lineHeight: headlineFontSize * 1.05,
-                      },
-                    ]}
-                    allowFontScaling={false}
-                    adjustsFontSizeToFit
-                    numberOfLines={3}
-                    minimumFontScale={0.6}
-                  >
-                    {t('auth.headlineLine1')}
-                    <RNText style={styles.headlineItalicRed}>{t('auth.headlineBrand')}</RNText>
-                    {t('auth.headlineLine2')}
+        <SafeAreaView style={styles.inner}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={
+              Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+            }
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            showsVerticalScrollIndicator={false}
+          >
+            {/*
+                Keep the hero in normal document flow. On iOS, Password AutoFill
+                can emit several keyboard frame changes for a single focus. The
+                previous animated maxHeight reacted to each event and left Fabric
+                with stale/clipped views (including a fragment in the top-left).
+              */}
+            <View style={styles.hero}>
+              <Logo3 size={52} />
+              <View style={styles.headlineWrap}>
+                <RNText
+                  style={[
+                    styles.headline,
+                    {
+                      fontSize: headlineFontSize,
+                      lineHeight: headlineFontSize * 1.05,
+                    },
+                  ]}
+                  allowFontScaling={false}
+                  adjustsFontSizeToFit
+                  numberOfLines={3}
+                  minimumFontScale={0.6}
+                >
+                  {t('auth.headlineLine1')}
+                  <RNText style={styles.headlineItalicRed}>
+                    {t('auth.headlineBrand')}
                   </RNText>
-                </View>
-                <Text style={styles.subtitle}>
-                  {t('auth.subtitle')}
-                </Text>
-              </Animated.View>
-
-              {/* Form — stays pinned, becomes the focus on keyboard open */}
-              <View style={styles.formGroup}>
-                <Input
-                  label={t('auth.email')}
-                  placeholder={t('auth.emailPlaceholder')}
-                  value={email}
-                  onChangeText={setEmail}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoComplete="email"
-                  textContentType="emailAddress"
-                  keyboardType="email-address"
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                  blurOnSubmit={false}
-                />
-                <Input
-                  ref={passwordRef}
-                  label={t('auth.password')}
-                  placeholder={t('auth.passwordPlaceholder')}
-                  value={password}
-                  onChangeText={setPassword}
-                  isPassword
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoComplete="password"
-                  textContentType="password"
-                  returnKeyType="done"
-                  onSubmitEditing={handleLogin}
-                />
-                <TouchableOpacity
-                  style={styles.forgotRow}
-                  onPress={() => {
-                    haptic.light();
-                    router.push('/(auth)/forgot-password');
-                  }}
-                  accessibilityRole="link"
-                  accessibilityLabel={t('auth.forgotPassword')}
-                >
-                  <RNText style={styles.linkAccent}>
-                    {t('auth.forgotPassword')}
-                  </RNText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.primaryBtnWrapper}
-                  onPress={() => {
-                    haptic.medium();
-                    void handleLogin();
-                  }}
-                  disabled={loading}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('auth.signInA11y')}
-                  accessibilityState={{ disabled: loading, busy: loading }}
-                >
-                  <LinearGradient
-                    colors={['#ff5b50', '#d4251c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.primaryBtn}
-                  >
-                    <RNText style={styles.primaryBtnText}>{t('auth.signInButton')}</RNText>
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.linkRow}
-                  onPress={() => {
-                    haptic.light();
-                    router.push('/(auth)/register');
-                  }}
-                  accessibilityRole="link"
-                  accessibilityLabel={t('auth.requestAccess')}
-                >
-                  <RNText style={styles.linkMuted}>{t('auth.noAccount')} </RNText>
-                  <RNText style={styles.linkAccent}>{t('auth.requestAccess')}</RNText>
-                </TouchableOpacity>
+                  {t('auth.headlineLine2')}
+                </RNText>
               </View>
+              <Text style={styles.subtitle}>{t('auth.subtitle')}</Text>
             </View>
-          </SafeAreaView>
-        </TouchableWithoutFeedback>
+
+            {/* The native iOS scroll inset keeps focused fields above the keyboard. */}
+            <View style={styles.formGroup}>
+              <Input
+                containerStyle={styles.fieldBlock}
+                label={t('auth.email')}
+                placeholder={t('auth.emailPlaceholder')}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="username"
+                textContentType="username"
+                keyboardType="email-address"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                blurOnSubmit={false}
+              />
+              <Input
+                ref={passwordRef}
+                containerStyle={styles.fieldBlock}
+                label={t('auth.password')}
+                placeholder={t('auth.passwordPlaceholder')}
+                value={password}
+                onChangeText={setPassword}
+                isPassword
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="current-password"
+                textContentType="password"
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+              />
+              <TouchableOpacity
+                style={styles.forgotRow}
+                onPress={() => {
+                  haptic.light();
+                  router.push('/(auth)/forgot-password');
+                }}
+                accessibilityRole="link"
+                accessibilityLabel={t('auth.forgotPassword')}
+              >
+                <RNText style={styles.linkAccent}>
+                  {t('auth.forgotPassword')}
+                </RNText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.primaryBtnWrapper}
+                onPress={() => {
+                  haptic.medium();
+                  void handleLogin();
+                }}
+                disabled={loading}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('auth.signInA11y')}
+                accessibilityState={{ disabled: loading, busy: loading }}
+              >
+                <LinearGradient
+                  colors={['#ff5b50', '#d4251c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.primaryBtn}
+                >
+                  <RNText style={styles.primaryBtnText}>
+                    {t('auth.signInButton')}
+                  </RNText>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.linkRow}
+                onPress={() => {
+                  haptic.light();
+                  router.push('/(auth)/register');
+                }}
+                accessibilityRole="link"
+                accessibilityLabel={t('auth.requestAccess')}
+              >
+                <RNText style={styles.linkMuted}>{t('auth.noAccount')} </RNText>
+                <RNText style={styles.linkAccent}>
+                  {t('auth.requestAccess')}
+                </RNText>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -271,14 +227,13 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   inner: { flex: 1 },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 28,
     paddingTop: 60,
     paddingBottom: 40,
-    justifyContent: 'space-between',
   },
   hero: {
-    overflow: 'hidden',
+    flexShrink: 0,
   },
   headlineWrap: {
     marginTop: 32,
@@ -301,7 +256,16 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   formGroup: {
+    width: '100%',
+    flexShrink: 0,
+    marginTop: 'auto',
+    paddingTop: 36,
     gap: 12,
+  },
+  fieldBlock: {
+    width: '100%',
+    minHeight: 76,
+    flexShrink: 0,
   },
   forgotRow: {
     alignSelf: 'flex-end',

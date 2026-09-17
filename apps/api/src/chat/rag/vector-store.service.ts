@@ -21,6 +21,8 @@ export interface RetrievalFilters {
   format?: string;
   /** Require alimentaire (NSF H1 / food contact) products only. */
   alimentaire?: boolean;
+  /** Explicit NSF category: A1 cleaners must never satisfy an H1 lubricant requirement. */
+  nsfCategory?: 'H1' | 'A1';
   /** Require eco_responsable products only. */
   ecoResponsable?: boolean;
   /** Restrict to a specific product_family (e.g. "DÉGRAISSANTS", "GRAISSES"). */
@@ -86,7 +88,15 @@ function chunkMatchesFilters(
     const ok = conds.some((c) => accepted.includes(c?.toString().toUpperCase()));
     if (!ok) return false;
   }
-  if (filters.alimentaire === true && meta.alimentaire !== true && meta.food_grade !== true) return false;
+  if (filters.alimentaire === true || filters.nsfCategory) {
+    const required = filters.nsfCategory ?? 'H1';
+    const categories = Array.isArray(meta.nsf_categories) ? meta.nsf_categories : [];
+    if (Array.isArray(meta.nsf_categories)) {
+      if (!categories.includes(required)) return false;
+    } else if (required !== 'H1' || (meta.alimentaire !== true && meta.food_grade !== true)) {
+      return false;
+    }
+  }
   if (filters.ecoResponsable === true && meta.eco_responsable !== true && meta.eco_responsible !== true) return false;
   if (filters.family && chunk.product_family !== filters.family) return false;
   return true;

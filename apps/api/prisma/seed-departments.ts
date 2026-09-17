@@ -14,10 +14,23 @@ const prisma = new PrismaClient();
 async function main() {
   console.log(`🌱 Seeding ${DEPARTMENTS.length} départements…`);
   for (const dept of DEPARTMENTS) {
+    const emailNotificationsDisabled =
+      dept.emailNotificationsDisabled ?? false;
     await prisma.department.upsert({
       where: { name: dept.name },
-      update: { code: dept.code },
-      create: { code: dept.code, name: dept.name },
+      update: {
+        code: dept.code,
+        // Preserve existing notification preferences unless the reference
+        // explicitly sets one (for example the "Divers" department).
+        ...(dept.emailNotificationsDisabled !== undefined
+          ? { emailNotificationsDisabled: dept.emailNotificationsDisabled }
+          : {}),
+      },
+      create: {
+        code: dept.code,
+        name: dept.name,
+        emailNotificationsDisabled,
+      },
     });
   }
   console.log(`✅ ${DEPARTMENTS.length} départements upsertés.`);

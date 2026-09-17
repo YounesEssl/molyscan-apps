@@ -5,10 +5,11 @@ import {
   useAudioRecorder,
   RecordingPresets,
 } from 'expo-audio';
-import { storage } from '@/lib/storage';
-import { API_CONFIG } from '@/constants/api';
+import { transcribeAudio } from '@/services/transcription.service';
+import { useRecordingKeepAwake } from './useRecordingKeepAwake';
 import { logger } from '@/lib/logger';
 import { haptic } from '@/lib/haptics';
+import { useAiDataConsent } from '@/providers/AiDataConsentProvider';
 
 export type VoiceInputState = 'idle' | 'recording' | 'transcribing';
 
@@ -36,7 +37,9 @@ export function useVoiceInput({
   minDurationSec = 1,
 }: UseVoiceInputOptions): UseVoiceInputReturn {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const { requestConsent } = useAiDataConsent();
   const [state, setState] = useState<VoiceInputState>('idle');
+  useRecordingKeepAwake(state !== 'idle');
   const [duration, setDuration] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -48,6 +51,8 @@ export function useVoiceInput({
 
   const startRecording = useCallback(async (): Promise<void> => {
     try {
+      if (!(await requestConsent())) return;
+
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
         haptic.warning();
@@ -78,7 +83,7 @@ export function useVoiceInput({
       logger.error('Voice input start failed', error);
       setState('idle');
     }
-  }, [recorder]);
+  }, [recorder, requestConsent]);
 
   const stopAndTranscribe = useCallback(async (): Promise<void> => {
     if (timerRef.current) {
@@ -104,41 +109,7 @@ export function useVoiceInput({
         return;
       }
 
-      const formData = new FormData();
-      formData.append('audio', {
-        uri,
-        type: 'audio/m4a',
-        name: 'speech.m4a',
-      } as unknown as Blob);
-
-      // XMLHttpRequest is used directly: React Native's native XHR correctly sets
-      // multipart/form-data + boundary for FormData bodies. Both fetch() (intercepted
-      // by the whatwg-fetch polyfill) and axios (default Content-Type: application/json)
-      // fail for URI-based file uploads in React Native.
-      const token = await storage.getToken();
-      const transcription = await new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${API_CONFIG.baseURL}/chat/transcribe`);
-        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.timeout = 30000;
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              // TransformInterceptor wraps all API responses in { data: T }
-              const envelope = JSON.parse(xhr.responseText) as { data: { transcription: string } };
-              resolve((envelope.data?.transcription ?? '').trim());
-            } catch {
-              reject(new Error('Failed to parse transcription response'));
-            }
-          } else {
-            reject(new Error(`HTTP ${xhr.status}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network request failed'));
-        xhr.ontimeout = () => reject(new Error('Transcription timed out'));
-        xhr.send(formData);
-      });
+      const transcription = await transcribeAudio(uri);
 
       const text = transcription;
       if (text) {

@@ -11,6 +11,7 @@ import { StorageService } from '../storage/storage.service';
 import { ScanFiltersDto } from './dto/scan-filters.dto';
 import { EquivalentFeedbackDto } from './dto/equivalent-feedback.dto';
 import { EquivalentFeedbackVote } from '@prisma/client';
+import { normalizeProductText } from '../common/utils/normalize';
 
 @Injectable()
 export class ScansService {
@@ -133,22 +134,26 @@ export class ScansService {
 
     const scan = await this.prisma.scan.findFirst({
       where: { id: scanId, userId },
-      select: { id: true },
+      select: { id: true, molydalEquivalent: true, equivalentsJson: true },
     });
     if (!scan) throw new NotFoundException('Scan not found');
 
-    if (dto.vote === 'down' && (!dto.suggestedName || !dto.suggestedName.trim())) {
-      throw new BadRequestException('suggestedName is required when vote is "down"');
+    const equivalentName = dto.equivalentName.trim();
+    const proposals = Array.isArray(scan.equivalentsJson) ? scan.equivalentsJson : [];
+    const names = [scan.molydalEquivalent, ...proposals.map((entry: any) => entry?.name)]
+      .filter((name): name is string => typeof name === 'string');
+    if (!equivalentName || !names.some((name) => normalizeProductText(name) === normalizeProductText(equivalentName))) {
+      throw new BadRequestException('Feedback must refer to an equivalent proposed in this scan');
     }
 
     const feedback = await this.prisma.scanEquivalentFeedback.create({
       data: {
         scanId,
         userId,
-        equivalentName: dto.equivalentName.trim(),
+        equivalentName,
         vote: dto.vote as EquivalentFeedbackVote,
         suggestedName:
-          dto.vote === 'down' ? dto.suggestedName!.trim() : null,
+          dto.vote === 'down' ? dto.suggestedName?.trim() || null : null,
       },
     });
 

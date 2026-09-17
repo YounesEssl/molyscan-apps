@@ -2,13 +2,13 @@
  * RAG Real Integration Eval
  *
  * Reproduit les conversations cassées en appelant la vraie stack :
- *   Gemini (reformulation) → Supabase (vecteurs réels) → Gemini (réponse)
+ *   Gemini (reformulation) → PostgreSQL / index PIM réel → Gemini (réponse)
  *
  * Aucun mock — on teste ce que l'utilisateur voit vraiment.
- * Les sources Supabase sont loguées pour diagnostiquer les problèmes de retrieval.
+ * Les sources de la réponse sont loguées : aucun second retrieval de diagnostic.
  *
  * Run: npm run test:eval:real
- * Requires: GEMINI_API_KEY, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY
+ * Requires: GEMINI_API_KEY, OPENAI_API_KEY, DATABASE_URL
  */
 
 import * as dotenv from 'dotenv';
@@ -41,6 +41,8 @@ function containsForbidden(text: string, products: string[]): string | null {
 
 interface RealEvalResult {
   name: string;
+  status: 'running' | 'completed' | 'error' | 'incomplete';
+  error?: string;
   passed: boolean;
   foundProduct: string | null;
   forbiddenFound: string | null;
@@ -51,18 +53,37 @@ interface RealEvalResult {
 
 const results: RealEvalResult[] = [];
 
+function markInterruptedCases(): void {
+  for (const result of results) {
+    if (result.status !== 'running') continue;
+    result.status = 'incomplete';
+    result.error = 'Test interrompu avant réception de la réponse complète (timeout ou arrêt du test).';
+  }
+}
+
+afterEach(markInterruptedCases);
+
 afterAll(() => {
-  const passed = results.filter((r) => r.passed).length;
+  markInterruptedCases();
+  const passed = results.filter((r) => r.status === 'completed' && r.passed).length;
   const total = results.length;
+  const completed = results.filter((r) => r.status === 'completed').length;
+  const errors = results.filter((r) => r.status === 'error').length;
+  const incomplete = results.filter((r) => r.status === 'incomplete').length;
 
   console.log('\n');
   console.log('━'.repeat(72));
   console.log(`  RAG REAL EVAL — ${passed}/${total} passed  (vrai index PIM, vrai LLM)`);
+  console.log(`  ${total} tentés · ${completed} terminés (réponse reçue) · ${errors} erreurs · ${incomplete} incomplets`);
   console.log('━'.repeat(72));
 
   for (const r of results) {
     const icon = r.passed ? '✅' : '❌';
-    console.log(`\n${icon}  ${r.name}`);
+    console.log(`\n${icon}  ${r.name} [${r.status}]`);
+    if (r.status !== 'completed') {
+      console.log(`   ${r.status === 'error' ? 'ERREUR' : 'INCOMPLET'} : ${r.error}`);
+      continue;
+    }
     console.log(`   Attendu    : ${r.expectedProducts.join(' | ')}`);
     console.log(`   Sources DB : ${r.retrievedSources.join(', ') || '(aucune)'}`);
 
@@ -89,8 +110,10 @@ afterAll(() => {
   }
 
   console.log('\n' + '━'.repeat(72));
-  if (passed < total) {
-    console.log(`  ${total - passed} cas échoué(s).`);
+  if (total === 0) {
+    console.log('  Aucun cas tenté : vérifier la configuration ou le filtre de tests.');
+  } else if (passed < total) {
+    console.log(`  ${completed - passed} résultat(s) incorrect(s), ${errors} erreur(s), ${incomplete} cas incomplet(s).`);
     console.log(`  Si "Absent du vector store" → vérifier le PIM et réindexer.`);
     console.log(`  Si "Mal sélectionné" → ajuster le system prompt puis relancer.`);
   } else {
@@ -103,13 +126,12 @@ afterAll(() => {
 
 describe('RAG Real Eval — stack complète sans mock', () => {
   let ragService: RagService;
-  let vectorStore: VectorStoreService;
+  let module: TestingModule | undefined;
 
   const requiredEnvVars = [
     'GEMINI_API_KEY',
     'OPENAI_API_KEY',
-    'SUPABASE_URL',
-    'SUPABASE_ANON_KEY',
+    'DATABASE_URL',
   ];
   const missingVars = requiredEnvVars.filter((v) => !process.env[v]);
   const skipIfMissing = missingVars.length > 0 ? test.skip : test;
@@ -120,7 +142,7 @@ describe('RAG Real Eval — stack complète sans mock', () => {
       return;
     }
 
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
@@ -131,48 +153,52 @@ describe('RAG Real Eval — stack complète sans mock', () => {
     }).compile();
 
     ragService = module.get<RagService>(RagService);
-    vectorStore = module.get<VectorStoreService>(VectorStoreService);
+    const vectorStore = module.get<VectorStoreService>(VectorStoreService);
 
     // onModuleInit n'est pas appelé automatiquement en test — on l'appelle manuellement
     vectorStore.onModuleInit();
   });
 
+  afterAll(async () => { await module?.close(); });
+
   describe.each(EVAL_CASES)('$name', (evalCase) => {
     skipIfMissing(
       'retourne le bon équivalent avec le vrai vector store',
       async () => {
-        // ── 1. Reformulation (Gemini) + retrieval (index PIM réel) ──
-        const reformulated = await (ragService as any).reformulateQuery(
-          evalCase.query,
-          [],
-        );
-        console.log(`\n  [${evalCase.name}]`);
-        console.log(`  Requête originale  : "${evalCase.query}"`);
-        console.log(`  Requête reformulée : "${reformulated}"`);
-
-        const chunks = await vectorStore.dualSearch(evalCase.query, reformulated);
-        const retrievedSources = [...new Set(chunks.map((c) => c.product_name))];
-        console.log(`  Sources index PIM  : ${retrievedSources.join(', ') || '(aucune)'}`);
-
-        // ── 2. Génération (Gemini réel) ──
-        const result = await ragService.generateResponse({
-          question: evalCase.query,
-          conversationHistory: [],
-        });
-
-        const found = containsAny(result.text, evalCase.expectedProducts);
-        const forbidden = containsForbidden(result.text, evalCase.forbiddenProducts ?? []);
-        const passed = !!found && !forbidden;
-
-        results.push({
-          name: evalCase.name,
-          passed,
-          foundProduct: found,
-          forbiddenFound: forbidden,
-          retrievedSources,
-          expectedProducts: evalCase.expectedProducts,
-          responseHead: result.text.slice(0, 200).replace(/\n/g, ' '),
-        });
+        // Register before the first await so rejected or timed-out cases remain in the report.
+        const entry: RealEvalResult = {
+          name: evalCase.name, status: 'running', passed: false,
+          foundProduct: null, forbiddenFound: null, retrievedSources: [],
+          expectedProducts: evalCase.expectedProducts, responseHead: '',
+        };
+        results.push(entry);
+        try {
+          console.log(`\n  [${evalCase.name}]`);
+          console.log(`  Requête originale : "${evalCase.query}"`);
+          const result = await ragService.generateResponse({
+            question: evalCase.query,
+            conversationHistory: [],
+          });
+          // Jest timeouts do not cancel the underlying promise. A late reply must
+          // not turn an already reported incomplete case into a success.
+          if (entry.status !== 'running') return;
+          const found = containsAny(result.text, evalCase.expectedProducts);
+          const forbidden = containsForbidden(result.text, evalCase.forbiddenProducts ?? []);
+          Object.assign(entry, {
+            status: 'completed', passed: !!found && !forbidden,
+            foundProduct: found, forbiddenFound: forbidden,
+            retrievedSources: result.sources,
+            responseHead: result.text.slice(0, 200).replace(/\n/g, ' '),
+          });
+          console.log(`  Sources index PIM : ${result.sources.join(', ') || '(aucune)'}`);
+        } catch (error) {
+          if (entry.status === 'running') {
+            entry.status = 'error';
+            entry.error = error instanceof Error ? error.message : String(error);
+          }
+          throw error;
+        }
+        const { foundProduct: found, forbiddenFound: forbidden } = entry;
 
         if (forbidden) {
           expect(forbidden).toBeNull();

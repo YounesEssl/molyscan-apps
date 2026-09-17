@@ -12,6 +12,8 @@ import { Eye } from 'react-native-solar-icons/icons/bold-duotone';
 import { Shop2 } from 'react-native-solar-icons/icons/bold-duotone';
 import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
 import { Logout2 } from 'react-native-solar-icons/icons/bold';
+import { TrashBinTrash } from 'react-native-solar-icons/icons/bold-duotone';
+import { Stars } from 'react-native-solar-icons/icons/bold-duotone';
 import { shadows } from '@/design/tokens/shadows';
 import { colors } from '@/design/tokens/colors';
 import { radius } from '@/design/tokens/radius';
@@ -35,8 +37,10 @@ interface SettingsItem {
 
 interface ProfileSettingsProps {
   onLogout: () => void;
+  onDeleteAccount: () => void;
   onItemPress?: (key: string) => void;
   canUpdateCRM?: boolean;
+  aiConsentGranted: boolean;
 }
 
 const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
@@ -46,8 +50,10 @@ const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
 
 export function ProfileSettings({
   onLogout,
+  onDeleteAccount,
   onItemPress,
   canUpdateCRM = true,
+  aiConsentGranted,
 }: ProfileSettingsProps): React.JSX.Element {
   const { t, i18n } = useTranslation();
   const currentLang: SupportedLanguage = i18n.language === 'fr' ? 'fr' : 'en';
@@ -69,6 +75,14 @@ export function ProfileSettings({
       label: t('profile.settingsLanguage'),
       sub: LANGUAGE_LABELS[currentLang],
       icon: Settings,
+    },
+    {
+      key: 'aiDataSharing',
+      label: t('profile.aiDataSharing'),
+      sub: aiConsentGranted
+        ? t('profile.aiDataSharingGranted')
+        : t('profile.aiDataSharingDenied'),
+      icon: Stars,
     },
     {
       key: 'privacy',
@@ -95,6 +109,13 @@ export function ProfileSettings({
             }
           />
         ))}
+        <SettingsRow
+          label={t('profile.deleteAccount')}
+          sub={t('profile.deleteAccountSub')}
+          icon={TrashBinTrash}
+          danger
+          onPress={onDeleteAccount}
+        />
         <SettingsRow
           label={t('profile.signOut')}
           icon={Logout2}

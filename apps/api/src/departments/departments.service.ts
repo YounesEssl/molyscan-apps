@@ -5,8 +5,17 @@ import { PrismaService } from '../prisma/prisma.service';
 export class DepartmentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Tri par code (NULLS LAST en Postgres pour l'ASC → zones export en fin).
-  list() {
+  // Liste publique destinée à l'inscription : les marqueurs administratifs,
+  // comme « Divers », ne sont pas des zones géographiques sélectionnables.
+  listPublic() {
+    return this.prisma.department.findMany({
+      where: { emailNotificationsDisabled: false },
+      orderBy: { code: 'asc' },
+    });
+  }
+
+  // Liste complète pour l'attribution des départements dans l'administration.
+  listAll() {
     return this.prisma.department.findMany({ orderBy: { code: 'asc' } });
   }
 }

@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { ScoreIndicator } from '@/components/ui/ScoreIndicator';
 import { colors } from '@/design/tokens/colors';
 import { spacing } from '@/design/tokens/spacing';
+import { TechnicalSheetButton } from './TechnicalSheetButton';
 
 export interface ScanEquivalent {
   name: string;
@@ -57,6 +58,7 @@ export function ScanEquivalentsList({
               {eq.reason}
             </Text>
           ) : null}
+          <TechnicalSheetButton productName={eq.name} />
         </Card>
       ))}
     </View>

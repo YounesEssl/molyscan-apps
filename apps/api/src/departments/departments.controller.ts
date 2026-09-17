@@ -12,6 +12,6 @@ export class DepartmentsController {
   @Get()
   @ApiOperation({ summary: 'List departments (public — registration picker)' })
   list() {
-    return this.departmentsService.list();
+    return this.departmentsService.listPublic();
   }
 }

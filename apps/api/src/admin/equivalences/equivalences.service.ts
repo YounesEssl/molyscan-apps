@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -18,6 +19,12 @@ export interface PendingEquivalence {
   compatibility: number | null;
   scanCount: number;
   lastScanAt: Date;
+  requestedBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
 }
 
 @Injectable()
@@ -56,6 +63,9 @@ export class EquivalencesService {
         equivalentFamily: true,
         compatibility: true,
         createdAt: true,
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 500,
@@ -85,6 +95,7 @@ export class EquivalencesService {
           compatibility: s.compatibility,
           scanCount: 1,
           lastScanAt: s.createdAt,
+          requestedBy: s.user,
         });
       }
     }
@@ -92,7 +103,17 @@ export class EquivalencesService {
   }
 
   async create(dto: CreateEquivalenceDto, validatedBy?: string) {
-    const competitorKey = equivalenceKey(dto.competitorBrand, dto.competitorName);
+    const noEquivalent = dto.noEquivalent ?? false;
+    const molydalEquivalent = noEquivalent ? '' : dto.molydalEquivalent?.trim();
+    if (!noEquivalent && !molydalEquivalent) {
+      throw new BadRequestException(
+        'Indiquez un produit Molydal ou confirmez l’absence d’équivalent.',
+      );
+    }
+    const competitorKey = equivalenceKey(
+      dto.competitorBrand,
+      dto.competitorName,
+    );
     const existing = await this.prisma.expertEquivalence.findUnique({
       where: { competitorKey },
     });
@@ -106,9 +127,10 @@ export class EquivalencesService {
         competitorBrand: dto.competitorBrand.trim(),
         competitorName: dto.competitorName.trim(),
         competitorKey,
-        molydalEquivalent: dto.molydalEquivalent.trim(),
-        molydalFamily: dto.molydalFamily?.trim() || null,
-        confidence: dto.confidence ?? 100,
+        molydalEquivalent: molydalEquivalent!,
+        noEquivalent,
+        molydalFamily: noEquivalent ? null : dto.molydalFamily?.trim() || null,
+        confidence: noEquivalent ? 0 : (dto.confidence ?? 100),
         note: dto.note?.trim() || null,
         validatedBy: validatedBy ?? null,
         source: 'expert',
@@ -129,9 +151,19 @@ export class EquivalencesService {
   async update(id: string, dto: UpdateEquivalenceDto, validatedBy?: string) {
     const current = await this.findById(id);
 
-    const competitorBrand = dto.competitorBrand?.trim() ?? current.competitorBrand;
+    const competitorBrand =
+      dto.competitorBrand?.trim() ?? current.competitorBrand;
     const competitorName = dto.competitorName?.trim() ?? current.competitorName;
     const competitorKey = equivalenceKey(competitorBrand, competitorName);
+    const noEquivalent = dto.noEquivalent ?? current.noEquivalent;
+    const molydalEquivalent = noEquivalent
+      ? ''
+      : (dto.molydalEquivalent?.trim() ?? current.molydalEquivalent);
+    if (!noEquivalent && !molydalEquivalent) {
+      throw new BadRequestException(
+        'Indiquez le produit Molydal avant de rétablir une équivalence.',
+      );
+    }
 
     // If the key changed, ensure it doesn't collide with another entry.
     if (competitorKey !== current.competitorKey) {
@@ -151,13 +183,17 @@ export class EquivalencesService {
         competitorBrand,
         competitorName,
         competitorKey,
-        molydalEquivalent:
-          dto.molydalEquivalent?.trim() ?? current.molydalEquivalent,
-        molydalFamily:
-          dto.molydalFamily !== undefined
+        noEquivalent,
+        molydalEquivalent,
+        molydalFamily: noEquivalent
+          ? null
+          : dto.molydalFamily !== undefined
             ? dto.molydalFamily?.trim() || null
             : current.molydalFamily,
-        confidence: dto.confidence ?? current.confidence,
+        confidence: noEquivalent
+          ? 0
+          : (dto.confidence ??
+            (current.noEquivalent ? 100 : current.confidence)),
         note: dto.note !== undefined ? dto.note?.trim() || null : current.note,
         validatedBy: validatedBy ?? current.validatedBy,
       },

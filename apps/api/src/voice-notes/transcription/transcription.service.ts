@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI, { toFile } from 'openai';
 import { extname } from 'path';
@@ -11,6 +11,8 @@ export class TranscriptionService {
   constructor(private configService: ConfigService) {
     this.openai = new OpenAI({
       apiKey: this.configService.getOrThrow<string>('OPENAI_API_KEY'),
+      timeout: 120_000,
+      maxRetries: 0,
     });
   }
 
@@ -51,8 +53,8 @@ export class TranscriptionService {
 
       return isHallucination ? null : text || null;
     } catch (error) {
-      this.logger.warn(`Whisper transcription failed: ${error}. Returning null.`);
-      return null;
+      this.logger.warn(`Whisper transcription failed: ${error}`);
+      throw new ServiceUnavailableException('Transcription temporarily unavailable. Please try again.');
     }
   }
 }

@@ -69,7 +69,7 @@ export class AuthService {
       const department = await this.prisma.department.findUnique({
         where: { id: dto.departmentId },
       });
-      if (!department) {
+      if (!department || department.emailNotificationsDisabled) {
         throw new BadRequestException('Département introuvable.');
       }
       departmentConnect = { connect: [{ id: department.id }] };
@@ -257,7 +257,13 @@ export class AuthService {
   private async notifyAdminsOfAccessRequest(user: User): Promise<void> {
     try {
       const admins = await this.prisma.user.findMany({
-        where: { role: UserRole.admin, status: UserStatus.approved },
+        where: {
+          role: UserRole.admin,
+          status: UserStatus.approved,
+          departments: {
+            none: { emailNotificationsDisabled: true },
+          },
+        },
         select: { email: true },
       });
       const recipients = admins.map((a) => a.email);

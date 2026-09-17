@@ -5,6 +5,7 @@
 export interface DepartmentSeed {
   code: string | null;
   name: string;
+  emailNotificationsDisabled?: boolean;
 }
 
 export const DEPARTMENTS: DepartmentSeed[] = [
@@ -109,4 +110,9 @@ export const DEPARTMENTS: DepartmentSeed[] = [
   { code: null, name: 'Espagne' },
   { code: null, name: 'Canada' },
   { code: null, name: 'Reste du monde' },
+  {
+    code: null,
+    name: 'Divers',
+    emailNotificationsDisabled: true,
+  },
 ];

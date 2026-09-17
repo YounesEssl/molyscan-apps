@@ -129,11 +129,12 @@ model User {
 }
 
 model Department {
-  id        String   @id @default(uuid())
-  code      String?  @unique
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                         String   @id @default(uuid())
+  code                       String?  @unique
+  name                       String   @unique
+  emailNotificationsDisabled Boolean  @default(false)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   users           User[]          @relation("UserDepartments")
   routedWorkflows PriceWorkflow[] @relation("WorkflowDepartment")
@@ -237,6 +238,8 @@ model ExpertEquivalence {
   competitorKey     String            @unique
   /// Molydal product name (free text, as it appears in the catalog / scan result)
   molydalEquivalent String
+  /// An expert explicitly confirmed there is no suitable Molydal equivalent.
+  noEquivalent      Boolean           @default(false)
   molydalFamily     String?
   confidence        Int               @default(100)
   note              String?
@@ -468,13 +471,27 @@ model VoiceNote {
   contactName      String?
   // Date/heure du rendez-vous à utiliser comme date de communication CRM.
   meetingAt        DateTime?
+  meetingEndAt     DateTime?
+  crmActionCode    String?
+  crmActionLabel   String?
+  crmObjectiveCode String?
+  crmObjectiveLabel String?
+  crmObjectiveCodes String[] @default([])
+  crmObjectiveLabels String[] @default([])
   productMentioned String?
   nextAction       String?
   notes            String?
-  // pending | synced | failed — état de la pousse vers le CRM (communication).
+  // pending | syncing | synced | failed | deleted.
   syncStatus       String   @default("pending")
   // ID de la communication créée côté CRM (comm_communicationid).
   crmCommunicationId String?
+  // Révision locale et dernière révision confirmée dans le CRM.
+  revision          Int      @default(0)
+  crmSyncedRevision Int?
+  // Verrou partagé entre processus API ; une tentative interrompue expire.
+  crmSyncToken      String?
+  crmSyncStartedAt  DateTime?
+  syncErrorCode     String?
   relatedScanId    String?
   userId           String
 

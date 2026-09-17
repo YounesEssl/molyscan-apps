@@ -101,7 +101,7 @@ export function PriceRequestsPage() {
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="border-b border-ink-4 text-xs font-semibold uppercase tracking-[0.1em] text-ink-3">
-                    <th className="px-5 py-3.5 font-semibold">Distributeur</th>
+                    <th className="px-5 py-3.5 font-semibold">Auteur de la demande</th>
                     <th className="px-5 py-3.5 font-semibold">Produit</th>
                     <th className="px-5 py-3.5 font-semibold">Département</th>
                     <th className="px-5 py-3.5 font-semibold">Envoyé à</th>

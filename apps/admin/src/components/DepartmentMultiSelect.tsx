@@ -49,6 +49,11 @@ export function DepartmentMultiSelect({
           {selectedList.map((dept) => (
             <span
               key={dept.id}
+              title={
+                dept.emailNotificationsDisabled
+                  ? 'Ce compte ne recevra pas les e-mails de notification.'
+                  : undefined
+              }
               className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-br from-red-vivid to-red px-3 py-1 text-sm font-medium text-white"
             >
               {deptLabel(dept)}
@@ -119,7 +124,14 @@ export function DepartmentMultiSelect({
                           {dept.code}
                         </span>
                       )}
-                      <span className="text-ink">{dept.name}</span>
+                      <span className="min-w-0 text-ink">
+                        <span>{dept.name}</span>
+                        {dept.emailNotificationsDisabled && (
+                          <span className="ml-2 text-xs text-ink-3">
+                            aucun e-mail de notification
+                          </span>
+                        )}
+                      </span>
                     </button>
                   </li>
                 );

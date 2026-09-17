@@ -9,6 +9,7 @@ import { RagService } from './rag/rag.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import type { AttachmentEntry } from './attachment.store';
+import { ChatDocumentsService } from './chat-documents.service';
 
 @Injectable()
 export class ChatService {
@@ -18,6 +19,7 @@ export class ChatService {
     private prisma: PrismaService,
     private ragService: RagService,
     private storage: StorageService,
+    private documents: ChatDocumentsService,
   ) {}
 
   // ── Helpers ────────────────────────────────────────────────────
@@ -211,9 +213,10 @@ export class ChatService {
     // it in the messages array sent to the LLM (history + explicit question)
     const history = await this.prisma.aIMessage.findMany({
       where: { conversationId },
-      orderBy: { timestamp: 'asc' },
+      orderBy: { timestamp: 'desc' },
       take: 20,
     });
+    history.reverse();
 
     // Save user message
     const userMessage = await this.prisma.aIMessage.create({
@@ -221,8 +224,14 @@ export class ChatService {
     });
 
     // Generate AI response
-    const aiResult = await this.ragService.generateResponse({
+    const aiResult = await this.documents.answer(text, history, conversation.molydalName, { name: conversation.scannedName, brand: conversation.scannedBrand }) ?? await this.ragService.generateResponse({
       question: text,
+      productContext: conversation.type === 'product' ? {
+        scannedName: conversation.scannedName ?? '',
+        scannedBrand: conversation.scannedBrand ?? '',
+        molydalName: conversation.molydalName ?? '',
+        molydalReference: conversation.molydalReference ?? '',
+      } : undefined,
       conversationHistory: history.map((m) => ({
         role: m.role as 'user' | 'assistant',
         text: m.text,
@@ -267,9 +276,10 @@ export class ChatService {
     // Fetch history BEFORE saving the current user message (same fix as sendMessage)
     const history = await this.prisma.aIMessage.findMany({
       where: { conversationId },
-      orderBy: { timestamp: 'asc' },
+      orderBy: { timestamp: 'desc' },
       take: 20,
     });
+    history.reverse();
 
     // Save user message
     await this.prisma.aIMessage.create({
@@ -278,6 +288,16 @@ export class ChatService {
 
     // Update conversation title
     await this.updateConversationMeta(conversationId, text, conversation.title);
+
+    const documentReply = !attachment
+      ? await this.documents.answer(text, history, conversation.molydalName, { name: conversation.scannedName, brand: conversation.scannedBrand })
+      : null;
+    if (documentReply) {
+      return {
+        sources: documentReply.sources,
+        stream: (async function* () { yield documentReply.text; })(),
+      };
+    }
 
     // For product-linked conversations, inject the full scan context into the
     // RAG system prompt so the LLM knows exactly what was scanned and why each

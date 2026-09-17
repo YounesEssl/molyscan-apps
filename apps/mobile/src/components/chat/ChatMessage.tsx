@@ -5,6 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/design/tokens/colors';
 import { typography } from '@/design/tokens/typography';
 import type { ChatMessage as ChatMessageModel } from '@/services/chatFree.service';
+import { useRouter } from 'expo-router';
+import { TechnicalSheetButton } from '@/components/product/TechnicalSheetButton';
 
 interface ChatMessageProps {
   message: ChatMessageModel;
@@ -13,6 +15,11 @@ interface ChatMessageProps {
 export const ChatMessage = React.memo(function ChatMessage({
   message,
 }: ChatMessageProps): React.JSX.Element {
+  const router = useRouter();
+  const normalizedContent = ` ${message.content.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ')} `;
+  const documentProducts = !message.isStreaming && !message.content.includes('/document/')
+    ? [...new Set(message.sources ?? [])].filter((name) => normalizedContent.includes(` ${name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()} `)).slice(0, 5)
+    : [];
   if (message.role === 'user') {
     return (
       <View
@@ -39,9 +46,15 @@ export const ChatMessage = React.memo(function ChatMessage({
       accessibilityLabel={`Assistant reply: ${message.content}`}
     >
       <View style={styles.assistant}>
-        <Markdown style={markdownStyles}>
+        <Markdown style={markdownStyles} onLinkPress={(url) => {
+          const match = /^\/document\/([a-zA-Z0-9_-]+)$/.exec(url);
+          if (!match) return true;
+          router.push(`/document/${match[1]}`);
+          return false;
+        }}>
           {message.content}
         </Markdown>
+        {documentProducts.map((name) => <TechnicalSheetButton key={name} productName={name} showProductName />)}
         {message.isStreaming ? (
           <RNText style={styles.streamingDot}>{'●'}</RNText>
         ) : null}

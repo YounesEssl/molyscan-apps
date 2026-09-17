@@ -1,9 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNumber, IsOptional, IsDateString } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsDateString, MaxLength, Min, IsArray, ArrayMaxSize } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { decodeObjectiveCodes } from './crm-objectives';
 
 export class CreateVoiceNoteDto {
   @ApiProperty()
   @IsNumber()
+  @Min(0)
   duration!: number;
 
   @ApiPropertyOptional({ description: 'Transcription déjà obtenue côté mobile (éditable)' })
@@ -30,6 +33,33 @@ export class CreateVoiceNoteDto {
   @IsOptional()
   @IsDateString()
   meetingAt?: string;
+
+  @ApiPropertyOptional({ description: 'Fin du rendez-vous (ISO 8601 avec fuseau)' })
+  @IsOptional()
+  @IsDateString()
+  meetingEndAt?: string;
+
+  @ApiPropertyOptional({ description: 'Code action fourni par le référentiel CRM' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  crmActionCode?: string;
+
+  @ApiPropertyOptional({ description: 'Code objectif fourni par le référentiel CRM' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  crmObjectiveCode?: string;
+
+  @ApiPropertyOptional({ description: 'Codes du référentiel CRM ; transmis dans comm_liste_objectifs', type: [String] })
+  @Transform(({ value }) => decodeObjectiveCodes(value))
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  @MaxLength(255, { each: true })
+  crmObjectiveCodes?: string[] | null;
+
 
   @ApiPropertyOptional()
   @IsOptional()

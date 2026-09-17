@@ -5,6 +5,7 @@ export interface Department {
   id: string;
   code: string | null;
   name: string;
+  emailNotificationsDisabled: boolean;
 }
 
 export interface CurrentUser {
@@ -79,6 +80,7 @@ export interface ExpertEquivalence {
   competitorName: string;
   competitorKey: string;
   molydalEquivalent: string;
+  noEquivalent: boolean;
   molydalFamily: string | null;
   confidence: number;
   note: string | null;
@@ -95,4 +97,63 @@ export interface PendingEquivalence {
   compatibility: number | null;
   scanCount: number;
   lastScanAt: string;
+  requestedBy: PriceRequestParty;
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CompetitiveIntelligenceRow {
+  brand: string;
+  product: string | null;
+  scanCount: number;
+  userCount: number;
+  matchedCount: number;
+  noMatchCount: number;
+  lastScanAt: string;
+}
+
+export interface CompetitiveIntelligence
+  extends PagedResult<CompetitiveIntelligenceRow> {
+  groupBy: 'product' | 'brand';
+  summary: { scanCount: number; productCount: number; brandCount: number };
+}
+
+export interface ScanFeedback {
+  id: string;
+  createdAt: string;
+  equivalentName: string;
+  suggestedName: string | null;
+  vote: 'up' | 'down';
+  user: PriceRequestParty;
+  scan: {
+    id: string;
+    identifiedBrand: string | null;
+    identifiedName: string | null;
+    competitorProduct: { brand: string; name: string } | null;
+  };
+}
+
+export interface ConversationSubmission {
+  id: string;
+  createdAt: string;
+  user: PriceRequestParty;
+  conversation: {
+    id: string;
+    title: string;
+    scannedBrand: string | null;
+    scannedName: string | null;
+    _count: { messages: number };
+  };
+}
+
+export interface SubmittedMessage {
+  id: string;
+  role: string;
+  text: string;
+  timestamp: string;
 }

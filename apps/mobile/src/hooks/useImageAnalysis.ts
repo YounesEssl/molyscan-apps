@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger';
 import { useLocation } from '@/hooks/useLocation';
 import { useOutboxStore } from '@/stores/outbox.store';
 import { enqueueScanAnalysis } from '@/lib/outbox/enqueue';
+import { useAiDataConsent } from '@/providers/AiDataConsentProvider';
 
 export interface AnalysisResult {
   /** Persisted scan id — used for equivalent feedback submission */
@@ -59,6 +60,7 @@ export interface UseImageAnalysis {
 
 export function useImageAnalysis(): UseImageAnalysis {
   const { getCurrentLocation } = useLocation();
+  const { requestConsent } = useAiDataConsent();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [capturedPhotoUri, setCapturedPhotoUri] = useState<string | null>(null);
@@ -74,6 +76,8 @@ export function useImageAnalysis(): UseImageAnalysis {
 
   const analyzeBase64 = useCallback(
     async (base64: string, mimeType = 'image/jpeg'): Promise<void> => {
+      if (!(await requestConsent())) return;
+
       const sizeKb = Math.round((base64.length * 0.75) / 1024);
       logger.debug(`[analyze] start — ${sizeKb} Ko, mime=${mimeType}`);
 
@@ -114,7 +118,7 @@ export function useImageAnalysis(): UseImageAnalysis {
         throw error;
       }
     },
-    [getCurrentLocation, queueScan],
+    [getCurrentLocation, queueScan, requestConsent],
   );
 
   const analyzeFromGallery = useCallback(async (): Promise<void> => {
@@ -122,6 +126,7 @@ export function useImageAnalysis(): UseImageAnalysis {
       logger.debug('[gallery] already analyzing, skip');
       return;
     }
+    if (!(await requestConsent())) return;
     // Android Photo Picker / iOS limited picker : accès ponctuel sans permission
     // de médiathèque (évite READ_MEDIA_IMAGES, rejeté par Google Play).
     logger.debug('[gallery] opening picker…');
@@ -153,7 +158,7 @@ export function useImageAnalysis(): UseImageAnalysis {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [analyzeBase64, isAnalyzing]);
+  }, [analyzeBase64, isAnalyzing, requestConsent]);
 
   const reset = useCallback((): void => {
     setResult(null);

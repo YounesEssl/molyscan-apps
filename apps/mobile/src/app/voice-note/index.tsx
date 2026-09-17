@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Alert, View, FlatList, StyleSheet } from 'react-native';
+import React, { useRef, useState, useCallback } from 'react';
+import { ActivityIndicator, Alert, View, FlatList, StyleSheet } from 'react-native';
 import { Microphone2 } from 'react-native-solar-icons/icons/bold-duotone';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +7,7 @@ import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Card, Badge, Button, EmptyState } from '@/components/ui';
 import { COLORS, SPACING } from '@/constants/theme';
-import { voiceNoteService } from '@/services/voice-note.service';
+import { voiceNoteService, isVoiceNoteConflict, voiceNoteSyncMessage, canSendVoiceNote, isVoiceNoteUpdateUnavailable } from '@/services/voice-note.service';
 import type { VoiceNote } from '@/schemas/voice-note.schema';
 import { formatRelativeDate } from '@/utils/date';
 import { haptic } from '@/lib/haptics';
@@ -27,12 +27,32 @@ export default function VoiceNoteScreen(): React.JSX.Element {
   const { t } = useTranslation();
   const [notes, setNotes] = useState<VoiceNote[]>([]);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const retryingRef = useRef(false);
+  const readRequest = useRef(0);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const loadNotes = useCallback(async () => {
+    if (retryingRef.current) return;
+    const request = ++readRequest.current;
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const result = await voiceNoteService.getAll();
+      if (request === readRequest.current) setNotes(result);
+    } catch {
+      if (request === readRequest.current) setLoadError(true);
+    } finally {
+      if (request === readRequest.current) setLoading(false);
+    }
+  }, []);
 
   // Reload notes when screen is focused (after recording)
   useFocusEffect(
     useCallback(() => {
-      voiceNoteService.getAll().then(setNotes);
-    }, []),
+      void loadNotes();
+      return () => { readRequest.current += 1; };
+    }, [loadNotes]),
   );
 
   const formatDuration = (seconds: number) => {
@@ -41,17 +61,26 @@ export default function VoiceNoteScreen(): React.JSX.Element {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleResync = async (id: string): Promise<void> => {
-    setRetryingId(id);
+  const handleResync = async (item: VoiceNote): Promise<void> => {
+    if (retryingRef.current || !canSendVoiceNote(item)) return;
+    retryingRef.current = true;
+    readRequest.current += 1;
+    setLoading(false);
+    setRetryingId(item.id);
     try {
-      const updated = await voiceNoteService.resync(id);
-      setNotes((current) => current.map((note) => (note.id === id ? updated : note)));
-      haptic.success();
+      const updated = await voiceNoteService.resync(item.id, item.revision);
+      setNotes((current) => current.map((note) => (note.id === item.id ? updated : note)));
+      if (updated.syncStatus === 'synced') haptic.success();
+      else {
+        haptic.warning();
+        Alert.alert(t('voiceNote.savedSyncFailedTitle'), t(voiceNoteSyncMessage(updated)));
+      }
     } catch (error) {
       haptic.error();
       logger.error('Voice note resync failed', error);
-      Alert.alert(t('voiceNote.resyncErrorTitle'), t('voiceNote.resyncErrorBody'));
+      Alert.alert(t('voiceNote.resyncErrorTitle'), t(isVoiceNoteConflict(error) ? 'voiceNote.historyConflictBody' : 'voiceNote.resyncErrorBody'));
     } finally {
+      retryingRef.current = false;
       setRetryingId(null);
     }
   };
@@ -70,9 +99,16 @@ export default function VoiceNoteScreen(): React.JSX.Element {
       </View>
       <FlatList
         data={notes}
+        refreshing={loading && notes.length > 0}
+        onRefresh={() => void loadNotes()}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListHeaderComponent={loadError ? <View style={styles.readState}>
+          <Text variant="body">{t('voiceNote.loadErrorTitle')}</Text>
+          <Text variant="caption" color={COLORS.textSecondary}>{t('voiceNote.loadErrorBody')}</Text>
+          <Button title={t('common.retry')} variant="secondary" onPress={() => void loadNotes()} />
+        </View> : null}
         renderItem={({ item }) => (
           <Card>
             <View style={styles.noteContent}>
@@ -98,14 +134,24 @@ export default function VoiceNoteScreen(): React.JSX.Element {
                   label={t(`voiceNote.syncStatus.${item.syncStatus ?? 'pending'}`)}
                   variant={syncBadgeVariant(item.syncStatus)}
                 />
-                {item.syncStatus === 'failed' && (
+              </View>
+              {(item.syncErrorCode || item.syncStatus === 'deleted') && (
+                <Text variant="caption" color={COLORS.textSecondary}>{t(voiceNoteSyncMessage(item))}</Text>
+              )}
+              {isVoiceNoteUpdateUnavailable(item) && item.syncStatus === 'pending' && (
+                <Text variant="caption" color={COLORS.textSecondary}>{t('voiceNote.updateUnavailableBody')}</Text>
+              )}
+              <View style={styles.actions}>
+                <Button title={t('voiceNote.editNote')} variant="secondary" size="sm" disabled={retryingId === item.id}
+                  onPress={() => router.push({ pathname: '/voice-note/record', params: { noteId: item.id } })} />
+                {(item.syncStatus === 'pending' || item.syncStatus === 'failed') && canSendVoiceNote(item) && (
                   <Button
                     title={t('voiceNote.resync')}
                     variant="secondary"
                     size="sm"
                     loading={retryingId === item.id}
                     disabled={retryingId !== null && retryingId !== item.id}
-                    onPress={() => void handleResync(item.id)}
+                    onPress={() => void handleResync(item)}
                   />
                 )}
               </View>
@@ -113,7 +159,8 @@ export default function VoiceNoteScreen(): React.JSX.Element {
           </Card>
         )}
         ListEmptyComponent={
-          <EmptyState icon={<Microphone2 size={32} color={COLORS.textMuted} />} title={t('voiceNote.emptyState')} />
+          loading ? <ActivityIndicator color={COLORS.primary} style={styles.readState} /> : loadError ? null :
+            <EmptyState icon={<Microphone2 size={32} color={COLORS.textMuted} />} title={t('voiceNote.emptyState')} />
         }
       />
     </ScreenWrapper>
@@ -144,11 +191,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   clientRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
   },
   clientName: {
+    flexShrink: 1,
     fontWeight: '700',
   },
   syncRow: {
@@ -157,4 +206,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: SPACING.sm,
   },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  readState: { paddingVertical: SPACING.lg, gap: SPACING.sm },
 });

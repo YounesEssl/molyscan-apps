@@ -43,6 +43,12 @@ export class CrmController {
     return this.crmService.searchCompanies(user.sub, q ?? '', parsedLimit);
   }
 
+  @Get('communication-options')
+  @ApiOperation({ summary: 'CRM action and objective reference lists for a new communication' })
+  getCommunicationOptions(@CurrentUser() user: JwtPayload) {
+    return this.crmService.getCommunicationOptions(user.sub);
+  }
+
   @Get('contacts')
   @ApiOperation({ summary: 'Search CRM contacts, optionally filtered by company' })
   getContacts(

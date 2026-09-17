@@ -1,6 +1,15 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { UserCheck, Users, Tag, Link2, LogOut, DatabaseZap } from 'lucide-react';
+import {
+  UserCheck,
+  Users,
+  Tag,
+  Link2,
+  LogOut,
+  DatabaseZap,
+  ChartNoAxesCombined,
+  MessageSquareWarning,
+} from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import type { AccessRequest } from '@/lib/types';
@@ -10,6 +19,12 @@ const navItems = [
   { to: '/users', label: 'Utilisateurs', icon: Users },
   { to: '/price-requests', label: 'Demandes de prix', icon: Tag },
   { to: '/equivalences', label: 'Équivalences', icon: Link2 },
+  { to: '/ai-feedback', label: 'Signalements IA', icon: MessageSquareWarning },
+  {
+    to: '/competitive-intelligence',
+    label: 'Veille concurrentielle',
+    icon: ChartNoAxesCombined,
+  },
   { to: '/catalogue', label: 'Catalogue produits', icon: DatabaseZap },
 ];
 
@@ -29,9 +44,9 @@ export function Layout() {
     : '';
 
   return (
-    <div className="flex min-h-screen bg-paper">
-      <aside className="sticky top-0 flex h-screen w-72 flex-col border-r border-ink-4 bg-paper-2">
-        <div className="px-7 pb-10 pt-8">
+    <div className="flex min-h-screen flex-col bg-paper md:flex-row">
+      <aside className="flex w-full shrink-0 flex-col border-b border-ink-4 bg-paper-2 md:sticky md:top-0 md:h-screen md:w-64 md:border-r md:border-b-0 lg:w-72">
+        <div className="flex items-center justify-between px-7 py-5 md:block md:pb-10 md:pt-8">
           <div className="flex items-baseline gap-2">
             <span className="font-display text-xl font-semibold tracking-tight text-ink">
               Molyscan
@@ -40,16 +55,24 @@ export function Layout() {
               Admin
             </span>
           </div>
+          <button
+            type="button"
+            onClick={logout}
+            aria-label="Se déconnecter"
+            className="cursor-pointer rounded-full p-2 text-ink-2 hover:bg-red-soft hover:text-ink md:hidden"
+          >
+            <LogOut className="h-5 w-5" />
+          </button>
         </div>
 
-        <nav className="flex-1 px-4">
+        <nav className="flex gap-1 overflow-x-auto px-4 pb-3 md:block md:flex-1 md:overflow-y-auto md:pb-0">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
                 [
-                  'flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-medium transition-colors',
+                  'flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-medium transition-colors',
                   isActive
                     ? 'bg-red-soft text-red'
                     : 'text-ink-2 hover:bg-black/[0.03] hover:text-ink',
@@ -67,7 +90,7 @@ export function Layout() {
           ))}
         </nav>
 
-        <div className="border-t border-ink-4 p-4">
+        <div className="hidden border-t border-ink-4 p-4 md:block">
           <div className="flex items-center gap-3 px-3 py-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-red-vivid to-red text-sm font-semibold text-white">
               {initials}
@@ -89,7 +112,7 @@ export function Layout() {
         </div>
       </aside>
 
-      <main className="relative flex-1 overflow-x-hidden">
+      <main className="relative min-w-0 flex-1 overflow-x-hidden">
         <Outlet />
       </main>
     </div>

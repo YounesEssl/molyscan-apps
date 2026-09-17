@@ -21,7 +21,7 @@ export function PrivacyPage() {
             <span className="italic text-red">confidentialité</span>
           </h1>
           <p className="mt-4 text-sm text-ink-2">
-            Dernière mise à jour : juin 2025
+            Dernière mise à jour : 30 août 2026
           </p>
         </div>
 
@@ -98,6 +98,7 @@ export function PrivacyPage() {
               </thead>
               <tbody className="divide-y divide-ink-4">
                 {[
+                  ['Partager avec Google Gemini et OpenAI les contenus choisis par l’utilisateur pour fournir les fonctions d’IA', 'Consentement explicite'],
                   ['Identifier les équivalents Molydal à des produits concurrents', 'Exécution du contrat'],
                   ['Gérer votre compte et vos accès', 'Exécution du contrat'],
                   ['Traiter les demandes de prix et notifier les commerciaux', 'Exécution du contrat'],
@@ -114,8 +115,56 @@ export function PrivacyPage() {
             </table>
           </Section>
 
-          {/* 4. Sous-traitants */}
-          <Section title="4. Sous-traitants et transferts hors UE">
+          {/* 4. Partage avec les services d’IA */}
+          <Section title="4. Partage avec des services d’intelligence artificielle">
+            <p>
+              Avant le premier envoi vers un service d’intelligence artificielle,
+              Molyscan affiche une demande de consentement dans l’application.
+              Aucun contenu choisi par l’utilisateur n’est transmis à Google
+              Gemini ou à OpenAI tant que l’utilisateur n’a pas expressément
+              sélectionné <strong className="text-ink">« J’accepte »</strong>.
+            </p>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-[16px] border border-ink-4 bg-paper-2 px-4 py-4">
+                <p className="font-medium text-ink">Google Gemini</p>
+                <p className="mt-1 text-sm">
+                  Molyscan lui transmet les photos de produits prises ou choisies
+                  par l’utilisateur, ses questions et les documents PDF qu’il
+                  joint. Ces contenus servent exclusivement à identifier les
+                  produits, rechercher leurs caractéristiques et générer les
+                  réponses de l’assistant.
+                </p>
+              </div>
+              <div className="rounded-[16px] border border-ink-4 bg-paper-2 px-4 py-4">
+                <p className="font-medium text-ink">OpenAI</p>
+                <p className="mt-1 text-sm">
+                  Molyscan lui transmet les questions et le texte technique
+                  nécessaire à la recherche sémantique, ainsi que les
+                  enregistrements audio déclenchés par l’utilisateur afin de les
+                  transcrire en texte.
+                </p>
+              </div>
+            </div>
+            <p className="mt-4">
+              Ces transmissions ont lieu uniquement quand l’utilisateur lance
+              la fonction concernée. Le refus empêche l’envoi et laisse
+              accessibles les fonctions qui ne reposent pas sur l’IA. Le
+              consentement peut être retiré à tout moment depuis{' '}
+              <strong className="text-ink">
+                Profil &gt; Partage de données avec l’IA
+              </strong>
+              . Un nouvel accord sera alors nécessaire avant tout nouvel envoi.
+            </p>
+            <p className="mt-4">
+              Molydal exige contractuellement et par ses mesures de sécurité que
+              Google et OpenAI protègent les données partagées au même niveau ou
+              à un niveau équivalent à celui décrit dans la présente politique
+              et requis par les règles applicables.
+            </p>
+          </Section>
+
+          {/* 5. Sous-traitants */}
+          <Section title="5. Sous-traitants et transferts hors UE">
             <p className="mb-4">
               Certains traitements sont assurés par des prestataires tiers. Nous
               nous assurons que chacun présente des garanties appropriées
@@ -133,9 +182,8 @@ export function PrivacyPage() {
                 {[
                   ['OVH', 'Hébergement des serveurs et stockage des photos', 'France (UE)'],
                   ['Supabase', 'Base de données vectorielle (recherche sémantique)', 'États-Unis¹'],
-                  ['Google (Gemini)', 'Analyse visuelle des photos de produits', 'États-Unis¹'],
-                  ['Anthropic (Claude)', 'Assistant IA conversationnel', 'États-Unis¹'],
-                  ['OpenAI', 'Génération d\'embeddings textuels', 'États-Unis¹'],
+                  ['Google (Gemini)', 'Analyse des photos et PDF, recherche produit et assistant IA conversationnel, après consentement', 'États-Unis¹'],
+                  ['OpenAI', 'Recherche sémantique et transcription des enregistrements audio, après consentement', 'États-Unis¹'],
                   ['Expo / EAS', 'Notifications push mobiles', 'États-Unis¹'],
                   ['Resend', 'Envoi d\'emails transactionnels', 'États-Unis¹'],
                 ].map(([name, role, country]) => (
@@ -153,15 +201,15 @@ export function PrivacyPage() {
             </p>
           </Section>
 
-          {/* 5. Conservation */}
-          <Section title="5. Durée de conservation">
+          {/* 6. Conservation */}
+          <Section title="6. Durée de conservation">
             <ul className="list-none space-y-2">
               {[
-                ['Données de compte', 'Durée du contrat d\'utilisation + 12 mois après clôture'],
-                ['Photos et scans', 'Durée du contrat + 12 mois après clôture'],
-                ['Notes vocales et transcriptions', 'Durée du contrat + 6 mois après clôture'],
+                ['Données de compte', 'Pendant la durée d\'utilisation, puis suppression à la clôture du compte'],
+                ['Photos et scans', 'Pendant la durée d\'utilisation, puis suppression à la clôture du compte'],
+                ['Notes vocales et transcriptions', 'Pendant la durée d\'utilisation, puis suppression à la clôture du compte'],
                 ['Logs de connexion', '12 mois glissants'],
-                ['Données de notifications', 'Supprimées à la désinscription ou à la clôture du compte'],
+                ['Données de notifications', 'Supprimées à la clôture du compte'],
               ].map(([type, duration]) => (
                 <li key={type} className="flex gap-3">
                   <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-red" />
@@ -171,10 +219,21 @@ export function PrivacyPage() {
                 </li>
               ))}
             </ul>
+            <p className="mt-4">
+              Vous pouvez initier la suppression de votre compte directement
+              dans l'application, depuis{' '}
+              <strong className="text-ink">
+                Profil &gt; Supprimer le compte
+              </strong>
+              . Le compte et les données associées sont alors supprimés. Seules
+              les informations dont la conservation est imposée par une
+              obligation légale peuvent être conservées pendant la durée
+              requise.
+            </p>
           </Section>
 
-          {/* 6. Droits */}
-          <Section title="6. Vos droits">
+          {/* 7. Droits */}
+          <Section title="7. Vos droits">
             <p className="mb-4">
               Conformément au Règlement Général sur la Protection des Données
               (RGPD — Règlement UE 2016/679), vous disposez des droits suivants
@@ -187,7 +246,7 @@ export function PrivacyPage() {
                 ['Droit à l\'effacement', 'Demander la suppression de vos données (« droit à l\'oubli »)'],
                 ['Droit à la portabilité', 'Recevoir vos données dans un format structuré et lisible par machine'],
                 ['Droit d\'opposition', 'Vous opposer à un traitement fondé sur l\'intérêt légitime'],
-                ['Droit de retrait du consentement', 'Retirer votre consentement à tout moment (ex. notifications push)'],
+                ['Droit de retrait du consentement', 'Retirer votre consentement à tout moment, notamment pour les notifications ou le partage avec les services d’IA'],
               ].map(([right, desc]) => (
                 <li key={right} className="flex gap-3">
                   <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-red" />
@@ -198,7 +257,9 @@ export function PrivacyPage() {
               ))}
             </ul>
             <p className="mt-4">
-              Pour exercer vos droits, contactez-nous à{' '}
+              La suppression du compte peut être initiée directement dans
+              l'application depuis le profil. Pour exercer vos autres droits,
+              contactez-nous à{' '}
               <a href="mailto:contact@molydal.com" className="text-red hover:underline">
                 contact@molydal.com
               </a>
@@ -220,8 +281,8 @@ export function PrivacyPage() {
             </p>
           </Section>
 
-          {/* 7. Sécurité */}
-          <Section title="7. Sécurité des données">
+          {/* 8. Sécurité */}
+          <Section title="8. Sécurité des données">
             <p>
               Vos données sont transmises via HTTPS (TLS 1.2+) et stockées sur
               des serveurs hébergés en France (OVH). Les accès à l'application
@@ -231,8 +292,8 @@ export function PrivacyPage() {
             </p>
           </Section>
 
-          {/* 8. Modifications */}
-          <Section title="8. Modifications de la politique">
+          {/* 9. Modifications */}
+          <Section title="9. Modifications de la politique">
             <p>
               Nous pouvons mettre à jour cette politique pour refléter des
               évolutions légales ou techniques. En cas de modification

@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { encryptSecret, decryptSecret } from './crm.crypto';
+import { formatCrmDateTime } from './crm-datetime';
 
 interface CrmLoginResponse {
   idToken: string;
@@ -29,8 +30,43 @@ export interface CrmContact {
   name: string;
 }
 
+export interface CrmOption {
+  value: string;
+  label: string;
+}
+
+export interface CrmCommunicationOptions {
+  actions: CrmOption[];
+  objectives: CrmOption[];
+  actionsAvailable: boolean;
+  objectivesAvailable: boolean;
+}
+
+export interface CrmCommunicationRecord {
+  companyId: string;
+  contactId?: string | null;
+  contactName?: string | null;
+  subject: string;
+  note: string;
+  datetime: Date;
+  endDatetime?: Date;
+  actionCode?: string;
+  objectiveCode?: string;
+  objectiveCodes?: string[];
+}
+
+export interface CrmCommunicationSelection {
+  crmActionCode?: string;
+  crmActionLabel?: string;
+  crmObjectiveCode?: string;
+  crmObjectiveLabel?: string;
+  crmObjectiveCodes: string[];
+  crmObjectiveLabels: string[];
+}
+
 // Marge de sécurité : on rafraîchit le token un peu avant son expiration réelle.
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
+const CRM_REQUEST_TIMEOUT_MS = 30_000;
 // La liste des sociétés change peu et l'appel CRM est lent (~14s pour 17k).
 // Au-delà de ce délai, on rafraîchit EN ARRIÈRE-PLAN sans faire attendre l'appelant.
 const COMPANY_FRESH_MS = 30 * 60_000;
@@ -46,6 +82,7 @@ export class CrmService implements OnModuleInit {
   private readonly personCache = new Map<string, { at: number; data: CrmContact[] }>();
   private readonly personRefreshing = new Set<string>();
   private readonly personRefreshPromises = new Map<string, Promise<CrmContact[]>>();
+  private readonly optionsCache = new Map<string, { at: number; data: CrmCommunicationOptions }>();
 
   constructor(
     private prisma: PrismaService,
@@ -94,6 +131,7 @@ export class CrmService implements OnModuleInit {
       create: { userId, login, passwordEnc, crmUserId, idToken: session.idToken, tokenExpiresAt },
       update: { login, passwordEnc, crmUserId, idToken: session.idToken, tokenExpiresAt },
     });
+    this.optionsCache.delete(userId);
 
     // Préchauffe le cache sociétés en arrière-plan (le 1er fetch CRM est lent).
     this.getCompanies(userId).catch((e) =>
@@ -118,7 +156,135 @@ export class CrmService implements OnModuleInit {
     this.personCache.delete(userId);
     this.personRefreshing.delete(userId);
     this.personRefreshPromises.delete(userId);
+    this.optionsCache.delete(userId);
     return { configured: false };
+  }
+
+  /** Values and labels come from the CRM reference lists, never from observed notes. */
+  async getCommunicationOptions(userId: string): Promise<CrmCommunicationOptions> {
+    const cred = await this.prisma.crmCredential.findUnique({ where: { userId }, select: { id: true } });
+    if (!cred) throw new BadRequestException('CRM credentials not configured for this user');
+    const cached = this.optionsCache.get(userId);
+    if (cached && Date.now() - cached.at < 5 * 60_000) return cached.data;
+
+    const actionOverride = Boolean(this.config.get<string>('CRM_ACTION_OPTIONS_PATH'));
+    const objectiveOverride = Boolean(this.config.get<string>('CRM_OBJECTIVE_OPTIONS_PATH'));
+    const [native, customActions, customObjectives] = await Promise.all([
+      !actionOverride || !objectiveOverride ? this.loadNativeCommunicationOptions(userId) : null,
+      actionOverride ? this.loadReferenceOptions(userId, 'ACTION') : null,
+      objectiveOverride ? this.loadReferenceOptions(userId, 'OBJECTIVE') : null,
+    ]);
+    const actions = actionOverride ? customActions : native?.actions ?? null;
+    const objectives = objectiveOverride ? customObjectives : native?.objectives ?? null;
+    const data = {
+      actions: actions ?? [], objectives: objectives ?? [],
+      actionsAvailable: actions !== null,
+      objectivesAvailable: objectives !== null,
+    };
+    // An unavailable reference is retried, so fixing CRM settings takes effect immediately.
+    if (data.actionsAvailable && data.objectivesAvailable) {
+      this.optionsCache.set(userId, { at: Date.now(), data });
+    }
+    return data;
+  }
+
+  private async loadNativeCommunicationOptions(userId: string) {
+    try {
+      // ICyPWA uses this single authenticated request for both picklists.
+      const raw = await this.authedRequest(userId, 'GET', '/api/AppStruct');
+      const translations = (raw as { offline?: { translations?: unknown } } | null)?.offline?.translations;
+      if (!Array.isArray(translations)) throw new Error('Expected AppStruct offline.translations');
+      return {
+        actions: this.nativePicklist(translations, 'comm_action'),
+        objectives: this.nativePicklist(translations, 'comm_liste_objectifs'),
+      };
+    } catch (error) {
+      this.logger.warn(`CRM communication references unavailable: ${error}`);
+      return { actions: null, objectives: null };
+    }
+  }
+
+  private nativePicklist(translations: unknown[], family: string): CrmOption[] | null {
+    const rows = translations.filter((row): row is Record<string, unknown> =>
+      row !== null && typeof row === 'object' && !Array.isArray(row)
+      && (row as Record<string, unknown>).type === 'choices'
+      && (row as Record<string, unknown>).family === family);
+    if (!rows.length) return null;
+    const options = new Map<string, CrmOption>();
+    for (const row of rows) {
+      if (typeof row.code !== 'string' || !row.code.trim()
+        || typeof row.capt !== 'string' || !row.capt.trim()
+        || (options.has(row.code) && options.get(row.code)!.label !== row.capt)) {
+        this.logger.warn(`CRM ${family} picklist has an invalid code or caption`);
+        return null;
+      }
+      options.set(row.code, { value: row.code, label: row.capt });
+    }
+    // Match ICyPWA getPicklist(): retain the AppStruct sequence and its localized
+    // captions, without sorting or deriving choices from existing communications.
+    return [...options.values()];
+  }
+
+  private async loadReferenceOptions(userId: string, kind: 'ACTION' | 'OBJECTIVE'): Promise<CrmOption[] | null> {
+    const path = this.config.get<string>(`CRM_${kind}_OPTIONS_PATH`);
+    const valueField = this.config.get<string>(`CRM_${kind}_VALUE_FIELD`);
+    const labelField = this.config.get<string>(`CRM_${kind}_LABEL_FIELD`);
+    // Explicit overrides retain their own code/caption mapping. An incomplete
+    // override is unavailable rather than silently falling back to another source.
+    if (!path || !valueField || !labelField) return null;
+    if (!/^\/api\/[A-Za-z0-9_/?=&.%-]+$/.test(path)) {
+      this.logger.warn(`Invalid CRM ${kind} reference endpoint`);
+      return null;
+    }
+    try {
+      const raw = await this.authedRequest(userId, 'GET', path);
+      if (!Array.isArray(raw) && !Array.isArray((raw as any)?.records) && !Array.isArray((raw as any)?.data)) {
+        throw new Error('Expected a CRM reference list');
+      }
+      const options = new Map<string, CrmOption>();
+      for (const row of this.extractList(raw)) {
+        const value = row[valueField];
+        const label = row[labelField];
+        if ((typeof value !== 'string' && typeof value !== 'number') || typeof label !== 'string' || !label.trim()) {
+          throw new Error('CRM reference mapping does not match the response');
+        }
+        options.set(String(value), { value: String(value), label: label.trim() });
+      }
+      return [...options.values()];
+    } catch (error) {
+      this.logger.warn(`CRM ${kind} reference unavailable: ${error}`);
+      return null;
+    }
+  }
+
+  private normalizeObjectiveCodes(objectives?: string[] | string): string[] {
+    const values = typeof objectives === 'string' ? [objectives] : objectives ?? [];
+    return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+  }
+
+  async validateCommunicationSelection(
+    userId: string,
+    actionCode?: string,
+    objectives?: string[] | string,
+  ): Promise<CrmCommunicationSelection> {
+    const objectiveCodes = this.normalizeObjectiveCodes(objectives);
+    if (!actionCode && !objectiveCodes.length) return { crmObjectiveCodes: [], crmObjectiveLabels: [] };
+    const options = await this.getCommunicationOptions(userId);
+    const action = actionCode ? options.actions.find((item) => item.value === actionCode) : undefined;
+    const selectedObjectives = objectiveCodes.map((code) => options.objectives.find((item) => item.value === code));
+    if ((actionCode && !options.actionsAvailable) || (objectiveCodes.length && !options.objectivesAvailable)) {
+      throw new ServiceUnavailableException('CRM reference lists unavailable. Please try again.');
+    }
+    if ((actionCode && !action) || selectedObjectives.some((objective) => !objective)) {
+      throw new BadRequestException('The selected CRM action or objective is no longer available');
+    }
+    const objectiveLabels = selectedObjectives.map((objective) => objective!.label);
+    return {
+      ...(action && { crmActionCode: action.value, crmActionLabel: action.label }),
+      ...(objectiveCodes.length && { crmObjectiveCode: objectiveCodes[0], crmObjectiveLabel: objectiveLabels[0] }),
+      crmObjectiveCodes: objectiveCodes,
+      crmObjectiveLabels: objectiveLabels,
+    };
   }
 
   // ── Données CRM ─────────────────────────────────────────────────
@@ -375,18 +541,14 @@ export class CrmService implements OnModuleInit {
    */
   async createCommunication(
     userId: string,
-    record: {
-      companyId: string;
-      contactId?: string | null;
-      contactName?: string | null;
-      subject: string;
-      note: string;
-      datetime: Date;
-    },
+    record: CrmCommunicationRecord,
+    communicationId?: string,
   ): Promise<{ id: string; createdIds: unknown }> {
     const cred = await this.prisma.crmCredential.findUnique({ where: { userId } });
-    const id = randomUUID();
-    const ts = this.formatDateTime(record.datetime);
+    // The caller persists this identifier before sending so an uncertain outcome
+    // can be reconciled without creating a second communication.
+    const id = communicationId ?? randomUUID();
+    const fields = await this.communicationFields(userId, id, record);
     const personId = await this.resolvePersonId(
       userId,
       record.companyId,
@@ -395,20 +557,11 @@ export class CrmService implements OnModuleInit {
     );
     const payload = [
       {
-        comm_communicationid: id,
-        comm_subject: (record.subject || 'Note vocale').slice(0, 255),
-        comm_companyid: record.companyId,
+        ...fields,
         ...(personId && { comm_personid: personId }),
-        comm_note: record.note ?? '',
         // Propriétaire = utilisateur CRM connecté, sinon la communication
         // n'apparaît dans aucune vue commerciale.
         ...(cred?.crmUserId && { comm_userids: cred.crmUserId }),
-        comm_type: 'vocal',
-        comm_action: 'vocal',
-        comm_status: 'complete',
-        // Champs réels de l'entité communication (≠ task_datetime de l'entité tâche).
-        comm_datetime: ts,
-        comm_todatetime: ts,
       },
     ];
 
@@ -418,6 +571,12 @@ export class CrmService implements OnModuleInit {
       '/api/Data/communication',
       payload,
     );
+    // The documented create response is a list of created GUIDs. A 2xx status
+    // alone (including proxy HTML or a malformed body) cannot confirm this write.
+    if (!Array.isArray(createdIds) || createdIds.length !== 1
+      || typeof createdIds[0] !== 'string' || createdIds[0].toLowerCase() !== id.toLowerCase()) {
+      throw new ServiceUnavailableException('CRM did not confirm creation of the reserved communication');
+    }
 
     if (personId) {
       await this.linkCommunicationToPerson(
@@ -432,12 +591,64 @@ export class CrmService implements OnModuleInit {
     return { id, createdIds };
   }
 
+  canUpdateCommunication(): boolean {
+    return true;
+  }
+
+  async updateCommunication(
+    userId: string,
+    communicationId: string,
+    record: CrmCommunicationRecord,
+  ): Promise<{ id: string; updatedIds: unknown }> {
+    const payload = await this.communicationFields(userId, communicationId, record);
+    // Real CRM validation requires an object for PUT; only creation uses an array.
+    // Innovation's confirmed update route retains the existing communication.
+    // Its owner/contact relations are deliberately absent from this payload.
+    const updatedIds = await this.authedRequest(userId, 'PUT',
+      `/api/Data/communication/${encodeURIComponent(communicationId)}`, payload);
+    const acknowledgement = updatedIds && typeof updatedIds === 'object' && !Array.isArray(updatedIds)
+      ? updatedIds as Record<string, unknown> : null;
+    const hasError = ['error', 'Error', 'errors', 'Errors'].some((field) => {
+      const value = acknowledgement?.[field];
+      if (Array.isArray(value)) return value.length > 0;
+      if (value && typeof value === 'object') return Object.keys(value).length > 0;
+      return Boolean(value);
+    });
+    if (updatedIds === false || acknowledgement?.success === false || acknowledgement?.Success === false || hasError) {
+      throw new ServiceUnavailableException('CRM rejected the communication update');
+    }
+    return { id: communicationId, updatedIds };
+  }
+
+  private async communicationFields(userId: string, id: string, record: CrmCommunicationRecord) {
+    if (record.endDatetime && record.endDatetime <= record.datetime) {
+      throw new BadRequestException('Appointment end must be after its start');
+    }
+    const selected = await this.validateCommunicationSelection(userId, record.actionCode,
+      record.objectiveCodes ?? record.objectiveCode);
+    return {
+      comm_communicationid: id,
+      comm_subject: (record.subject || 'Note vocale').slice(0, 255),
+      comm_companyid: record.companyId,
+      comm_note: record.note ?? '',
+      comm_type: 'vocal',
+      comm_action: record.actionCode || 'vocal',
+      comm_status: 'complete',
+      comm_datetime: this.formatDateTime(record.datetime),
+      comm_todatetime: this.formatDateTime(record.endDatetime ?? record.datetime),
+      // Match the AppStruct field name exactly: the CRM silently ignores
+      // "Comm_liste_objectifs" despite returning HTTP 200.
+      // An explicit empty array clears earlier selections on an update.
+      comm_liste_objectifs: selected.crmObjectiveCodes,
+    };
+  }
+
   async communicationExists(userId: string, communicationId: string): Promise<boolean | null> {
     try {
       const token = await this.getToken(userId);
       let res = await this.fetchCrm(
         'GET',
-        `/api/Data/communication/${communicationId}`,
+        `/api/Data/communication/${encodeURIComponent(communicationId)}`,
         token,
       );
 
@@ -445,7 +656,7 @@ export class CrmService implements OnModuleInit {
         const refreshedToken = await this.getToken(userId, true);
         res = await this.fetchCrm(
           'GET',
-          `/api/Data/communication/${communicationId}`,
+          `/api/Data/communication/${encodeURIComponent(communicationId)}`,
           refreshedToken,
         );
       }
@@ -454,7 +665,12 @@ export class CrmService implements OnModuleInit {
 
       const text = await res.text().catch(() => '');
       if (res.status === 400 || res.status === 404) {
-        if (/inconnu|unknown|not found/i.test(text)) return false;
+        // A missing route, proxy HTML page or generic 404 is not proof that the
+        // record is absent. Only an error naming this identifier permits a retry.
+        const html = /text\/html/i.test(res.headers.get('content-type') ?? '') || /^\s*</.test(text);
+        const namesRecord = text.toLowerCase().includes(communicationId.toLowerCase());
+        const missingRecord = /\b(?:unknown\s+(?:communication|record)|(?:communication|record)\s+(?:not[\s_-]*found|unknown)|(?:communication|enregistrement)\s+(?:inconnue?|introuvable))\b/i.test(text);
+        if (!html && namesRecord && missingRecord) return false;
       }
 
       this.logger.warn(
@@ -499,7 +715,7 @@ export class CrmService implements OnModuleInit {
   /** Appel authentifié avec un re-login automatique en cas de 401. */
   private async authedRequest(
     userId: string,
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT',
     path: string,
     body?: unknown,
   ): Promise<unknown> {
@@ -517,7 +733,18 @@ export class CrmService implements OnModuleInit {
       throw new ServiceUnavailableException('CRM request failed');
     }
 
-    return res.json().catch(() => null);
+    try {
+      // Successful updates may return 204 or an empty 200. Read the body before
+      // parsing so an interrupted or malformed nonempty reply never becomes success.
+      const text = await res.text();
+      if (/text\/html/i.test(res.headers.get('content-type') ?? '') || /^\s*</.test(text)) {
+        throw new Error('Unexpected HTML response');
+      }
+      if (!text.trim()) return null;
+      return JSON.parse(text);
+    } catch {
+      throw new ServiceUnavailableException('CRM response could not be confirmed');
+    }
   }
 
   /** Renvoie un Bearer valide pour ce user, depuis le cache ou via re-login. */
@@ -552,6 +779,7 @@ export class CrmService implements OnModuleInit {
     try {
       res = await fetch(`${this.baseUrl}/api/Connection/Login/`, {
         method: 'POST',
+        signal: AbortSignal.timeout(CRM_REQUEST_TIMEOUT_MS),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ Login: login, Password: password }),
       });
@@ -576,7 +804,9 @@ export class CrmService implements OnModuleInit {
       throw new ServiceUnavailableException('CRM login failed');
     }
 
-    const data = (await res.json()) as CrmLoginResponse;
+    const data = (await res.json().catch(() => {
+      throw new ServiceUnavailableException('CRM login response failed');
+    })) as CrmLoginResponse;
     if (!data?.idToken) {
       throw new ServiceUnavailableException('CRM login returned no token');
     }
@@ -584,7 +814,7 @@ export class CrmService implements OnModuleInit {
   }
 
   private async fetchCrm(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT',
     path: string,
     token: string,
     body?: unknown,
@@ -592,6 +822,7 @@ export class CrmService implements OnModuleInit {
     try {
       return await fetch(`${this.baseUrl}${path}`, {
         method,
+        signal: AbortSignal.timeout(CRM_REQUEST_TIMEOUT_MS),
         headers: {
           Authorization: `Bearer ${token}`,
           ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -604,12 +835,8 @@ export class CrmService implements OnModuleInit {
     }
   }
 
-  /** Format attendu par l'API : 'YYYY-MM-DD HH:mm:ss'. */
-  private formatDateTime(d: Date): string {
-    const p = (n: number) => String(n).padStart(2, '0');
-    return (
-      `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
-      `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
-    );
+  /** CRM timezone is explicit: never inherit the VPS operating system timezone. */
+  formatDateTime(date: Date): string {
+    return formatCrmDateTime(date, this.config.get<string>('CRM_TIME_ZONE', 'Europe/Paris'));
   }
 }

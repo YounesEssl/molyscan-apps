@@ -8,6 +8,7 @@ interface UseAuthReturn {
   user: User | null;
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 export function useAuth(): UseAuthReturn {
@@ -27,10 +28,16 @@ export function useAuth(): UseAuthReturn {
     clearUser();
   }, [clearUser]);
 
+  const deleteAccount = useCallback(async (): Promise<void> => {
+    await authService.deleteAccount();
+    clearUser();
+  }, [clearUser]);
+
   return {
     isAuthenticated,
     user,
     login,
     logout,
+    deleteAccount,
   };
 }

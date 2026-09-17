@@ -18,13 +18,28 @@
       }
     },
     "production": {
-      "autoIncrement": true,
+      "autoIncrement": false,
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.molyscan.fr/api"
+      },
       "android": {
         "buildType": "app-bundle"
+      }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6805487812"
+      }
+    }
   }
 }

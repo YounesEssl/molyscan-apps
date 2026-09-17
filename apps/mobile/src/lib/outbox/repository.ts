@@ -129,6 +129,19 @@ export async function remove(id: string): Promise<void> {
   await db.runAsync(`DELETE FROM outbox WHERE id = ?`, id);
 }
 
+/** Remove every row of one kind and return its referenced image paths. */
+export async function removeByKind(kind: OutboxKind): Promise<string[]> {
+  const db = await getOutboxDb();
+  const rows = await db.getAllAsync<{ image_path: string | null }>(
+    `SELECT image_path FROM outbox WHERE kind = ?`,
+    kind,
+  );
+  await db.runAsync(`DELETE FROM outbox WHERE kind = ?`, kind);
+  return rows
+    .map((row) => row.image_path)
+    .filter((path): path is string => path !== null);
+}
+
 /** Re-queue all dead-lettered rows (manual "retry failed" action). */
 export async function retryAllFailed(): Promise<void> {
   const db = await getOutboxDb();

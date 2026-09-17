@@ -28,6 +28,7 @@ export interface SimulatedScanFields {
     | 'cartridge'
     | 'bulk_drum';
   alimentaire?: boolean;
+  nsfCategory?: 'H1' | 'A1';
   ecoResponsable?: boolean;
 }
 
@@ -89,7 +90,7 @@ export const PROD_FEEDBACK_CASES: ProdFeedbackCase[] = [
       scannedName: 'ECO DEGREASER',
       scannedBrand: 'INTERFLON',
     },
-    simulatedScan: { format: 'liquid_bottle', alimentaire: true, ecoResponsable: true },
+    simulatedScan: { format: 'liquid_bottle', nsfCategory: 'A1', ecoResponsable: true },
     expectedProducts: ['KL 9 H', 'KL9H'],
     forbiddenProducts: ['KL 104'],
     note: 'Dégraissant éco-responsable + alimentaire NSF — KL 104 est solvant non-alimentaire',

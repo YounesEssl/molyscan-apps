@@ -9,6 +9,8 @@ import { UsersPage } from './pages/UsersPage';
 import { PriceRequestsPage } from './pages/PriceRequestsPage';
 import { EquivalencesPage } from './pages/EquivalencesPage';
 import { RagManagementPage } from './pages/RagManagementPage';
+import { CompetitiveIntelligencePage } from './pages/CompetitiveIntelligencePage';
+import { AiFeedbackPage } from './pages/AiFeedbackPage';
 
 export function App() {
   return (
@@ -22,6 +24,8 @@ export function App() {
           <Route path="/users" element={<UsersPage />} />
           <Route path="/price-requests" element={<PriceRequestsPage />} />
           <Route path="/equivalences" element={<EquivalencesPage />} />
+          <Route path="/competitive-intelligence" element={<CompetitiveIntelligencePage />} />
+          <Route path="/ai-feedback" element={<AiFeedbackPage />} />
           <Route path="/catalogue" element={<RagManagementPage />} />
           <Route path="/rag" element={<Navigate to="/catalogue" replace />} />
           <Route path="/" element={<Navigate to="/access-requests" replace />} />

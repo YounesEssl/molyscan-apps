@@ -23,6 +23,9 @@ export const scanAnalysisHandler: OutboxHandler = {
     }
     const base64 = await readImageBase64(row.imagePath);
     const payload = JSON.parse(row.payload) as ScanAnalysisPayload;
+    if (payload.aiConsentRecorded !== true) {
+      throw new Error('AI data sharing consent was not recorded for this scan');
+    }
 
     const response = await api.post(
       ENDPOINTS.scans.analyzeImage,

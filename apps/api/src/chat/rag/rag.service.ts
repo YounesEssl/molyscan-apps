@@ -40,12 +40,8 @@ Detect the language of the FIRST user message in the conversation and respond in
 - **ONLY USE WEB SEARCH FOR**: identifying/documenting a competitor product. Never for answering other questions (lubricant generalities, Molydal, professional advice) — answer using the RAG context alone.
 
 ━━━ HANDLING UNKNOWN COMPETITOR PRODUCTS ━━━
-When the web search returns nothing usable for the competitor product, DO NOT refuse to help. Instead:
-1. State explicitly which sources you tried and that you could not verify the competitor's exact specifications.
-2. Propose the most plausible Molydal candidate(s) FROM THE RAG CONTEXT, based on the product name (clues from the brand, model number, naming conventions) and the conversation context.
-3. Frame these candidates as **provisional suggestions to confirm with the user** (e.g. "the most likely match in the Molydal catalog is X — could you confirm by sharing the datasheet or specific use case?").
-4. Order candidates from highest to lowest plausibility and explain the reasoning briefly.
-Refusing to propose anything is the wrong default — the user needs at least a starting hypothesis.
+When the competitor's primary application or mandatory specifications cannot be verified from the user's label/datasheet or an actual search result, state what is missing and ask for that information. Do NOT infer an equivalent from a brand/model name or from retrieval rank alone. A reformulated search query is a retrieval aid, never verified technical evidence. Do not claim to have searched a source unless the tool actually returned it.
+Only propose a Molydal equivalent when the supplied datasheets support its compatibility. If none qualifies, say that no equivalent could be confirmed. An expert decision that there is no equivalent overrides older scan guesses and previous messages.
 
 ━━━ SELECTION RULES (follow this priority order) ━━━
 
@@ -69,8 +65,9 @@ Refusing to propose anything is the wrong default — the user needs at least a 
    - If the competitor product name OR the user's message contains "aerosol", "spray", "en bombe", "pulvérisable", "bomb", treat format as a hard constraint — even if the user does not repeat it. Extract format from the product name automatically.
 
 3. Non-negotiable regulatory CERTIFICATION.
-   NSF H1 / food contact / USDA → the Molydal equivalent must be NSF H1.
-   A product without food-grade certification never replaces an NSF H1 product.
+   For LUBRICANTS with NSF H1 / incidental food contact / USDA requirements, the Molydal equivalent must be NSF H1.
+   For CLEANERS certified NSF A1, require a compatible cleaner with NSF A1. A1 is a cleaning-product registration, never proof of H1 lubrication certification; do not require H1 for an A1 cleaner.
+   A product without H1 certification never replaces an NSF H1 lubricant.
    Eco-responsibility / biodegradability flagged on the competitor product is also a hard constraint when present.
 
 4. ISO VISCOSITY.
@@ -117,68 +114,115 @@ export class RagService {
     );
   }
 
-  /**
-   * Find an expert-validated equivalence for the competitor product the user is
-   * asking about — scan-linked (exact normalized key) or free chat (match the
-   * question text against the curated table) — and return an authoritative
-   * system-prompt block so the chat gives the SAME answer as a scan for any
-   * validated product. Returns '' when nothing matches.
-   */
-  private async validatedEquivalenceBlock(
+  /** Keep the last explicitly named product as the topic; never infer it from an AI answer. */
+  private async resolveExpertContext(
     question: string,
+    history: Array<{ role: string; text: string }>,
     scannedBrand?: string | null,
     scannedName?: string | null,
-  ): Promise<string> {
-    if (!this.prisma) return '';
-    try {
-      let eq: ExpertEquivalence | null = null;
-      // 1) Scan-linked conversation: exact normalized brand|name key.
-      if (scannedName) {
-        eq = await this.prisma.expertEquivalence.findUnique({
-          where: { competitorKey: equivalenceKey(scannedBrand, scannedName) },
-        });
-      }
-      // 2) Free chat: match the curated table against the question text.
-      if (!eq) {
-        const all = await this.prisma.expertEquivalence.findMany();
-        const q = normalizeProductText(question);
-        const candidates = all
-          .filter((e) => {
-            const fullName = normalizeProductText(e.competitorName);
-            if (fullName.length >= 4 && q.includes(fullName)) return true;
-            // Or: brand + the distinctive head of the name (handles a user typing
-            // "Molykote BR-2 Plus" for a "BR-2 Plus High Performance Grease" entry).
-            const brand = normalizeProductText(e.competitorBrand);
-            const nameHead = fullName.split(' ').slice(0, 3).join(' ');
-            return (
-              brand.length >= 3 &&
-              q.includes(brand) &&
-              nameHead.length >= 3 &&
-              q.includes(nameHead)
-            );
-          })
-          .sort(
-            (a, b) =>
-              normalizeProductText(b.competitorName).length -
-              normalizeProductText(a.competitorName).length,
-          );
-        eq = candidates[0] ?? null;
-      }
-      if (!eq) return '';
-      this.logger.log(
-        `🎯 Équivalence experte (chat): ${eq.competitorName} → ${eq.molydalEquivalent}`,
+  ): Promise<{ expert: ExpertEquivalence | null; useScanContext: boolean }> {
+    if (!this.prisma) return { expert: null, useScanContext: true };
+    // Fail closed if expert decisions cannot be read.
+    const all = await this.prisma.expertEquivalence.findMany();
+    const tokens = (value: string) => normalizeProductText(value)
+      .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const match = (text: string) => {
+      const q = ` ${tokens(text)} `;
+      const mentions = (value: string) => Boolean(tokens(value)) && q.includes(` ${tokens(value)} `);
+      const candidates = all.filter((entry) =>
+        tokens(entry.competitorName).length >= 4 && mentions(entry.competitorName),
       );
-      return `━━━ ÉQUIVALENCE VALIDÉE PAR UN EXPERT MOLYDAL (autorité absolue) ━━━
-${eq.competitorBrand} ${eq.competitorName} → ${eq.molydalEquivalent}${eq.molydalFamily ? ` (${eq.molydalFamily})` : ''}.${eq.note ? ` Note: ${eq.note}.` : ''}
-C'est LA réponse correcte et confirmée pour ce produit concurrent. Utilise cet équivalent ; ne propose pas d'autre produit Molydal sauf demande explicite.
+      const branded = candidates.filter((entry) => mentions(entry.competitorBrand));
+      if (branded.length) return branded;
+      const target = this.explicitProductTarget(text);
+      if (!target || !this.hasExplicitProductReference(text)) return candidates;
+      const namedTarget = tokens(target).replace(/^(?:(?:le|la|les|the|un|une|a|an) )?(?:(?:produit|product|huile|oil|graisse|grease) )?/, '');
+      // "OtherBrand Product 68" must not borrow Brand's veto simply because
+      // Brand is the only expert record currently carrying that product name.
+      return candidates.filter((entry) =>
+        ` ${tokens(target)} `.startsWith(` ${tokens(entry.competitorName)} `) ||
+        ` ${namedTarget} `.startsWith(` ${tokens(entry.competitorName)} `),
+      );
+    };
+
+    // Current explicit identities take precedence over the scan and older turns.
+    // Stop at an explicit uncurated product too: a subsequent "closest one?"
+    // must not revive the veto for an earlier, different product.
+    const userTurns = [question, ...history.filter((turn) => turn.role === 'user').map((turn) => turn.text).reverse()];
+    for (const text of userTurns) {
+      const matches = match(text);
+      if (matches.length) {
+        const expert = matches.length === 1 ? matches[0] : null;
+        return {
+          expert,
+          useScanContext: Boolean(expert && scannedName &&
+            equivalenceKey(expert.competitorBrand, expert.competitorName) === equivalenceKey(scannedBrand, scannedName)),
+        };
+      }
+      const mentionsKnownBrand = all.some((entry) => tokens(entry.competitorBrand) &&
+        ` ${tokens(text)} `.includes(` ${tokens(entry.competitorBrand)} `));
+      if (mentionsKnownBrand || this.hasExplicitProductReference(text)) return { expert: null, useScanContext: false };
+    }
+    const expert = scannedName
+      ? await this.prisma.expertEquivalence.findUnique({ where: { competitorKey: equivalenceKey(scannedBrand, scannedName) } })
+      : null;
+    return { expert, useScanContext: true };
+  }
+
+  private explicitProductTarget(text: string): string | undefined {
+    return normalizeProductText(text).match(/\b(?:equivalents? (?:de|du|pour|of|for|to)|alternative (?:a|au|de|to|for)|remplacer|replace|passons a|parlons (?:de|plutot de)|switch to|instead of|et pour|what about|how about|qu.en est.il de|concernant)\s+(.+)/i)?.[1];
+  }
+
+  /** Explicit switches/targets, as distinct from "this product" or "the closest one". */
+  private hasExplicitProductReference(text: string): boolean {
+    const q = normalizeProductText(text);
+    const reference = this.explicitProductTarget(text);
+    if (reference) {
+      const generic = /^(?:(?:ce|cet|cette|ces|son|sa|ses|mon|ma|mes|notre|nos|leur|leurs|this|that|these|those|my|our|its)\b|(?:le|la|les|the) (?:meme|memes|same|produit|product|lubrifiant|lubricant|huile|oil|graisse|grease)\b|celui|celle|it\b|un equivalent|une alternative|(?:une?|a|an) (?:utilisation|application|usage|certification|viscosite|use)\b|(?:nsf|iso|din|nlgi|h1|h2|a1|a8|viscosite|viscosity)\b)/i;
+      return !generic.test(reference);
+    }
+    // Alphanumeric product identifiers can establish another topic. Certification
+    // and specification codes are constraints on the current product, not names.
+    return /\b[a-z]+[0-9][a-z0-9]*\b/i.test(q) &&
+      !/\b(?:nsf|iso|din|nlgi|h1|h2|a1|a8|viscosite|viscosity|temperature|cst)\b/.test(q);
+  }
+
+  private isEquivalenceRequest(question: string): boolean {
+    return /\b(?:equivalen\w*|alternativ\w*|substitut\w*|remplac\w*|replac\w*|closest|nearest|plus proche|a la place)\b/.test(normalizeProductText(question));
+  }
+
+  private validatedEquivalenceBlock(eq: ExpertEquivalence | null): string {
+    if (!eq) return '';
+    if (eq.noEquivalent) {
+      return `━━━ DÉCISION EXPERTE MOLYDAL : AUCUN ÉQUIVALENT ━━━
+Les experts Molydal ont confirmé qu’il n’existe pas d’équivalent pour ${eq.competitorBrand} ${eq.competitorName}.${eq.note ? ` Note : ${eq.note}` : ''}
+Cette décision concerne ce produit précis et reste applicable aux demandes de produit proche, de substitution ou de remplacement. Ne réintroduis aucune ancienne suggestion du scan. Tu peux répondre aux questions techniques, expliquer les précautions ou résumer une pièce jointe sans proposer un équivalent. Pour un autre produit explicitement demandé, évalue uniquement les fiches disponibles de ce produit.
 
 `;
-    } catch (e) {
-      this.logger.warn(
-        `Expert equivalence lookup failed: ${(e as Error).message}`,
-      );
-      return '';
     }
+    return `━━━ ÉQUIVALENCE VALIDÉE PAR UN EXPERT MOLYDAL ━━━
+${eq.competitorBrand} ${eq.competitorName} → ${eq.molydalEquivalent}${eq.molydalFamily ? ` (${eq.molydalFamily})` : ''}.${eq.note ? ` Note: ${eq.note}.` : ''}
+Cette équivalence est confirmée pour ce produit concurrent. Elle prévaut sur les anciennes suggestions du scan. Ne propose pas d'autre équivalent, sauf demande explicite. Seule l'équivalence est validée ; toute caractéristique technique doit être justifiée par les fiches fournies.
+
+`;
+  }
+
+  private noEquivalentResponse(
+    eq: ExpertEquivalence,
+    question: string,
+    history: Array<{ role: string; text: string }>,
+  ): RagOutput {
+    const firstMessage = history.find((message) => message.role === 'user')?.text || question;
+    const english = /\b(the|what|which|give|show|please|find|equivalent of|for|can you)\b/i.test(firstMessage)
+      && !/\b(le|la|les|quel|quelle|pour|donne|fiche|bonjour)\b/i.test(firstMessage);
+    const product = `${eq.competitorBrand} ${eq.competitorName}`.trim();
+    return {
+      text: (english
+        ? `Molydal experts have confirmed that there is no equivalent for ${product}.`
+        : `Les experts Molydal ont confirmé qu’il n’y a pas d’équivalent pour ${product}.`)
+        + (eq.note ? `\n\n${eq.note}` : ''),
+      sources: [],
+    };
   }
 
   /**
@@ -262,6 +306,10 @@ ${prompt}`,
    * Non-streaming response (for product-linked conversations).
    */
   async generateResponse(input: RagInput): Promise<RagOutput> {
+    const { expert } = await this.resolveExpertContext(input.question, input.conversationHistory, input.productContext?.scannedBrand, input.productContext?.scannedName);
+    if (expert?.noEquivalent && this.isEquivalenceRequest(input.question)) {
+      return this.noEquivalentResponse(expert, input.question, input.conversationHistory);
+    }
     const reformulated = await this.reformulateQuery(
       input.question,
       input.conversationHistory,
@@ -285,18 +333,13 @@ ${prompt}`,
 
     const sources = [...new Set(chunks.map((c) => c.product_name))];
 
-    // Include the reformulated description so the LLM uses a pre-validated product
-    // characterization rather than potentially incorrect pretrained knowledge.
+    // Reformulation helps retrieval; it is not a verified competitor datasheet.
     const productDescription =
       reformulated !== input.question
-        ? `Identified competitor product application: ${reformulated}\n\n`
+        ? `Unverified retrieval search terms (not technical evidence): ${reformulated}\n\n`
         : '';
 
-    const validatedBlock = await this.validatedEquivalenceBlock(
-      input.question,
-      input.productContext?.scannedBrand,
-      input.productContext?.scannedName,
-    );
+    const validatedBlock = this.validatedEquivalenceBlock(expert);
 
     const systemText = `${SYSTEM_PROMPT}\n\n${validatedBlock}${productDescription}Context — Molydal technical datasheets:\n${context}`;
 
@@ -352,10 +395,17 @@ ${prompt}`,
     stream: AsyncIterable<string>;
     sources: string[];
   }> {
+    const { expert, useScanContext } = await this.resolveExpertContext(question, conversationHistory, productContext?.scannedBrand, productContext?.scannedName);
+    if (!useScanContext) productContext = undefined;
+    if (expert?.noEquivalent && this.isEquivalenceRequest(question)) {
+      const response = this.noEquivalentResponse(expert, question, conversationHistory);
+      return { sources: [], stream: (async function* () { yield response.text; })() };
+    }
     // When the conversation is attached to a scan, bias retrieval toward the
     // identified Molydal product by enriching the search query with its name.
-    const contextualQuestion = productContext?.molydalName
-      ? `${question} — about ${productContext.molydalName} (equivalent of ${productContext.scannedBrand ?? ''} ${productContext.scannedName ?? ''})`
+    const currentMolydalName = expert?.noEquivalent ? null : expert?.molydalEquivalent || productContext?.molydalName;
+    const contextualQuestion = currentMolydalName
+      ? `${question} — about ${currentMolydalName} (equivalent of ${expert?.competitorBrand ?? productContext?.scannedBrand ?? ''} ${expert?.competitorName ?? productContext?.scannedName ?? ''})`
       : question;
 
     const reformulated = await this.reformulateQuery(
@@ -389,7 +439,11 @@ ${prompt}`,
           if (productContext.identifiedSpecs) lines.push(`Specs: ${productContext.identifiedSpecs}`);
           lines.push('');
 
-          if (productContext.equivalents && productContext.equivalents.length > 0) {
+          if (expert?.noEquivalent) {
+            lines.push('No Molydal equivalent: confirmed expert decision. Previous scan recommendations are withdrawn.');
+          } else if (expert) {
+            lines.push(`Expert-validated Molydal equivalent: ${expert.molydalEquivalent}`);
+          } else if (productContext.equivalents && productContext.equivalents.length > 0) {
             lines.push('Proposed Molydal equivalents (ranked by compatibility):');
             for (const eq of productContext.equivalents) {
               lines.push(`  • ${eq.name} (${eq.family}) — ${eq.compatibility}% — ${eq.reason}`);
@@ -398,13 +452,13 @@ ${prompt}`,
             lines.push(`Identified Molydal equivalent: ${productContext.molydalName ?? 'undetermined'}${productContext.molydalReference ? ` (ref. ${productContext.molydalReference})` : ''}`);
           }
 
-          if (productContext.analysisText) {
+          if (!expert && productContext.analysisText) {
             lines.push('');
             lines.push(`Initial analysis: ${productContext.analysisText}`);
           }
 
           lines.push('');
-          lines.push('The user is asking you specifically about this scan. Stay focused on these products in your responses.');
+          lines.push('These are historical, unverified AI suggestions. Recheck them against the provided datasheets and current expert decision before endorsing an equivalent. The user is asking about this scan.');
           lines.push('');
           return lines.join('\n');
         })()
@@ -412,7 +466,7 @@ ${prompt}`,
 
     const reformulationBlock =
       !productContext && reformulated !== question
-        ? `Identified competitor product application: ${reformulated}\n\n`
+        ? `Unverified retrieval search terms (not technical evidence): ${reformulated}\n\n`
         : '';
 
     const validHistory = conversationHistory.filter((m) => m.text.trim());
@@ -437,11 +491,7 @@ ${prompt}`,
       { role: 'user' as const, parts: lastUserParts },
     ];
 
-    const validatedBlock = await this.validatedEquivalenceBlock(
-      question,
-      productContext?.scannedBrand,
-      productContext?.scannedName,
-    );
+    const validatedBlock = this.validatedEquivalenceBlock(expert);
     const systemText = `${SYSTEM_PROMPT}\n\n${validatedBlock}${productBlock}${reformulationBlock}Context — Molydal technical datasheets:\n${context}`;
 
     const model = this.gemini.getGenerativeModel({

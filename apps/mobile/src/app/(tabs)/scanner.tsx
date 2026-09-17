@@ -17,6 +17,7 @@ import { useTabBarSpacing } from '@/hooks/useTabBarSpacing';
 import { useImageAnalysis } from '@/hooks/useImageAnalysis';
 import { colors } from '@/design/tokens/colors';
 import { logger } from '@/lib/logger';
+import { useAiDataConsent } from '@/providers/AiDataConsentProvider';
 
 export default function ScannerScreen(): React.JSX.Element {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function ScannerScreen(): React.JSX.Element {
     useCameraPermission();
   const { tabBarBottom } = useTabBarSpacing();
   const analysis = useImageAnalysis();
+  const { requestConsent } = useAiDataConsent();
 
   const [flashEnabled, setFlashEnabled] = React.useState(false);
 
@@ -47,6 +49,7 @@ export default function ScannerScreen(): React.JSX.Element {
 
   const handleCapture = async (): Promise<void> => {
     if (analysis.isAnalyzing) return;
+    if (!(await requestConsent())) return;
     analysis.setIsAnalyzing(true);
     try {
       const photoPromise = cameraRef.current?.takePictureAsync({

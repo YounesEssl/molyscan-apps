@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
 import { request as httpsRequest } from 'https';
 import { chmodSync, readFileSync, writeFileSync } from 'fs';
 
@@ -196,18 +195,53 @@ export class SellbaseClient {
     return grouped;
   }
 
+  canDownloadDocument(kind: string, productInstanceId?: number | null): boolean {
+    return (kind === 'technical_sheet' && !!productInstanceId)
+      || !!this.config.get<string>('SELLBASE_MEDIA_BASE_URL')
+      || (kind === 'safety_sheet' && this.config.get('SELLBASE_BASE', 'c_molydal') === 'c_molydal');
+  }
+
   async downloadDocument(fileName: string, options?: { productInstanceId?: number | null; kind?: string; language?: string }): Promise<Response> {
     if (options?.kind === 'technical_sheet' && options.productInstanceId) {
       const publicOrigin = this.config.get('MOLYDAL_PUBLIC_URL', 'https://www.molydal.com').replace(/\/$/, '');
       const language = ['fr', 'en', 'de', 'es', 'it'].includes(options.language ?? '') ? options.language : 'fr';
       return fetch(`${publicOrigin}/${language}/produit/${options.productInstanceId}/fiche-technique`, { signal: AbortSignal.timeout(30_000) });
     }
-    const mediaBase = this.config.getOrThrow<string>('SELLBASE_MEDIA_BASE_URL').replace(/\/$/, '');
+    const mediaBase = this.config.get<string>('SELLBASE_MEDIA_BASE_URL');
+    const usePublicSafetySheet = !mediaBase && options?.kind === 'safety_sheet'
+      && this.config.get('SELLBASE_BASE', 'c_molydal') === 'c_molydal';
+    if (!mediaBase && !usePublicSafetySheet) throw new Error('Sellbase document access is not configured');
+    // PIM values are filenames, not URLs. Check before authentication so an
+    // invalid imported value cannot send credentials or escape the media root.
+    const parts = fileName.replace(/\\/g, '/').split('/');
+    if (!fileName || /^[a-z][a-z\d+.-]*:/i.test(fileName) || /[\u0000-\u001f\u007f]/.test(fileName)
+      || parts.some((part) => !part || part === '.' || part === '..')) {
+      throw new Error('Invalid Sellbase document path');
+    }
+    for (const part of parts) {
+      let decoded: string;
+      try { decoded = decodeURIComponent(part); } catch { throw new Error('Invalid Sellbase document path'); }
+      if (decoded === '.' || decoded === '..' || /[/\\%\u0000-\u001f\u007f]/.test(decoded)) {
+        throw new Error('Invalid Sellbase document path');
+      }
+    }
+    // The public Molydal Sellbase archive shards flat filenames by their first
+    // one/two lowercase characters. FR/GB AGL 41 NF and other initials were
+    // verified against real PDFs; the image archive "molydal_p" is different.
+    if (usePublicSafetySheet && parts.length === 1) {
+      parts.unshift(parts[0].slice(0, 1).toLowerCase(), parts[0].slice(0, 2).toLowerCase());
+    }
+    const safePath = parts.map(encodeURIComponent).join('/');
+    if (usePublicSafetySheet) {
+      return fetch(`https://static.sellbase-plateforme.com/molydal/molydal/${safePath}`, {
+        signal: AbortSignal.timeout(30_000), redirect: 'error',
+      });
+    }
     const token = await this.authenticate();
-    const safePath = fileName.split('/').map(encodeURIComponent).join('/');
-    return fetch(`${mediaBase}/${safePath}`, {
+    return fetch(`${mediaBase!.replace(/\/$/, '')}/${safePath}`, {
       headers: { authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(30_000),
+      redirect: 'error',
     });
   }
 }

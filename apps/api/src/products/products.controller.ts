@@ -35,6 +35,7 @@ export class ProductsController {
   async pimDocumentContent(@Param('documentId') documentId: string, @Res() response: Response) {
     const file = await this.productsService.downloadPimDocument(documentId);
     response.setHeader('Content-Type', file.contentType);
+    response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
     response.setHeader('Cache-Control', 'private, max-age=3600');
     response.send(file.buffer);

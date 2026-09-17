@@ -21,9 +21,8 @@ import { colors } from '@/design/tokens/colors';
 import { scanService, type ScanLinkedConversation } from '@/services/scan.service';
 import { chatFreeService } from '@/services/chatFree.service';
 import { useAuthStore } from '@/stores/auth.store';
-import { productService, type PimDocument } from '@/services/product.service';
+import { productService, selectTechnicalSheet, type PimDocument } from '@/services/product.service';
 import { TechnicalSheetCTA } from '@/components/product/TechnicalSheetCTA';
-import { getLocales } from 'expo-localization';
 
 interface ScanDetail {
   id: string;
@@ -62,7 +61,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
   // Seuls les distributeurs peuvent émettre une demande de prix.
   const isDistributor = useAuthStore((s) => s.user?.role) === 'distributor';
   const [priceModalOpen, setPriceModalOpen] = useState(false);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [scan, setScan] = useState<ScanDetail | null>(null);
   const [conversations, setConversations] = useState<ScanLinkedConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,14 +94,15 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
   useEffect(() => {
     if (!productName) { setDocuments([]); return; }
-    void productService.getPimDocuments(productName).then(setDocuments).catch(() => setDocuments([]));
+    let current = true;
+    setDocuments([]);
+    void productService.getPimDocuments(productName).then((docs) => { if (current) setDocuments(docs); }).catch(() => { if (current) setDocuments([]); });
+    return () => { current = false; };
   }, [productName]);
 
   const technicalSheet = useMemo(() => {
-    const sheets = documents.filter((d) => d.kind === 'technical_sheet');
-    const language = getLocales()[0]?.languageCode ?? 'fr';
-    return sheets.find((d) => d.language === language) ?? sheets.find((d) => d.language === 'fr') ?? sheets.find((d) => d.language === 'en') ?? sheets[0];
-  }, [documents]);
+    return selectTechnicalSheet(documents, i18n.language);
+  }, [documents, i18n.language]);
 
   const handleAskAI = async (): Promise<void> => {
     if (!scan?.scannedProduct || creatingChat) return;
@@ -178,8 +178,8 @@ export default function ProductDetailScreen(): React.JSX.Element {
 
         {technicalSheet ? (
           <TechnicalSheetCTA
-            label={t('product.technicalSheet')}
-            subtitle={technicalSheet.fileName}
+            label={t('documents.consultTechnicalSheet')}
+            subtitle={`${productName} · ${technicalSheet.language.toUpperCase()}`}
             onPress={() => router.push(`/document/${technicalSheet.id}`)}
           />
         ) : null}

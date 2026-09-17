@@ -19,7 +19,14 @@ const ACCESS_REQUEST_SELECT = {
   role: true,
   status: true,
   createdAt: true,
-  departments: { select: { id: true, name: true, code: true } },
+  departments: {
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      emailNotificationsDisabled: true,
+    },
+  },
 } satisfies Prisma.UserSelect;
 
 const USER_SELECT = {
@@ -33,7 +40,14 @@ const USER_SELECT = {
   phone: true,
   avatarUrl: true,
   createdAt: true,
-  departments: { select: { id: true, name: true, code: true } },
+  departments: {
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      emailNotificationsDisabled: true,
+    },
+  },
   _count: { select: { scans: true, workflows: true } },
 } satisfies Prisma.UserSelect;
 
@@ -55,7 +69,7 @@ export class AdminService {
   // ─── Départements ──────────────────────────────────────────────────────
 
   listDepartments() {
-    return this.departmentsService.list();
+    return this.departmentsService.listAll();
   }
 
   async createDepartment(name: string) {
@@ -233,7 +247,12 @@ export class AdminService {
           select: { id: true, firstName: true, lastName: true, email: true },
         },
         routedDepartment: {
-          select: { id: true, name: true, code: true },
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            emailNotificationsDisabled: true,
+          },
         },
         recipients: {
           select: {

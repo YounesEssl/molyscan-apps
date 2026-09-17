@@ -4,8 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, RagIndexStatus, RagSyncStatus, RagSyncTrigger } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmbeddingService } from '../chat/rag/embedding.service';
-import { SellbaseClient, SellbaseElement } from './sellbase.client';
-import { CARAC, boolFromAny, buildChunk, detectProductType, documents, hash, latestDate, mergeData, numberValue, text } from './pim.normalizer';
+import { SellbaseClient, SellbaseElement, type SellbaseDatum } from './sellbase.client';
+import { CARAC, buildChunk, detectProductType, documents, hash, latestDate, mergeData, numberValue, productCertifications, text } from './pim.normalizer';
 
 @Injectable()
 export class PimSyncService {
@@ -86,6 +86,7 @@ export class PimSyncService {
         seenProducts.add(elementId);
         const family = text(familyData, 10) ?? text(familyData, 15);
         const subfamily = text(subfamilyData, 13) ?? text(subfamilyData, 15);
+        const labels = productCertifications(data);
         const payload = {
           sellbaseInstanceId: Number(row.instance_id_4) || null,
           name, family, subfamily,
@@ -94,7 +95,7 @@ export class PimSyncService {
           viscosity40: numberValue(data, CARAC.viscosity40), baseOilViscosity40: numberValue(data, CARAC.baseOilViscosity40),
           temperatureMin: numberValue(data, CARAC.temperatureMin), temperatureMax: numberValue(data, CARAC.temperatureMax), dropPoint: numberValue(data, CARAC.dropPoint),
           dinClassification: text(data, CARAC.din), isoClassification: text(data, CARAC.iso),
-          foodGrade: boolFromAny(data, [47, 1124, 1373]), ecoResponsible: boolFromAny(data, [1364, 1400]), moshMoahFree: boolFromAny(data, [1374]),
+          foodGrade: labels.foodGrade, ecoResponsible: labels.ecoResponsible, moshMoahFree: labels.moshMoahFree,
           productType: detectProductType(name, family), active: true, rawData: data as unknown as Prisma.InputJsonValue,
         };
         const sourceHash = hash(payload);
@@ -104,9 +105,16 @@ export class PimSyncService {
           create: { sellbaseElementId: elementId, ...payload, sourceHash, sourceUpdatedAt: latestDate(data) },
           update: { ...payload, sourceHash, sourceUpdatedAt: latestDate(data) },
         });
-        await this.prisma.pimDocument.deleteMany({ where: { productId: product.id } });
         const docs = documents(data);
-        if (docs.length) await this.prisma.pimDocument.createMany({ data: docs.map((d) => ({ id: randomUUID(), productId: product.id, ...d })) });
+        // Preserve document IDs: saved assistant links must survive monthly syncs.
+        for (const doc of docs) {
+          await this.prisma.pimDocument.upsert({
+            where: { productId_sellbaseCaracId: { productId: product.id, sellbaseCaracId: doc.sellbaseCaracId } },
+            create: { productId: product.id, ...doc },
+            update: doc,
+          });
+        }
+        await this.prisma.pimDocument.deleteMany({ where: { productId: product.id, sellbaseCaracId: { notIn: docs.map((doc) => doc.sellbaseCaracId) } } });
       }
 
       const removed = await this.prisma.pimProduct.updateMany({ where: { sellbaseElementId: { notIn: [...seenProducts] }, active: true }, data: { active: false } });
@@ -151,8 +159,15 @@ export class PimSyncService {
     const previous = await this.prisma.ragIndexVersion.findFirst({ where: { status: RagIndexStatus.active } });
     let count = 0;
     for (const product of products) {
-      const content = buildChunk(product);
-      const contentHash = hash({ content, model: this.embeddings.model });
+      const labels = productCertifications(product.rawData as Record<string, SellbaseDatum>);
+      const content = buildChunk({ ...product, ...labels });
+      const packaging = [...new Set(product.references.map((r) => r.packaging).filter(Boolean))];
+      const metadata = JSON.stringify({ product_name: product.name, family: product.family,
+        food_grade: labels.foodGrade, nsf_categories: labels.nsfCategories, certifications: labels.certifications,
+        eco_responsible: labels.ecoResponsible, product_type: product.productType, packaging, conditionnements: packaging });
+      // Metadata participates in reuse: a newly recognized NSF A1 class must
+      // not keep an older chunk whose text happened to remain identical.
+      const contentHash = hash({ content, metadata, model: this.embeddings.model, normalizationVersion: 2 });
       const id = randomUUID();
       if (previous) {
         const copied = await this.prisma.$executeRawUnsafe(
@@ -164,8 +179,6 @@ export class PimSyncService {
       const embedding = await this.embeddings.generateEmbedding(content);
       if (embedding.length !== this.embeddings.dimensions) throw new Error(`Invalid embedding dimension for ${product.name}`);
       const vector = `[${embedding.join(',')}]`;
-      const packaging = [...new Set(product.references.map((r) => r.packaging).filter(Boolean))];
-      const metadata = JSON.stringify({ product_name: product.name, family: product.family, food_grade: product.foodGrade, eco_responsible: product.ecoResponsible, product_type: product.productType, packaging, conditionnements: packaging });
       await this.prisma.$executeRawUnsafe(
         `INSERT INTO "rag_chunks" ("id","indexId","productId","content","contentHash","metadata","embedding","createdAt") VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::vector,NOW())`,
         id, indexId, product.id, content, contentHash, metadata, vector,

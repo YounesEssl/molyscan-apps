@@ -11,6 +11,9 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { AdminInsightsService } from './admin-insights.service';
+import { AdminFeedbackQueryDto, AdminPageDto } from './dto/admin-page.dto';
+import { CompetitiveIntelligenceQueryDto } from './dto/competitive-intelligence-query.dto';
 import { ApproveAccessRequestDto } from './dto/approve-access-request.dto';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -25,7 +28,39 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly insights: AdminInsightsService,
+  ) {}
+
+  @Get('competitive-intelligence')
+  @ApiOperation({
+    summary: 'Historique des scans agrégé par produit ou marque',
+  })
+  competitiveIntelligence(@Query() query: CompetitiveIntelligenceQueryDto) {
+    return this.insights.competitiveIntelligence(query);
+  }
+
+  @Get('scan-feedback')
+  @ApiOperation({ summary: 'Signalements d’équivalence avec leur auteur' })
+  scanFeedback(@Query() query: AdminFeedbackQueryDto) {
+    return this.insights.listScanFeedback(query);
+  }
+
+  @Get('conversation-submissions')
+  @ApiOperation({ summary: 'Conversations transmises avec leur auteur' })
+  conversationSubmissions(@Query() query: AdminFeedbackQueryDto) {
+    return this.insights.listConversationSubmissions(query);
+  }
+
+  @Get('conversation-submissions/:id')
+  @ApiOperation({ summary: 'Messages d’une conversation transmise, paginés' })
+  conversationSubmission(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: AdminPageDto,
+  ) {
+    return this.insights.conversationSubmission(id, query);
+  }
 
   @Get('departments')
   @ApiOperation({ summary: 'List all departments' })

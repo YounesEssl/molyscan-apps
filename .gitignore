@@ -97,3 +97,7 @@ ref_v3_full.png
 
 # OS
 Thumbs.db
+
+# Local scratch work and private App Review notes
+/tmp/
+apps/mobile/store-assets/app-review-*.txt

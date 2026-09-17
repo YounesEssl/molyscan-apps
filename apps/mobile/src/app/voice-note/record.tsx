@@ -18,50 +18,22 @@ import { StopCircle } from 'react-native-solar-icons/icons/bold-duotone';
 import { Document } from 'react-native-solar-icons/icons/bold-duotone';
 import { Shop2 } from 'react-native-solar-icons/icons/bold-duotone';
 import { AltArrowRight } from 'react-native-solar-icons/icons/bold';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
+import { usePreventRemove } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Button, Card, BottomSheet, SearchBar } from '@/components/ui';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { voiceNoteService } from '@/services/voice-note.service';
-import { crmService, type CrmCompany, type CrmContact } from '@/services/crm.service';
-import { API_CONFIG } from '@/constants/api';
-import { storage } from '@/lib/storage';
+import { voiceNoteService, isVoiceNoteConflict, voiceNoteSyncMessage, isVoiceNoteUpdateUnavailable, canSendVoiceNote } from '@/services/voice-note.service';
+import type { VoiceNote } from '@/schemas/voice-note.schema';
+import { voiceNoteToDraft, voiceNoteObjectives, voiceNoteDraftChanges, mergeVoiceNoteDraft, type VoiceNoteDraft } from '@/lib/voiceNoteDraft';
+import { crmService, type CrmCompany, type CrmContact, type CrmCommunicationOptions, type CrmOption } from '@/services/crm.service';
+import { transcribeAudio } from '@/services/transcription.service';
+import { useRecordingKeepAwake } from '@/hooks/useRecordingKeepAwake';
 import { haptic } from '@/lib/haptics';
 import { logger } from '@/lib/logger';
-
-/**
- * Transcrit un enregistrement via POST /chat/transcribe (Whisper).
- * XHR direct : en React Native, axios/fetch échouent sur l'upload de fichier
- * par URI (voir useVoiceInput). Renvoie le texte transcrit (vide si échec).
- */
-async function transcribeAudio(uri: string): Promise<string> {
-  const formData = new FormData();
-  formData.append('audio', { uri, type: 'audio/m4a', name: 'note.m4a' } as unknown as Blob);
-  const token = await storage.getToken();
-  return new Promise<string>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_CONFIG.baseURL}/chat/transcribe`);
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    xhr.timeout = 30000;
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const envelope = JSON.parse(xhr.responseText) as { data: { transcription: string } };
-          resolve((envelope.data?.transcription ?? '').trim());
-        } catch {
-          reject(new Error('Failed to parse transcription response'));
-        }
-      } else {
-        reject(new Error(`HTTP ${xhr.status}`));
-      }
-    };
-    xhr.onerror = () => reject(new Error('Network request failed'));
-    xhr.ontimeout = () => reject(new Error('Transcription timed out'));
-    xhr.send(formData);
-  });
-}
+import { useAiDataConsent } from '@/providers/AiDataConsentProvider';
 
 interface CrmFields {
   clientName: string;
@@ -70,8 +42,6 @@ interface CrmFields {
   nextAction: string;
   notes: string;
 }
-
-type CrmAttachmentMode = 'company' | 'contact';
 
 function roundToNextSlot(date = new Date()): Date {
   const rounded = new Date(date);
@@ -154,12 +124,19 @@ function addMinutes(date: Date, delta: number): Date {
 
 export default function VoiceNoteRecordScreen(): React.JSX.Element {
   const router = useRouter();
+  const navigation = useNavigation();
+  const { noteId } = useLocalSearchParams<{ noteId?: string }>();
+  const isEditing = Boolean(noteId);
   const { t, i18n } = useTranslation();
+  const { requestConsent } = useAiDataConsent();
   const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
-  const [phase, setPhase] = useState<'idle' | 'recording' | 'transcribing' | 'review'>('idle');
+  const [phase, setPhase] = useState<'idle' | 'recording' | 'transcribing' | 'review'>(isEditing ? 'review' : 'idle');
   const [isRecording, setIsRecording] = useState(false);
+  useRecordingKeepAwake(isRecording || phase === 'transcribing');
   const [duration, setDuration] = useState(0);
   const [transcription, setTranscription] = useState('');
+  const [transcriptionFailed, setTranscriptionFailed] = useState(false);
+  const audioUriRef = useRef<string | null>(null);
   const [crmFields, setCrmFields] = useState<CrmFields>({
     clientName: '',
     contactName: '',
@@ -168,8 +145,25 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
     notes: '',
   });
   const [saving, setSaving] = useState(false);
-  const [attachmentMode, setAttachmentMode] = useState<CrmAttachmentMode>('company');
+  const saveInFlightRef = useRef(false);
+  const [saveIntent, setSaveIntent] = useState<'local' | 'send'>('local');
+  const [loadedNote, setLoadedNote] = useState<VoiceNote | null>(null);
+  const [baselineDraft, setBaselineDraft] = useState<VoiceNoteDraft | null>(null);
+  const [loadingNote, setLoadingNote] = useState(isEditing);
+  const [loadError, setLoadError] = useState(false);
+  const [needsReload, setNeedsReload] = useState(false);
+  const [editNotice, setEditNotice] = useState<string | null>(null);
+  const [meetingAtSet, setMeetingAtSet] = useState(true);
+  const [meetingEndAtSet, setMeetingEndAtSet] = useState(true);
   const [meetingAt, setMeetingAt] = useState<Date>(() => roundToNextSlot());
+  const [meetingEndAt, setMeetingEndAt] = useState<Date>(() => addMinutes(roundToNextSlot(), 30));
+  const [meetingPickerTarget, setMeetingPickerTarget] = useState<'start' | 'end'>('start');
+  const activeMeetingAt = meetingPickerTarget === 'end' ? meetingEndAt : meetingAt;
+  const [crmOptions, setCrmOptions] = useState<CrmCommunicationOptions | null>(null);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [optionSheet, setOptionSheet] = useState<'action' | 'objective' | null>(null);
+  const [crmAction, setCrmAction] = useState<CrmOption | null>(null);
+  const [crmObjectives, setCrmObjectives] = useState<CrmOption[]>([]);
   const [meetingMonth, setMeetingMonth] = useState<Date>(() => startOfMonth(roundToNextSlot()));
   const [meetingTimeText, setMeetingTimeText] = useState(() => formatTimeInput(roundToNextSlot()));
   const [meetingSheetVisible, setMeetingSheetVisible] = useState(false);
@@ -192,6 +186,94 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const draft: VoiceNoteDraft = {
+    transcription, clientName: crmFields.clientName, contactName: crmFields.contactName,
+    contactId, companyId, meetingAt: meetingAtSet ? meetingAt.toISOString() : null,
+    meetingEndAt: meetingEndAtSet ? meetingEndAt.toISOString() : null,
+    crmActionCode: crmAction?.value ?? null, crmObjectiveCodes: crmObjectives.map((option) => option.value),
+    productMentioned: crmFields.product, nextAction: crmFields.nextAction, notes: crmFields.notes,
+  };
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const changes = baselineDraft ? voiceNoteDraftChanges(baselineDraft, draft) : {};
+  const isDirty = isEditing && Object.keys(changes).length > 0;
+
+  const applyDraft = useCallback((value: VoiceNoteDraft, note: VoiceNote) => {
+    setTranscription(value.transcription);
+    setDuration(note.duration);
+    setCrmFields({ clientName: value.clientName, contactName: value.contactName,
+      product: value.productMentioned, nextAction: value.nextAction, notes: value.notes });
+    setCompanyId(value.companyId);
+    // The saved client label is editable text, not a verified CRM company name.
+    setCompanyName('');
+    setContactId(value.contactId);
+    const start = new Date(value.meetingAt ?? note.createdAt);
+    setMeetingAt(start);
+    setMeetingEndAt(new Date(value.meetingEndAt ?? start.getTime() + 30 * 60_000));
+    setMeetingAtSet(value.meetingAt !== null);
+    setMeetingEndAtSet(value.meetingEndAt !== null);
+    setCrmAction(value.crmActionCode ? { value: value.crmActionCode,
+      label: value.crmActionCode === note.crmActionCode ? note.crmActionLabel || value.crmActionCode : value.crmActionCode } : null);
+    const knownObjectives = voiceNoteObjectives(note);
+    setCrmObjectives(value.crmObjectiveCodes.map((code) => knownObjectives.find((option) => option.value === code)
+      ?? { value: code, label: code }));
+  }, []);
+
+  const noteLoadRef = useRef(0);
+  const loadNote = useCallback(async () => {
+    if (!noteId) return;
+    const request = ++noteLoadRef.current;
+    setLoadingNote(true);
+    setLoadError(false);
+    try {
+      const note = await voiceNoteService.getById(noteId);
+      if (request !== noteLoadRef.current) return;
+      const next = voiceNoteToDraft(note);
+      setLoadedNote(note);
+      setBaselineDraft(next);
+      applyDraft(next, note);
+    } catch {
+      if (request === noteLoadRef.current) setLoadError(true);
+    } finally {
+      if (request === noteLoadRef.current) setLoadingNote(false);
+    }
+  }, [noteId, applyDraft]);
+
+  useEffect(() => {
+    void loadNote();
+    return () => { noteLoadRef.current += 1; };
+  }, [loadNote]);
+
+  usePreventRemove(isEditing && (isDirty || saving), ({ data }) => {
+    if (saveInFlightRef.current) {
+      Alert.alert(t('voiceNote.operationInProgress'), t('voiceNote.waitForSave'));
+      return;
+    }
+    Alert.alert(t('voiceNote.unsavedTitle'), t('voiceNote.unsavedBody'), [
+      { text: t('voiceNote.keepEditing'), style: 'cancel' },
+      { text: t('voiceNote.discardChanges'), style: 'destructive', onPress: () => navigation.dispatch(data.action) },
+    ]);
+  });
+
+  const reloadPreservingEdits = async () => {
+    if (!noteId || !baselineDraft || saveInFlightRef.current) return;
+    setLoadingNote(true);
+    try {
+      const latest = await voiceNoteService.getById(noteId);
+      const nextBase = voiceNoteToDraft(latest);
+      const merged = mergeVoiceNoteDraft(baselineDraft, draftRef.current, nextBase);
+      setLoadedNote(latest);
+      setBaselineDraft(nextBase);
+      applyDraft(merged.draft, latest);
+      setNeedsReload(false);
+      setEditNotice(merged.conflicts.length ? 'voiceNote.reloadedConflicts' : 'voiceNote.reloadedPreserved');
+    } catch {
+      Alert.alert(t('voiceNote.loadErrorTitle'), t('voiceNote.reloadErrorBody'));
+    } finally {
+      setLoadingNote(false);
+    }
+  };
+
   const isMissingCrmCredentialsError = (error: any): boolean =>
     error?.response?.status === 400 &&
     /CRM credentials not configured/i.test(String(error?.response?.data?.message ?? ''));
@@ -209,6 +291,28 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         },
       ],
     );
+  };
+
+  const loadCommunicationOptions = async () => {
+    setLoadingOptions(true);
+    try {
+      setCrmOptions(await crmService.getCommunicationOptions());
+    } catch (error) {
+      setCrmOptions(null);
+      if (isMissingCrmCredentialsError(error)) {
+        setOptionSheet(null);
+        showMissingCrmCredentialsAlert();
+      } else {
+        logger.error('CRM reference lists unavailable', error);
+      }
+    } finally {
+      setLoadingOptions(false);
+    }
+  };
+
+  const openOptionSheet = (kind: 'action' | 'objective') => {
+    setOptionSheet(kind);
+    void loadCommunicationOptions();
   };
 
   // Recherche société côté serveur (≤50 résultats parmi ~17k).
@@ -265,11 +369,6 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   }, []);
 
   const openContactSheet = () => {
-    if (attachmentMode === 'company' && !companyId) {
-      haptic.warning();
-      return;
-    }
-
     haptic.light();
     setContactQuery('');
     setContactSheetVisible(true);
@@ -284,25 +383,9 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
   useEffect(() => {
     if (!contactSheetVisible) return;
-    const selectedCompanyId = attachmentMode === 'company' ? companyId : null;
-    if (attachmentMode === 'company' && !selectedCompanyId) return;
-    const id = setTimeout(() => loadContacts(selectedCompanyId, contactQuery), 300);
+    const id = setTimeout(() => loadContacts(companyId, contactQuery), 300);
     return () => clearTimeout(id);
-  }, [attachmentMode, companyId, contactQuery, contactSheetVisible, loadContacts]);
-
-  const switchAttachmentMode = (mode: CrmAttachmentMode) => {
-    if (mode === attachmentMode) return;
-
-    haptic.light();
-    setAttachmentMode(mode);
-    setCompanyId(null);
-    setCompanyName('');
-    setContactId(null);
-    setContacts([]);
-    setTotalContacts(0);
-    setContactsLoaded(false);
-    setCrmFields((f) => ({ ...f, clientName: '', contactName: '' }));
-  };
+  }, [companyId, contactQuery, contactSheetVisible, loadContacts]);
 
   const selectCompany = (company: CrmCompany) => {
     haptic.light();
@@ -367,46 +450,71 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
     return baseMonday.toLocaleDateString(locale, { weekday: 'short' }).slice(0, 2);
   };
 
-  const openMeetingSheet = () => {
+  const updateMeetingDate = (next: Date) => {
+    if (meetingPickerTarget === 'end') {
+      setMeetingEndAtSet(true);
+      setMeetingEndAt(next);
+    } else {
+      setMeetingAtSet(true);
+      // Moving the start keeps the selected appointment duration.
+      const length = Math.max(60_000, meetingEndAt.getTime() - meetingAt.getTime());
+      setMeetingAt(next);
+      setMeetingEndAt(new Date(next.getTime() + length));
+    }
+  };
+
+  const openMeetingSheet = (target: 'start' | 'end') => {
     haptic.light();
-    setMeetingMonth(startOfMonth(meetingAt));
-    setMeetingTimeText(formatTimeInput(meetingAt));
+    const date = target === 'end' ? meetingEndAt : meetingAt;
+    setMeetingPickerTarget(target);
+    setMeetingMonth(startOfMonth(date));
+    setMeetingTimeText(formatTimeInput(date));
     setMeetingSheetVisible(true);
   };
 
   const selectMeetingDate = (date: Date) => {
     haptic.light();
-    setMeetingAt((current) => applyDatePart(current, date));
-    if (!sameMonth(date, meetingMonth)) {
-      setMeetingMonth(startOfMonth(date));
-    }
+    updateMeetingDate(applyDatePart(activeMeetingAt, date));
+    if (!sameMonth(date, meetingMonth)) setMeetingMonth(startOfMonth(date));
   };
 
   const commitMeetingTime = () => {
-    const next = applyTimeInput(meetingAt, meetingTimeText);
+    const next = applyTimeInput(activeMeetingAt, meetingTimeText);
     if (!next) {
       haptic.warning();
-      setMeetingTimeText(formatTimeInput(meetingAt));
-      return;
+      setMeetingTimeText(formatTimeInput(activeMeetingAt));
+      return false;
     }
-
-    setMeetingAt(next);
+    updateMeetingDate(next);
     setMeetingTimeText(formatTimeInput(next));
+    return true;
   };
 
   const adjustMeetingTime = (minutes: number) => {
     haptic.light();
-    setMeetingAt((current) => {
-      const next = addMinutes(current, minutes);
-      setMeetingTimeText(formatTimeInput(next));
-      return next;
-    });
+    const next = addMinutes(activeMeetingAt, minutes);
+    updateMeetingDate(next);
+    setMeetingTimeText(formatTimeInput(next));
   };
 
-  const canSave = Boolean(companyId);
+  const validMeetingEnd = !meetingEndAtSet || (meetingAtSet && meetingEndAt > meetingAt);
+  const canSave = Boolean(companyId) && validMeetingEnd;
+  const attachmentLocked = isEditing && Boolean(loadedNote?.crmCommunicationId);
+  const updateUnavailable = Boolean(loadedNote && isVoiceNoteUpdateUnavailable(loadedNote));
+  const canSaveEdits = Boolean(loadedNote) && Boolean(crmFields.clientName.trim()) && validMeetingEnd
+    && loadedNote?.syncStatus !== 'syncing' && !needsReload && !loadingNote;
+  const formBusy = saving || loadingNote;
+  const objectiveOptions = [
+    ...(crmOptions?.objectivesAvailable ? crmOptions.objectives : []),
+    ...crmObjectives.filter((selected) => !crmOptions?.objectivesAvailable
+      || !crmOptions.objectives.some((option) => option.value === selected.value)),
+  ];
+  const optionChoices = optionSheet === 'action' ? (crmOptions?.actionsAvailable ? crmOptions.actions : []) : objectiveOptions;
 
   const startRecording = async () => {
     try {
+      if (!(await requestConsent())) return;
+
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
         haptic.warning();
@@ -422,6 +530,8 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
       haptic.medium();
       recorder.record();
+      setTranscriptionFailed(false);
+      audioUriRef.current = null;
       setIsRecording(true);
       setPhase('recording');
       setDuration(0);
@@ -449,8 +559,10 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       await recorder.stop();
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: false });
       uri = recorder.uri ?? null;
+      audioUriRef.current = uri;
     } catch (error) {
       logger.error('VoiceNote stop failed', error);
+      setTranscriptionFailed(true);
     }
 
     // Transcription Whisper via /chat/transcribe avant l'écran de review.
@@ -461,18 +573,38 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         text = await transcribeAudio(uri);
       } catch (error) {
         logger.error('VoiceNote transcription failed', error);
+        setTranscriptionFailed(true);
       }
     }
 
+    if (!text) setTranscriptionFailed(true);
     setTranscription(text);
     const nextMeetingAt = roundToNextSlot();
     setMeetingAt(nextMeetingAt);
+    setMeetingEndAt(addMinutes(nextMeetingAt, 30));
     setMeetingMonth(startOfMonth(nextMeetingAt));
     setMeetingTimeText(formatTimeInput(nextMeetingAt));
     setPhase('review');
   };
 
+  const retryTranscription = async () => {
+    if (!audioUriRef.current) return;
+    setPhase('transcribing');
+    try {
+      const text = await transcribeAudio(audioUriRef.current);
+      setTranscriptionFailed(!text);
+      if (text) setTranscription(text);
+    } catch (error) {
+      setTranscriptionFailed(true);
+      logger.error('Voice note transcription retry failed', error);
+    } finally {
+      setPhase('review');
+    }
+  };
+
   const handleSave = async () => {
+    if (!canSave || saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setSaving(true);
     try {
       const formData = new FormData();
@@ -482,32 +614,98 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       formData.append('contactName', crmFields.contactName);
       if (contactId) formData.append('contactId', contactId);
       formData.append('meetingAt', meetingAt.toISOString());
+      formData.append('meetingEndAt', meetingEndAt.toISOString());
+      if (crmAction) formData.append('crmActionCode', crmAction.value);
+      formData.append('crmObjectiveCodes', JSON.stringify(crmObjectives.map((option) => option.value)));
       formData.append('productMentioned', crmFields.product);
       formData.append('nextAction', crmFields.nextAction);
       formData.append('notes', crmFields.notes);
       if (companyId) formData.append('companyId', companyId);
-      if (recorder.uri) {
+      if (audioUriRef.current) {
         formData.append('audio', {
-          uri: recorder.uri,
+          uri: audioUriRef.current,
           type: 'audio/m4a',
           name: 'recording.m4a',
         } as unknown as Blob);
       }
-      await voiceNoteService.create(formData);
-      haptic.success();
-      router.back();
+      const saved = await voiceNoteService.create(formData);
+      if (saved.syncStatus !== 'synced') {
+        haptic.warning();
+        Alert.alert(t('voiceNote.savedSyncFailedTitle'), t(voiceNoteSyncMessage(saved)), [
+          { text: t('common.ok'), onPress: () => router.back() },
+        ]);
+      } else {
+        haptic.success();
+        router.back();
+      }
     } catch (e) {
       haptic.error();
       Alert.alert(t('voiceNote.saveErrorTitle'), t('voiceNote.saveErrorBody'));
       if (__DEV__) console.error('[VoiceNote] Save failed:', e);
     } finally {
+      saveInFlightRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  const handleSaveEdits = async (send: boolean) => {
+    if (!noteId || !loadedNote || !baselineDraft || !canSaveEdits || saveInFlightRef.current || (send && (!companyId || !canSendVoiceNote(loadedNote)))) return;
+    saveInFlightRef.current = true;
+    setSaving(true);
+    setSaveIntent(send ? 'send' : 'local');
+    Keyboard.dismiss();
+    let locallySaved = false;
+    try {
+      const patch = voiceNoteDraftChanges(baselineDraft, draftRef.current);
+      let saved = loadedNote;
+      if (Object.keys(patch).length) {
+        saved = await voiceNoteService.update(noteId, { ...patch, expectedRevision: loadedNote.revision });
+        const savedDraft = voiceNoteToDraft(saved);
+        setLoadedNote(saved);
+        setBaselineDraft(savedDraft);
+        applyDraft(savedDraft, saved);
+      }
+      locallySaved = true;
+      setEditNotice('voiceNote.savedLocallyBody');
+      if (send) {
+        saved = await voiceNoteService.resync(noteId, saved.revision);
+        setLoadedNote(saved);
+        const syncedDraft = voiceNoteToDraft(saved);
+        setBaselineDraft(syncedDraft);
+        applyDraft(syncedDraft, saved);
+        setEditNotice(voiceNoteSyncMessage(saved));
+        if (saved.syncStatus === 'synced') {
+          haptic.success();
+          Alert.alert(t('voiceNote.sentTitle'), t('voiceNote.sentBody'));
+        } else {
+          haptic.warning();
+          Alert.alert(t('voiceNote.savedSyncFailedTitle'), t(voiceNoteSyncMessage(saved)));
+        }
+      } else {
+        haptic.success();
+      }
+    } catch (error) {
+      haptic.warning();
+      if (isVoiceNoteConflict(error)) {
+        setNeedsReload(true);
+        setEditNotice('voiceNote.conflictBody');
+        Alert.alert(t('voiceNote.conflictTitle'), t('voiceNote.conflictBody'));
+      } else if (locallySaved) {
+        setEditNotice('voiceNote.resyncErrorBody');
+        Alert.alert(t('voiceNote.savedSyncFailedTitle'), t('voiceNote.resyncErrorBody'));
+      } else {
+        Alert.alert(t('voiceNote.saveErrorTitle'), t('voiceNote.editSaveErrorBody'));
+      }
+      logger.error('Voice note edit failed', error);
+    } finally {
+      saveInFlightRef.current = false;
       setSaving(false);
     }
   };
 
   return (
     <ScreenWrapper padded={false}>
-      <Header title={t('voiceNote.newNoteTitle')} showBack />
+      <Header title={t(isEditing ? 'voiceNote.editTitle' : 'voiceNote.newNoteTitle')} showBack />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -516,6 +714,14 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.content}>
+        {isEditing && loadingNote && !loadedNote && <ActivityIndicator color={COLORS.primary} style={styles.sheetLoader} />}
+        {isEditing && loadError && !loadedNote && (
+          <View style={styles.cardContent}>
+            <Text variant="body">{t('voiceNote.loadErrorTitle')}</Text>
+            <Text variant="caption" color={COLORS.textSecondary}>{t('voiceNote.loadErrorBody')}</Text>
+            <Button title={t('common.retry')} onPress={() => void loadNote()} />
+          </View>
+        )}
         {/* Recording phase */}
         {(phase === 'idle' || phase === 'recording') && (
           <View style={styles.recordingSection}>
@@ -585,16 +791,33 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         )}
 
         {/* Review phase — transcription + CRM fields */}
-        {phase === 'review' && (
+        {phase === 'review' && (!isEditing || loadedNote) && (
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {isEditing && loadedNote && (
+              <Card style={styles.reviewCard}>
+                <View style={styles.cardContent}>
+                  <Text variant="label">{t(`voiceNote.syncStatus.${loadedNote.syncStatus}`)}</Text>
+                  <Text variant="caption" color={COLORS.textSecondary}>
+                    {t(isDirty && (!editNotice || editNotice === 'voiceNote.savedLocallyBody' || editNotice === 'voiceNote.sentBody')
+                      ? 'voiceNote.unsavedHint' : editNotice ?? voiceNoteSyncMessage(loadedNote))}
+                  </Text>
+                  {(needsReload || loadedNote.syncStatus === 'syncing') && (
+                    <Button title={t('voiceNote.reloadPreservingEdits')} variant="secondary" loading={loadingNote}
+                      disabled={saving} onPress={() => void reloadPreservingEdits()} />
+                  )}
+                </View>
+              </Card>
+            )}
+            <View pointerEvents={formBusy ? 'none' : 'auto'}>
             {/* Transcription */}
             <Card style={styles.reviewCard}>
               <View style={styles.cardContent}>
                 <Text variant="label">{t('voiceNote.transcription')}</Text>
                 <TextInput
+                  editable={!formBusy}
                   style={styles.transcriptionInput}
                   value={transcription}
                   onChangeText={setTranscription}
@@ -605,103 +828,78 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
               </View>
             </Card>
 
+            {transcriptionFailed && (
+              <View style={styles.cardContent}>
+                <Text variant="caption" color={COLORS.textSecondary}>{t('voiceNote.transcriptionFailed')}</Text>
+                {audioUriRef.current && <Button title={t('voiceNote.retryTranscription')} variant="secondary" onPress={() => void retryTranscription()} />}
+              </View>
+            )}
+
             {/* CRM attachment */}
             <Card style={styles.reviewCard}>
               <View style={styles.cardContent}>
                 <Text variant="label">{t('voiceNote.crmAttachment')}</Text>
 
-                <View style={styles.segmented}>
-                  <TouchableOpacity
-                    style={[
-                      styles.segmentButton,
-                      attachmentMode === 'company' && styles.segmentButtonActive,
-                    ]}
-                    onPress={() => switchAttachmentMode('company')}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: attachmentMode === 'company' }}
-                  >
+                <Text variant="caption" color={COLORS.textSecondary}>
+                  {t('voiceNote.company')}
+                </Text>
+                <TouchableOpacity
+                  style={styles.companyPicker}
+                  onPress={openCompanySheet}
+                  disabled={attachmentLocked}
+                  accessibilityState={{ disabled: attachmentLocked }}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('voiceNote.company')}
+                >
+                  <View style={styles.companyPickerLeft}>
+                    <Shop2 size={18} color={companyId ? COLORS.primary : COLORS.textMuted} />
                     <Text
-                      variant="caption"
-                      style={styles.segmentText}
-                      color={attachmentMode === 'company' ? COLORS.primary : COLORS.textSecondary}
+                      variant="body"
+                      color={companyId ? COLORS.text : COLORS.textMuted}
+                      numberOfLines={1}
                     >
-                      {t('voiceNote.attachCompany')}
+                      {companyName || (companyId ? t('voiceNote.linkedCompany', { id: companyId }) : t('voiceNote.companyPlaceholder'))}
                     </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.segmentButton,
-                      attachmentMode === 'contact' && styles.segmentButtonActive,
-                    ]}
-                    onPress={() => switchAttachmentMode('contact')}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: attachmentMode === 'contact' }}
-                  >
-                    <Text
-                      variant="caption"
-                      style={styles.segmentText}
-                      color={attachmentMode === 'contact' ? COLORS.primary : COLORS.textSecondary}
-                    >
-                      {t('voiceNote.attachContact')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  </View>
+                  <AltArrowRight size={14} color={COLORS.textMuted} />
+                </TouchableOpacity>
 
-                {attachmentMode === 'company' ? (
-                  <TouchableOpacity
-                    style={styles.companyPicker}
-                    onPress={openCompanySheet}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('voiceNote.company')}
-                  >
-                    <View style={styles.companyPickerLeft}>
-                      <Shop2 size={18} color={companyId ? COLORS.primary : COLORS.textMuted} />
-                      <Text
-                        variant="body"
-                        color={companyId ? COLORS.text : COLORS.textMuted}
-                        numberOfLines={1}
-                      >
-                        {companyName || t('voiceNote.companyPlaceholder')}
-                      </Text>
-                    </View>
-                    <AltArrowRight size={14} color={COLORS.textMuted} />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.companyPicker}
-                    onPress={openContactSheet}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('voiceNote.contact')}
-                  >
-                    <View style={styles.companyPickerLeft}>
-                      <Shop2 size={18} color={contactId ? COLORS.primary : COLORS.textMuted} />
-                      <Text
-                        variant="body"
-                        color={contactId ? COLORS.text : COLORS.textMuted}
-                        numberOfLines={1}
-                      >
-                        {crmFields.contactName || t('voiceNote.contactPlaceholder')}
-                      </Text>
-                    </View>
-                    <AltArrowRight size={14} color={COLORS.textMuted} />
-                  </TouchableOpacity>
+                <Text variant="caption" color={COLORS.textSecondary}>
+                  {t('voiceNote.contact')}
+                </Text>
+                <TouchableOpacity
+                  style={styles.companyPicker}
+                  onPress={openContactSheet}
+                  disabled={attachmentLocked}
+                  accessibilityState={{ disabled: attachmentLocked }}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('voiceNote.contact')}
+                >
+                  <View style={styles.companyPickerLeft}>
+                    <Shop2 size={18} color={contactId ? COLORS.primary : COLORS.textMuted} />
+                    <Text
+                      variant="body"
+                      color={contactId ? COLORS.text : COLORS.textMuted}
+                      numberOfLines={1}
+                    >
+                      {crmFields.contactName || t('voiceNote.contactPlaceholder')}
+                    </Text>
+                  </View>
+                  <AltArrowRight size={14} color={COLORS.textMuted} />
+                </TouchableOpacity>
+
+                {attachmentLocked && <Text variant="caption" color={COLORS.textMuted}>{t('voiceNote.attachmentLocked')}</Text>}
+                {!attachmentLocked && contactId && (
+                  <Button title={t('voiceNote.clearContact')} variant="secondary" size="sm" onPress={() => {
+                    setContactId(null); setCrmFields((fields) => ({ ...fields, contactName: '' }));
+                  }} />
                 )}
-
-                {attachmentMode === 'contact' && companyName ? (
-                  <Text variant="caption" color={COLORS.textMuted}>
-                    {t('voiceNote.contactCompany', { company: companyName })}
-                  </Text>
-                ) : null}
 
                 {!companyId && (
                   <Text variant="caption" color={COLORS.textMuted}>
-                    {attachmentMode === 'company'
-                      ? t('voiceNote.companyHint')
-                      : t('voiceNote.contactGlobalHint')}
+                    {t('voiceNote.contactGlobalHint')}
                   </Text>
                 )}
               </View>
@@ -713,7 +911,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                 <Text variant="label">{t('voiceNote.meetingAt')}</Text>
                 <TouchableOpacity
                   style={styles.companyPicker}
-                  onPress={openMeetingSheet}
+                  onPress={() => openMeetingSheet('start')}
                   activeOpacity={0.7}
                   accessibilityRole="button"
                   accessibilityLabel={t('voiceNote.meetingAt')}
@@ -721,7 +919,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                   <View style={styles.companyPickerLeft}>
                     <Document size={18} color={COLORS.primary} />
                     <Text variant="body" color={COLORS.text} numberOfLines={1}>
-                      {formatMeetingDateTime(meetingAt)}
+                      {meetingAtSet ? formatMeetingDateTime(meetingAt) : t('voiceNote.notProvided')}
                     </Text>
                   </View>
                   <AltArrowRight size={14} color={COLORS.textMuted} />
@@ -729,6 +927,18 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                 <Text variant="caption" color={COLORS.textMuted}>
                   {t('voiceNote.meetingAtHint')}
                 </Text>
+                <Text variant="label">{t('voiceNote.meetingEndAt')}</Text>
+                <TouchableOpacity
+                  style={styles.companyPicker}
+                  onPress={() => openMeetingSheet('end')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('voiceNote.meetingEndAt')}
+                >
+                  <Text variant="body">{meetingEndAtSet ? formatMeetingDateTime(meetingEndAt) : t('voiceNote.notProvided')}</Text>
+                  <AltArrowRight size={14} color={COLORS.textMuted} />
+                </TouchableOpacity>
+                {!validMeetingEnd && <Text variant="caption" color={COLORS.danger}>{t(meetingAtSet ? 'voiceNote.invalidMeetingEnd' : 'voiceNote.meetingStartRequired')}</Text>}
+
               </View>
             </Card>
 
@@ -736,11 +946,32 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
             <Card style={styles.reviewCard}>
               <View style={styles.cardContent}>
                 <Text variant="label">{t('voiceNote.crmFields')}</Text>
+                {(['action', 'objective'] as const).map((kind) => {
+                  const selectedLabel = kind === 'action' ? crmAction?.label : crmObjectives.map((option) => option.label).join(', ');
+                  return (
+                    <View key={kind} style={styles.fieldRow}>
+                      <Text variant="caption" style={styles.fieldLabel}>{t(`voiceNote.crm${kind === 'action' ? 'Action' : 'Objective'}`)}</Text>
+                      <TouchableOpacity
+                        style={styles.companyPicker}
+                        onPress={() => openOptionSheet(kind)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t(`voiceNote.crm${kind === 'action' ? 'Action' : 'Objective'}`)}
+                      >
+                        <Text variant="body" color={selectedLabel ? COLORS.text : COLORS.textMuted} style={styles.flex}>
+                          {selectedLabel || t('voiceNote.selectCrmOption')}
+                        </Text>
+                        <AltArrowRight size={14} color={COLORS.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+
 
               <View style={styles.fieldRow}>
                 <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.client')}</Text>
                 <TextInput
                   style={styles.fieldInput}
+                  editable={!formBusy}
                   value={crmFields.clientName}
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, clientName: v }))}
                   placeholder={t('voiceNote.clientPlaceholder')}
@@ -757,6 +988,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                 <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.productField')}</Text>
                 <TextInput
                   style={styles.fieldInput}
+                  editable={!formBusy}
                   value={crmFields.product}
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, product: v }))}
                   placeholder={t('voiceNote.productPlaceholder')}
@@ -771,6 +1003,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                 <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.nextAction')}</Text>
                 <TextInput
                   style={styles.fieldInput}
+                  editable={!formBusy}
                   value={crmFields.nextAction}
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, nextAction: v }))}
                   placeholder={t('voiceNote.nextActionPlaceholder')}
@@ -785,6 +1018,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                 <Text variant="caption" style={styles.fieldLabel}>{t('voiceNote.notes')}</Text>
                 <TextInput
                   style={[styles.fieldInput, styles.notesInput]}
+                  editable={!formBusy}
                   value={crmFields.notes}
                   onChangeText={(v) => setCrmFields((f) => ({ ...f, notes: v }))}
                   placeholder={t('voiceNote.notesPlaceholder')}
@@ -797,14 +1031,26 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
               </View>
               </View>
             </Card>
+            </View>
 
             {/* Actions */}
             <View style={styles.actions}>
-              {!canSave && (
+              {!companyId && (
                 <Text variant="caption" color={COLORS.textMuted} style={styles.saveHint}>
-                  {t('voiceNote.attachmentRequired')}
+                  {t(isEditing ? 'voiceNote.attachmentRequiredForSend' : 'voiceNote.attachmentRequired')}
                 </Text>
               )}
+              {updateUnavailable && <Text variant="caption" color={COLORS.textSecondary}>{t('voiceNote.updateUnavailableBody')}</Text>}
+              {loadedNote && (loadedNote.syncErrorCode === 'legacy_uncertain' || loadedNote.syncStatus === 'deleted') && (
+                <Text variant="caption" color={COLORS.textSecondary}>{t(voiceNoteSyncMessage(loadedNote))}</Text>
+              )}
+              {isEditing ? <>
+                <Button title={t('voiceNote.saveChanges')} variant="secondary" loading={saving && saveIntent === 'local'}
+                  disabled={!canSaveEdits || !isDirty || saving} onPress={() => void handleSaveEdits(false)} style={styles.actionButton} />
+                <Button title={t('voiceNote.saveAndSend')} variant="primary" loading={saving && saveIntent === 'send'}
+                  disabled={!canSaveEdits || !companyId || saving || !loadedNote || !canSendVoiceNote(loadedNote)}
+                  onPress={() => void handleSaveEdits(true)} style={styles.actionButton} />
+              </> : <>
               <Button
                 title={t('voiceNote.saveNote')}
                 variant="primary"
@@ -817,20 +1063,25 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
               <Button
                 title={t('voiceNote.reRecord')}
                 variant="secondary"
+                disabled={saving}
                 icon={<Microphone2 size={20} color={COLORS.primary} />}
                 onPress={() => {
                   setPhase('idle');
                   setDuration(0);
                   setTranscription('');
+                  setTranscriptionFailed(false);
+                  audioUriRef.current = null;
+                  setCrmAction(null);
+                  setCrmObjectives([]);
                   setCompanyId(null);
                   setCompanyName('');
                   setContactId(null);
                   setContacts([]);
                   setTotalContacts(0);
                   setContactsLoaded(false);
-                  setAttachmentMode('company');
                   const nextMeetingAt = roundToNextSlot();
                   setMeetingAt(nextMeetingAt);
+                  setMeetingEndAt(addMinutes(nextMeetingAt, 30));
                   setMeetingMonth(startOfMonth(nextMeetingAt));
                   setMeetingTimeText(formatTimeInput(nextMeetingAt));
                   setCrmFields({
@@ -843,12 +1094,67 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
                 }}
                 style={styles.actionButton}
               />
+              </>}
             </View>
           </ScrollView>
         )}
       </View>
       </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      <BottomSheet visible={optionSheet !== null} onClose={() => setOptionSheet(null)}>
+        <Text variant="label" style={styles.sheetTitle}>
+          {t(optionSheet === 'action' ? 'voiceNote.crmAction' : 'voiceNote.crmObjective')}
+        </Text>
+        {optionSheet === 'objective' && <Text variant="caption" color={COLORS.textSecondary} style={styles.sheetIntro}>
+          {t('voiceNote.multipleObjectivesHint')}
+        </Text>}
+        {loadingOptions ? <ActivityIndicator color={COLORS.primary} style={styles.sheetLoader} /> : (
+          <>
+            {(!crmOptions || !(optionSheet === 'action' ? crmOptions.actionsAvailable : crmOptions.objectivesAvailable)) && (
+              <View style={styles.cardContent}>
+                <Text variant="body" color={COLORS.textSecondary}>{t('voiceNote.crmOptionsUnavailable')}</Text>
+                <Button title={t('voiceNote.resync')} variant="secondary" onPress={() => void loadCommunicationOptions()} />
+              </View>
+            )}
+            {optionChoices.length > 0 ? (
+              <ScrollView style={styles.optionList} keyboardShouldPersistTaps="handled">
+                {optionChoices.map((option) => {
+                  const selected = optionSheet === 'action' ? crmAction?.value === option.value : crmObjectives.some((item) => item.value === option.value);
+                  return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={styles.companyPicker}
+                    onPress={() => {
+                      if (optionSheet === 'action') {
+                        setCrmAction(option);
+                        setOptionSheet(null);
+                      } else {
+                        setCrmObjectives((current) => current.some((item) => item.value === option.value)
+                          ? current.filter((item) => item.value !== option.value) : [...current, option]);
+                      }
+                    }}
+                    accessibilityRole={optionSheet === 'objective' ? 'checkbox' : 'button'}
+                    accessibilityState={optionSheet === 'objective' ? { checked: selected } : { selected }}
+                  >
+                    <Text variant="body" style={styles.flex}>{option.label}</Text>
+                    {optionSheet === 'objective' && <View style={[styles.optionCheckbox, selected && styles.optionCheckboxSelected]}>
+                      {selected && <Text variant="caption" color={COLORS.surface}>✓</Text>}
+                    </View>}
+                  </TouchableOpacity>
+                ); })}
+              </ScrollView>
+            ) : crmOptions && (optionSheet === 'action' ? crmOptions.actionsAvailable : crmOptions.objectivesAvailable) ? (
+              <Text variant="caption" color={COLORS.textMuted}>{t('voiceNote.crmOptionsEmpty')}</Text>
+            ) : null}
+            <Button title={t('voiceNote.clearCrmOption')} variant="secondary" onPress={() => {
+              if (optionSheet === 'action') { setCrmAction(null); setOptionSheet(null); }
+              else setCrmObjectives([]);
+            }} style={styles.sheetButton} />
+          </>
+        )}
+        {optionSheet === 'objective' && <Button title={t('voiceNote.objectivesDone')} onPress={() => setOptionSheet(null)} style={styles.sheetButton} />}
+      </BottomSheet>
 
       <BottomSheet visible={companySheetVisible} onClose={() => setCompanySheetVisible(false)}>
         <Text variant="label" style={styles.sheetTitle}>{t('voiceNote.selectCompany')}</Text>
@@ -950,9 +1256,9 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       </BottomSheet>
 
       <BottomSheet visible={meetingSheetVisible} onClose={() => setMeetingSheetVisible(false)}>
-        <Text variant="label" style={styles.sheetTitle}>{t('voiceNote.selectMeetingAt')}</Text>
+        <Text variant="label" style={styles.sheetTitle}>{t(meetingPickerTarget === 'end' ? 'voiceNote.selectMeetingEndAt' : 'voiceNote.selectMeetingAt')}</Text>
         <Text variant="caption" color={COLORS.textMuted} style={styles.sheetIntro}>
-          {formatMeetingDateTime(meetingAt)}
+          {formatMeetingDateTime(activeMeetingAt)}
         </Text>
 
         <View style={styles.calendarHeader}>
@@ -989,7 +1295,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
         <View style={styles.calendarGrid}>
           {buildCalendarDays(meetingMonth).map(({ date, inMonth }) => {
-            const selected = dateKey(date) === dateKey(meetingAt);
+            const selected = dateKey(date) === dateKey(activeMeetingAt);
             return (
               <TouchableOpacity
                 key={dateKey(date)}
@@ -1060,7 +1366,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         <Button
           title={t('common.ok')}
           variant="primary"
-          onPress={() => setMeetingSheetVisible(false)}
+          onPress={() => { if (commitMeetingTime()) setMeetingSheetVisible(false); }}
           style={styles.sheetButton}
         />
       </BottomSheet>
@@ -1171,28 +1477,10 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     flex: 1,
   },
-  segmented: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.md,
-    padding: 4,
-    gap: 4,
-  },
-  segmentButton: {
-    flex: 1,
-    minHeight: 38,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentButtonActive: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.primary + '25',
-  },
   segmentText: {
     fontWeight: '700',
   },
+  optionList: { maxHeight: 320 },
   sheetTitle: {
     marginBottom: SPACING.md,
   },
@@ -1314,6 +1602,16 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: SPACING.lg,
   },
+  optionCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionCheckboxSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   fieldRow: {
     gap: SPACING.xs,
   },

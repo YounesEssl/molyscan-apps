@@ -2,7 +2,7 @@
   "expo": {
     "name": "Molyscan",
     "slug": "molyscan",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,8 +15,11 @@
     },
     "ios": {
       "bundleIdentifier": "com.molydal.molyscan",
-      "buildNumber": "1",
-      "supportsTablet": true,
+      "buildNumber": "8",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "Molyscan utilise votre caméra pour photographier les produits et identifier les équivalents Molydal.",
         "NSPhotoLibraryUsageDescription": "Molyscan a besoin d'accéder à vos photos pour analyser une image depuis votre galerie.",
@@ -26,7 +29,7 @@
     },
     "android": {
       "package": "com.molydal.molyscan",
-      "versionCode": 29,
+      "versionCode": 31,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.READ_MEDIA_IMAGES",
@@ -39,7 +42,6 @@
       },
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "resize",
-      "usesCleartextTraffic": true,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -62,14 +64,18 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Molyscan to access your camera for barcode scanning."
+          "cameraPermission": "Molyscan utilise votre caméra pour photographier l'étiquette d'un lubrifiant et identifier le produit ainsi que ses équivalents Molydal.",
+          "microphonePermission": "Molyscan utilise le micro pour enregistrer une note vocale de visite et la transcrire dans votre compte CRM.",
+          "recordAudioAndroid": false
         }
       ],
       "expo-sqlite",
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Molyscan utilise votre position pour géolocaliser vos scans."
+          "locationWhenInUsePermission": "Molyscan utilise votre position, uniquement pendant l'utilisation de l'app, pour associer un lieu à vos scans.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false
         }
       ],
       [
@@ -84,7 +90,10 @@
           "icon": "./assets/icon.png",
           "color": "#E87722"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-localization",
+      "expo-asset"
     ],
     "extra": {
       "router": {

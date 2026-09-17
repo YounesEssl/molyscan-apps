@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
@@ -27,6 +28,7 @@ import { scanService } from '@/services/scan.service';
 import { useAuthStore } from '@/stores/auth.store';
 import { haptic } from '@/lib/haptics';
 import { logger } from '@/lib/logger';
+import { TechnicalSheetButton } from '@/components/product/TechnicalSheetButton';
 
 interface AnalysisResult {
   id?: string;
@@ -62,6 +64,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
   const [pendingDownEq, setPendingDownEq] = useState<string | null>(null);
   const [suggestedName, setSuggestedName] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const feedbackInFlight = useRef(false);
   const hasMatch = result.equivalents.length > 0;
   const noProduct = !result.identified.name || result.identified.name === 'null';
 
@@ -71,13 +74,15 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
   const canSubmitFeedback = Boolean(result.id) && !isDistributor;
 
   const handleVote = async (eqName: string, vote: Vote): Promise<void> => {
-    if (!canSubmitFeedback || feedback[eqName]?.submitted) return;
+    if (!canSubmitFeedback || feedback[eqName]?.submitted || feedbackInFlight.current) return;
     haptic.light();
     if (vote === 'down') {
       setSuggestedName('');
       setPendingDownEq(eqName);
       return;
     }
+    feedbackInFlight.current = true;
+    setSubmittingFeedback(true);
     setFeedback((prev) => ({ ...prev, [eqName]: { vote: 'up', submitted: false } }));
     try {
       await scanService.submitEquivalentFeedback(result.id!, {
@@ -87,24 +92,28 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       setFeedback((prev) => ({ ...prev, [eqName]: { vote: 'up', submitted: true } }));
     } catch (error) {
       logger.error('[feedback] up vote failed', error);
+      Alert.alert(t('scanner.feedbackErrorTitle'), t('scanner.feedbackErrorMessage'));
       setFeedback((prev) => {
         const next = { ...prev };
         delete next[eqName];
         return next;
       });
+    } finally {
+      feedbackInFlight.current = false;
+      setSubmittingFeedback(false);
     }
   };
 
   const handleSubmitDownVote = async (): Promise<void> => {
-    if (!pendingDownEq || !canSubmitFeedback) return;
+    if (!pendingDownEq || !canSubmitFeedback || feedbackInFlight.current) return;
+    feedbackInFlight.current = true;
     const trimmed = suggestedName.trim();
-    if (!trimmed) return;
     setSubmittingFeedback(true);
     try {
       await scanService.submitEquivalentFeedback(result.id!, {
         equivalentName: pendingDownEq,
         vote: 'down',
-        suggestedName: trimmed,
+        suggestedName: trimmed || undefined,
       });
       setFeedback((prev) => ({
         ...prev,
@@ -114,7 +123,9 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
       setSuggestedName('');
     } catch (error) {
       logger.error('[feedback] down vote failed', error);
+      Alert.alert(t('scanner.feedbackErrorTitle'), t('scanner.feedbackErrorMessage'));
     } finally {
+      feedbackInFlight.current = false;
       setSubmittingFeedback(false);
     }
   };
@@ -241,6 +252,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
             <Text variant="caption" color={colors.ink2} style={styles.reason}>
               {eq.reason}
             </Text>
+            <TechnicalSheetButton productName={eq.name} />
 
             {canSubmitFeedback ? (
               <View style={styles.feedbackRow}>
@@ -254,6 +266,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
                   <>
                     <TouchableOpacity
                       onPress={() => handleVote(eq.name, 'up')}
+                      disabled={submittingFeedback}
                       style={[
                         styles.voteBtn,
                         fb?.vote === 'up' && styles.voteBtnActiveUp,
@@ -265,6 +278,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleVote(eq.name, 'down')}
+                      disabled={submittingFeedback}
                       style={[
                         styles.voteBtn,
                         fb?.vote === 'down' && styles.voteBtnActiveDown,
@@ -336,6 +350,8 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
               value={suggestedName}
               onChangeText={setSuggestedName}
               placeholder={t('scanner.suggestPlaceholder')}
+              accessibilityLabel={t('scanner.suggestPlaceholder')}
+              maxLength={200}
               placeholderTextColor={colors.ink3}
               style={styles.modalInput}
               autoFocus
@@ -359,7 +375,7 @@ export const ImageAnalysisResult: React.FC<ImageAnalysisResultProps> = ({
                 }
                 variant="primary"
                 onPress={handleSubmitDownVote}
-                disabled={submittingFeedback || suggestedName.trim().length === 0}
+                disabled={submittingFeedback}
               />
             </View>
           </View>
