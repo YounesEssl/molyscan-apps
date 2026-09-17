@@ -1,4 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { FeaturesService } from '../features/features.service';
 import { VoiceNotesService } from './voice-notes.service';
 
 describe('New CRM voice notes', () => {
@@ -6,11 +8,15 @@ describe('New CRM voice notes', () => {
   let prisma: any;
   let crm: any;
   let transcription: any;
+  let features: FeaturesService;
+  let featureValue: string | undefined;
   const start = '2026-09-16T08:30:00.000Z';
   const end = '2026-09-16T09:00:00.000Z';
   let row: any;
 
   beforeEach(() => {
+    featureValue = 'true';
+    features = new FeaturesService({ get: jest.fn(() => featureValue) } as unknown as ConfigService);
     row = { id: 'note', userId: 'user', duration: 95, createdAt: new Date(start),
       meetingAt: new Date(start), meetingEndAt: new Date(end), revision: 0,
       crmSyncedRevision: null, crmCommunicationId: null, crmSyncToken: null,
@@ -34,10 +40,12 @@ describe('New CRM voice notes', () => {
         crmObjectiveCodes: objectives, crmObjectiveLabels: objectives.map((code: string) => `Objectif ${code}`),
       })),
       createCommunication: jest.fn().mockResolvedValue({ id: 'remote' }),
+      communicationExists: jest.fn().mockResolvedValue(true),
+      updateCommunication: jest.fn().mockResolvedValue({ id: 'remote' }),
       formatDateTime: jest.fn().mockReturnValue('2026-09-16 10:30:00'),
     };
     transcription = { transcribe: jest.fn().mockResolvedValue('server transcript') };
-    service = new VoiceNotesService(prisma, { upload: jest.fn() } as any, transcription, crm);
+    service = new VoiceNotesService(prisma, { upload: jest.fn() } as any, transcription, crm, features);
   });
 
   it('persists the end and validated labels, then forwards dates and codes to CRM', async () => {
@@ -158,5 +166,108 @@ describe('New CRM voice notes', () => {
     expect((await service.update('note', 'user', { expectedRevision: 0, crmObjectiveCodes: ['two', 'one'] })).revision).toBe(0);
     expect(crm.validateCommunicationSelection).not.toHaveBeenCalled();
     expect(prisma.voiceNote.updateMany).not.toHaveBeenCalled();
+  });
+
+  describe('operator-controlled CRM history editing', () => {
+    const disabledResponse = { status: 403, response: expect.objectContaining({ code: 'CRM_HISTORY_EDITING_DISABLED' }) };
+
+    it.each([undefined, 'false'])('rejects edits before any database access or CRM validation when configured as %s', async (value) => {
+      featureValue = value;
+      const original = { ...row };
+      await expect(service.update('note', 'user', {
+        expectedRevision: 0, transcription: 'Do not save', crmActionCode: 'visit', crmObjectiveCodes: ['one'],
+      })).rejects.toMatchObject(disabledResponse);
+      for (const method of Object.values(prisma.voiceNote)) expect(method).not.toHaveBeenCalled();
+      expect(crm.validateCommunicationSelection).not.toHaveBeenCalled();
+      expect(crm.communicationExists).not.toHaveBeenCalled();
+      expect(crm.createCommunication).not.toHaveBeenCalled();
+      expect(crm.updateCommunication).not.toHaveBeenCalled();
+      expect(row).toEqual(original);
+    });
+
+    it.each([
+      { revision: 1, syncStatus: 'pending', crmCommunicationId: 'remote', crmSyncedRevision: 0 },
+      { revision: 2, syncStatus: 'failed', crmCommunicationId: 'remote', crmSyncedRevision: 1 },
+      { revision: 1, syncStatus: 'pending', crmCommunicationId: null, crmSyncedRevision: null },
+      { revision: 3, syncStatus: 'synced', crmCommunicationId: 'remote', crmSyncedRevision: 3 },
+    ])('blocks resending revision $revision in state $syncStatus without reserving a lock or touching CRM', async (state) => {
+      featureValue = 'false';
+      Object.assign(row, state, { companyId: 'company' });
+      const original = { ...row };
+      // Omitting expectedRevision is the legacy resync contract and cannot bypass the gate.
+      await expect(service.resync('note', 'user')).rejects.toMatchObject(disabledResponse);
+      expect(prisma.voiceNote.updateMany).not.toHaveBeenCalled();
+      expect(prisma.voiceNote.create).not.toHaveBeenCalled();
+      expect(crm.validateCommunicationSelection).not.toHaveBeenCalled();
+      expect(crm.communicationExists).not.toHaveBeenCalled();
+      expect(crm.createCommunication).not.toHaveBeenCalled();
+      expect(crm.updateCommunication).not.toHaveBeenCalled();
+      expect(row).toEqual(original);
+    });
+
+    it('still creates and sends a new note with actions and multiple objectives while disabled', async () => {
+      featureValue = 'false';
+      const result = await service.create('user', {
+        duration: 95, transcription: 'Initial report', companyId: 'company',
+        meetingAt: start, meetingEndAt: end, crmActionCode: 'visit', crmObjectiveCodes: ['one', 'two'],
+      });
+      expect(result).toMatchObject({ revision: 0, syncStatus: 'synced', crmUpdateAvailable: false });
+      expect(crm.createCommunication).toHaveBeenCalledTimes(1);
+      expect(crm.createCommunication).toHaveBeenCalledWith('user', expect.objectContaining({
+        actionCode: 'visit', objectiveCodes: ['one', 'two'], datetime: new Date(start), endDatetime: new Date(end),
+      }), expect.any(String));
+      expect(crm.updateCommunication).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])('still reconciles an initial-send failure with the same reserved ID when remote existence is %s', async (exists) => {
+      featureValue = 'false';
+      Object.assign(row, { companyId: 'company', syncStatus: 'failed', crmCommunicationId: 'reserved',
+        crmSyncedRevision: null, revision: 0, syncErrorCode: 'crm_unavailable' });
+      crm.communicationExists.mockResolvedValue(exists);
+      const result = await service.resync('note', 'user');
+      expect(result).toMatchObject({ revision: 0, syncStatus: 'synced', crmCommunicationId: 'reserved', crmUpdateAvailable: false });
+      expect(crm.communicationExists).toHaveBeenCalledWith('user', 'reserved');
+      if (exists) {
+        expect(crm.updateCommunication).toHaveBeenCalledWith('user', 'reserved', expect.any(Object));
+        expect(crm.createCommunication).not.toHaveBeenCalled();
+      } else {
+        expect(crm.createCommunication).toHaveBeenCalledWith('user', expect.any(Object), 'reserved');
+        expect(crm.updateCommunication).not.toHaveBeenCalled();
+      }
+    });
+
+    it('does not send an unchanged initial note again after successful synchronization', async () => {
+      featureValue = 'false';
+      Object.assign(row, { companyId: 'company', syncStatus: 'synced', crmCommunicationId: 'remote', crmSyncedRevision: 0 });
+      expect(await service.resync('note', 'user', 0)).toMatchObject({ revision: 0, syncStatus: 'synced', crmUpdateAvailable: false });
+      expect(prisma.voiceNote.updateMany).not.toHaveBeenCalled();
+      expect(crm.communicationExists).not.toHaveBeenCalled();
+      expect(crm.createCommunication).not.toHaveBeenCalled();
+      expect(crm.updateCommunication).not.toHaveBeenCalled();
+    });
+
+    it('takes activation and deactivation into account for an existing service and note', async () => {
+      featureValue = 'false';
+      Object.assign(row, { companyId: 'company', syncStatus: 'synced', crmCommunicationId: 'remote', crmSyncedRevision: 0 });
+      expect((await service.findById('note', 'user')).crmUpdateAvailable).toBe(false);
+      featureValue = 'true';
+      expect((await service.findById('note', 'user')).crmUpdateAvailable).toBe(true);
+      expect(await service.update('note', 'user', { expectedRevision: 0, notes: 'Enabled on server' }))
+        .toMatchObject({ revision: 1, syncStatus: 'pending', crmUpdateAvailable: true });
+      expect((await service.resync('note', 'user', 1)).syncStatus).toBe('synced');
+      expect(crm.updateCommunication).toHaveBeenCalledTimes(1);
+      featureValue = 'false';
+      expect((await service.findById('note', 'user')).crmUpdateAvailable).toBe(false);
+      await expect(service.update('note', 'user', { expectedRevision: 1, notes: 'Disabled again' }))
+        .rejects.toMatchObject(disabledResponse);
+      expect(row.notes).toBe('Enabled on server');
+      expect(crm.createCommunication).not.toHaveBeenCalled();
+    });
+
+    it('never advertises editing when the CRM adapter cannot update communications', async () => {
+      featureValue = 'true';
+      crm.canUpdateCommunication.mockReturnValue(false);
+      expect((await service.findById('note', 'user')).crmUpdateAvailable).toBe(false);
+    });
   });
 });

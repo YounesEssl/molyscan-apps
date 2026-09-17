@@ -21,6 +21,7 @@ import { StorageModule } from './storage/storage.module';
 import { HealthModule } from './health/health.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PimModule } from './pim/pim.module';
+import { FeaturesModule } from './features/features.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { PimModule } from './pim/pim.module';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     ScheduleModule.forRoot(),
     PrismaModule,
+    FeaturesModule,
     EmailModule,
     AuthModule,
     AdminModule,

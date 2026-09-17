@@ -31,6 +31,7 @@ import { voiceNoteToDraft, voiceNoteObjectives, voiceNoteDraftChanges, mergeVoic
 import { crmService, type CrmCompany, type CrmContact, type CrmCommunicationOptions, type CrmOption } from '@/services/crm.service';
 import { transcribeAudio } from '@/services/transcription.service';
 import { useRecordingKeepAwake } from '@/hooks/useRecordingKeepAwake';
+import { useFeatures } from '@/hooks/useFeatures';
 import { haptic } from '@/lib/haptics';
 import { logger } from '@/lib/logger';
 import { useAiDataConsent } from '@/providers/AiDataConsentProvider';
@@ -127,6 +128,9 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   const navigation = useNavigation();
   const { noteId } = useLocalSearchParams<{ noteId?: string }>();
   const isEditing = Boolean(noteId);
+  const { crmHistoryEditingEnabled, isCheckingFeatures, refreshFeatures } = useFeatures();
+  const editingAllowedRef = useRef(crmHistoryEditingEnabled);
+  editingAllowedRef.current = crmHistoryEditingEnabled;
   const { t, i18n } = useTranslation();
   const { requestConsent } = useAiDataConsent();
   const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
@@ -244,7 +248,11 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
     return () => { noteLoadRef.current += 1; };
   }, [loadNote]);
 
-  usePreventRemove(isEditing && (isDirty || saving), ({ data }) => {
+  usePreventRemove(isEditing && crmHistoryEditingEnabled && (isDirty || saving), ({ data }) => {
+    if (!editingAllowedRef.current) {
+      navigation.dispatch(data.action);
+      return;
+    }
     if (saveInFlightRef.current) {
       Alert.alert(t('voiceNote.operationInProgress'), t('voiceNote.waitForSave'));
       return;
@@ -254,6 +262,13 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       { text: t('voiceNote.discardChanges'), style: 'destructive', onPress: () => navigation.dispatch(data.action) },
     ]);
   });
+
+  useEffect(() => {
+    if (isEditing && !crmHistoryEditingEnabled && !isCheckingFeatures) {
+      Keyboard.dismiss();
+      router.dismissTo('/voice-note');
+    }
+  }, [isEditing, crmHistoryEditingEnabled, isCheckingFeatures, router]);
 
   const reloadPreservingEdits = async () => {
     if (!noteId || !baselineDraft || saveInFlightRef.current) return;
@@ -501,7 +516,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   const canSave = Boolean(companyId) && validMeetingEnd;
   const attachmentLocked = isEditing && Boolean(loadedNote?.crmCommunicationId);
   const updateUnavailable = Boolean(loadedNote && isVoiceNoteUpdateUnavailable(loadedNote));
-  const canSaveEdits = Boolean(loadedNote) && Boolean(crmFields.clientName.trim()) && validMeetingEnd
+  const canSaveEdits = crmHistoryEditingEnabled && Boolean(loadedNote) && Boolean(crmFields.clientName.trim()) && validMeetingEnd
     && loadedNote?.syncStatus !== 'syncing' && !needsReload && !loadingNote;
   const formBusy = saving || loadingNote;
   const objectiveOptions = [
@@ -656,6 +671,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
     Keyboard.dismiss();
     let locallySaved = false;
     try {
+      if (!(await refreshFeatures()).crmHistoryEditingEnabled) return;
       const patch = voiceNoteDraftChanges(baselineDraft, draftRef.current);
       let saved = loadedNote;
       if (Object.keys(patch).length) {
@@ -668,6 +684,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       locallySaved = true;
       setEditNotice('voiceNote.savedLocallyBody');
       if (send) {
+        if (!(await refreshFeatures()).crmHistoryEditingEnabled) return;
         saved = await voiceNoteService.resync(noteId, saved.revision);
         setLoadedNote(saved);
         const syncedDraft = voiceNoteToDraft(saved);
@@ -685,6 +702,8 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         haptic.success();
       }
     } catch (error) {
+      if ((error as { response?: { status?: number } })?.response?.status === 403
+        && !(await refreshFeatures()).crmHistoryEditingEnabled) return;
       haptic.warning();
       if (isVoiceNoteConflict(error)) {
         setNeedsReload(true);
@@ -702,6 +721,15 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       setSaving(false);
     }
   };
+
+  if (isEditing && !crmHistoryEditingEnabled) {
+    return (
+      <ScreenWrapper padded={false}>
+        <Header title={t('voiceNote.title')} showBack />
+        {isCheckingFeatures && <ActivityIndicator color={COLORS.primary} style={styles.sheetLoader} />}
+      </ScreenWrapper>
+    );
+  }
 
   return (
     <ScreenWrapper padded={false}>

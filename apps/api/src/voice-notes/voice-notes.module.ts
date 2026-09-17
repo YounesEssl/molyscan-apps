@@ -3,9 +3,10 @@ import { VoiceNotesController } from './voice-notes.controller';
 import { VoiceNotesService } from './voice-notes.service';
 import { TranscriptionService } from './transcription/transcription.service';
 import { CrmModule } from '../crm/crm.module';
+import { FeaturesModule } from '../features/features.module';
 
 @Module({
-  imports: [CrmModule],
+  imports: [CrmModule, FeaturesModule],
   controllers: [VoiceNotesController],
   providers: [VoiceNotesService, TranscriptionService],
 })

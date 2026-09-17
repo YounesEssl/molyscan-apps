@@ -8,6 +8,7 @@ import { CrmService } from '../crm/crm.service';
 import { CreateVoiceNoteDto } from './dto/create-voice-note.dto';
 import { UpdateVoiceNoteDto } from './dto/update-voice-note.dto';
 import { objectiveCodesFromDto } from './dto/crm-objectives';
+import { FeaturesService } from '../features/features.service';
 
 @Injectable()
 export class VoiceNotesService {
@@ -19,6 +20,7 @@ export class VoiceNotesService {
     private storageService: StorageService,
     private transcriptionService: TranscriptionService,
     private crmService: CrmService,
+    private features: FeaturesService,
   ) {}
 
   async findAll(userId: string) {
@@ -105,6 +107,10 @@ export class VoiceNotesService {
    * CRM injoignable…), la note reste enregistrée avec syncStatus='failed'.
    */
   private async syncToCrm(note: VoiceNote) {
+    // Initial sends and their unchanged retries remain part of the base CRM
+    // flow. A saved historical edit must never bypass the paid feature gate,
+    // including from older mobile versions or after the feature is revoked.
+    if (note.revision !== 0) this.features.assertCrmHistoryEditingEnabled();
     if (!note.companyId) {
       return note;
     }
@@ -178,6 +184,7 @@ export class VoiceNotesService {
   }
 
   async update(id: string, userId: string, dto: UpdateVoiceNoteDto) {
+    this.features.assertCrmHistoryEditingEnabled();
     const existing = await this.prisma.voiceNote.findFirst({
       where: { id, userId, syncStatus: { not: 'deleted' } },
     });
@@ -308,7 +315,7 @@ export class VoiceNotesService {
       revision: note.revision,
       crmSyncedRevision: note.crmSyncedRevision,
       syncErrorCode: interrupted ? 'crm_unavailable' : note.syncErrorCode,
-      crmUpdateAvailable: this.crmService.canUpdateCommunication(),
+      crmUpdateAvailable: this.features.isCrmHistoryEditingEnabled() && this.crmService.canUpdateCommunication(),
       createdAt: note.createdAt.toISOString(),
     };
   }

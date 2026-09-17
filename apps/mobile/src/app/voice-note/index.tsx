@@ -7,8 +7,9 @@ import { ScreenWrapper } from '@/components/layout/ScreenWrapper';
 import { Header } from '@/components/layout/Header';
 import { Text, Card, Badge, Button, EmptyState } from '@/components/ui';
 import { COLORS, SPACING } from '@/constants/theme';
-import { voiceNoteService, isVoiceNoteConflict, voiceNoteSyncMessage, canSendVoiceNote, isVoiceNoteUpdateUnavailable } from '@/services/voice-note.service';
+import { voiceNoteService, isVoiceNoteConflict, voiceNoteSyncMessage, canResyncVoiceNoteFromHistory, isVoiceNoteUpdateUnavailable } from '@/services/voice-note.service';
 import type { VoiceNote } from '@/schemas/voice-note.schema';
+import { useFeatures } from '@/hooks/useFeatures';
 import { formatRelativeDate } from '@/utils/date';
 import { haptic } from '@/lib/haptics';
 import { logger } from '@/lib/logger';
@@ -25,6 +26,7 @@ function syncBadgeVariant(status?: string): SyncBadgeVariant {
 export default function VoiceNoteScreen(): React.JSX.Element {
   const router = useRouter();
   const { t } = useTranslation();
+  const { crmHistoryEditingEnabled, refreshFeatures } = useFeatures();
   const [notes, setNotes] = useState<VoiceNote[]>([]);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const retryingRef = useRef(false);
@@ -62,12 +64,16 @@ export default function VoiceNoteScreen(): React.JSX.Element {
   };
 
   const handleResync = async (item: VoiceNote): Promise<void> => {
-    if (retryingRef.current || !canSendVoiceNote(item)) return;
+    if (retryingRef.current || !canResyncVoiceNoteFromHistory(item, crmHistoryEditingEnabled)) return;
     retryingRef.current = true;
     readRequest.current += 1;
     setLoading(false);
     setRetryingId(item.id);
     try {
+      if (!canResyncVoiceNoteFromHistory(item)) {
+        const latest = await refreshFeatures();
+        if (!canResyncVoiceNoteFromHistory(item, latest.crmHistoryEditingEnabled)) return;
+      }
       const updated = await voiceNoteService.resync(item.id, item.revision);
       setNotes((current) => current.map((note) => (note.id === item.id ? updated : note)));
       if (updated.syncStatus === 'synced') haptic.success();
@@ -76,12 +82,22 @@ export default function VoiceNoteScreen(): React.JSX.Element {
         Alert.alert(t('voiceNote.savedSyncFailedTitle'), t(voiceNoteSyncMessage(updated)));
       }
     } catch (error) {
+      if ((error as { response?: { status?: number } })?.response?.status === 403
+        && !(await refreshFeatures()).crmHistoryEditingEnabled) return;
       haptic.error();
       logger.error('Voice note resync failed', error);
       Alert.alert(t('voiceNote.resyncErrorTitle'), t(isVoiceNoteConflict(error) ? 'voiceNote.historyConflictBody' : 'voiceNote.resyncErrorBody'));
     } finally {
       retryingRef.current = false;
       setRetryingId(null);
+    }
+  };
+
+  const handleEdit = async (item: VoiceNote): Promise<void> => {
+    if (retryingRef.current || !crmHistoryEditingEnabled) return;
+    const latest = await refreshFeatures();
+    if (!retryingRef.current && latest.crmHistoryEditingEnabled) {
+      router.push({ pathname: '/voice-note/record', params: { noteId: item.id } });
     }
   };
 
@@ -100,7 +116,7 @@ export default function VoiceNoteScreen(): React.JSX.Element {
       <FlatList
         data={notes}
         refreshing={loading && notes.length > 0}
-        onRefresh={() => void loadNotes()}
+        onRefresh={() => { void loadNotes(); void refreshFeatures(); }}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -141,10 +157,10 @@ export default function VoiceNoteScreen(): React.JSX.Element {
               {isVoiceNoteUpdateUnavailable(item) && item.syncStatus === 'pending' && (
                 <Text variant="caption" color={COLORS.textSecondary}>{t('voiceNote.updateUnavailableBody')}</Text>
               )}
-              <View style={styles.actions}>
-                <Button title={t('voiceNote.editNote')} variant="secondary" size="sm" disabled={retryingId === item.id}
-                  onPress={() => router.push({ pathname: '/voice-note/record', params: { noteId: item.id } })} />
-                {(item.syncStatus === 'pending' || item.syncStatus === 'failed') && canSendVoiceNote(item) && (
+              {(crmHistoryEditingEnabled || canResyncVoiceNoteFromHistory(item, crmHistoryEditingEnabled)) && <View style={styles.actions}>
+                {crmHistoryEditingEnabled && <Button title={t('voiceNote.editNote')} variant="secondary" size="sm" disabled={retryingId !== null}
+                  onPress={() => void handleEdit(item)} />}
+                {canResyncVoiceNoteFromHistory(item, crmHistoryEditingEnabled) && (
                   <Button
                     title={t('voiceNote.resync')}
                     variant="secondary"
@@ -154,7 +170,7 @@ export default function VoiceNoteScreen(): React.JSX.Element {
                     onPress={() => void handleResync(item)}
                   />
                 )}
-              </View>
+              </View>}
             </View>
           </Card>
         )}

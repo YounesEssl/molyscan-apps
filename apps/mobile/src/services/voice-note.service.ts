@@ -47,6 +47,17 @@ export function canSendVoiceNote(note: VoiceNote): boolean {
     && note.syncStatus !== 'deleted' && note.syncErrorCode !== 'legacy_uncertain';
 }
 
+export function canResyncVoiceNoteFromHistory(note: VoiceNote, editingEnabled = false): boolean {
+  if (!canSendVoiceNote(note) || !['pending', 'failed'].includes(note.syncStatus)) return false;
+  if (editingEnabled) return true;
+  // A failed initial creation remains retryable without the paid editor.
+  // A reserved remote ID is safe only when the API explicitly confirms that
+  // no revision has ever been synchronized.
+  const neverSynced = note.crmSyncedRevision === null
+    || (note.crmSyncedRevision === undefined && !note.crmCommunicationId);
+  return note.revision === 0 && neverSynced;
+}
+
 async function postMultipart<T>(path: string, data: FormData): Promise<T> {
   const token = await storage.getToken();
 

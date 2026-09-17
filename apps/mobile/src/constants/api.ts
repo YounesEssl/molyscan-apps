@@ -4,6 +4,7 @@ export const API_CONFIG = {
 };
 
 export const ENDPOINTS = {
+  features: '/features',
   auth: {
     login: '/auth/login',
     register: '/auth/register',

@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
+import { FeaturesService } from '../features/features.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VoiceNotesService } from './voice-notes.service';
 
@@ -29,7 +31,8 @@ integration('Voice note editing and synchronization with PostgreSQL', () => {
       createCommunication: jest.fn(async (_user, _record, id) => ({ id })),
       updateCommunication: jest.fn(async (_user, id) => ({ id })),
     };
-    service = new VoiceNotesService(prisma, {} as any, {} as any, crm);
+    const features = new FeaturesService({ get: () => 'true' } as unknown as ConfigService);
+    service = new VoiceNotesService(prisma, {} as any, {} as any, crm, features);
   });
   afterAll(async () => {
     try {

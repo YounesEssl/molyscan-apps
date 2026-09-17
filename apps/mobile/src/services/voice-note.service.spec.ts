@@ -9,7 +9,7 @@ jest.mock('@/schemas/voice-note.schema', () => require('../schemas/voice-note.sc
 
 import { api } from '@/lib/axios';
 import { VoiceNoteSchema } from '../schemas/voice-note.schema';
-import { canSendVoiceNote, isVoiceNoteConflict, isVoiceNoteUpdateUnavailable, voiceNoteService, voiceNoteSyncMessage } from './voice-note.service';
+import { canSendVoiceNote, canResyncVoiceNoteFromHistory, isVoiceNoteConflict, isVoiceNoteUpdateUnavailable, voiceNoteService, voiceNoteSyncMessage } from './voice-note.service';
 
 const rawNote = { id: 'note-1', duration: 90, transcription: 'Compte rendu', clientName: 'Client', createdAt: '2026-09-17T08:00:00.000Z' };
 const parsed = (overrides: Record<string, unknown> = {}) => VoiceNoteSchema.parse({ ...rawNote, ...overrides });
@@ -101,5 +101,27 @@ describe('CRM note edits and resend transport', () => {
     expect(api.patch).toHaveBeenCalledWith('/voice-notes/note-1', { expectedRevision: 0, crmObjectiveCodes: codes });
     expect(updated.crmObjectiveCodes).toEqual(codes);
     expect(updated.crmObjectiveLabels).toEqual(codes);
+  });
+
+  it.each(['pending', 'failed'])('keeps an unchanged initial %s send retryable with editing disabled', (syncStatus) => {
+    const note = parsed({ syncStatus, revision: 0, crmSyncedRevision: null, crmCommunicationId: 'reserved-1' });
+    expect(canResyncVoiceNoteFromHistory(note)).toBe(true);
+    expect(canResyncVoiceNoteFromHistory({ ...note, crmCommunicationId: null })).toBe(true);
+  });
+
+  it('hides resending a modified note until the paid feature is enabled', () => {
+    const note = parsed({ revision: 1, syncStatus: 'pending', crmSyncedRevision: null });
+    expect(canResyncVoiceNoteFromHistory(note)).toBe(false);
+    expect(canResyncVoiceNoteFromHistory(note, true)).toBe(true);
+  });
+
+  it('blocks a previously synchronized revision zero or an ambiguous legacy ID while disabled', () => {
+    const note = parsed({ revision: 0, syncStatus: 'failed', crmSyncedRevision: 0, crmCommunicationId: 'remote-1', crmUpdateAvailable: true });
+    expect(canResyncVoiceNoteFromHistory(note)).toBe(false);
+    expect(canResyncVoiceNoteFromHistory({ ...note, crmSyncedRevision: undefined })).toBe(false);
+  });
+
+  it.each(['synced', 'syncing', 'deleted'])('never shows a history resend for %s, even when enabled', (syncStatus) => {
+    expect(canResyncVoiceNoteFromHistory(parsed({ syncStatus, crmUpdateAvailable: true }), true)).toBe(false);
   });
 });
