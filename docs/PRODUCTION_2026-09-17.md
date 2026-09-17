@@ -44,13 +44,34 @@ Après synchronisation, le service compilé de production a téléchargé réell
 
 ## Distribution mobile
 
-Builds EAS :
+### iOS
 
-- iOS : `ab481053-64a2-4acd-90d3-2772a7e54e83`.
-- Android AAB : `7d106035-0d9c-4e24-8448-b3a0f8970dab`.
-- Android APK : `f2a29b87-7b73-4623-b65e-a94ef9a56c44`.
+Version **1.0.2 / build 8 soumise à Apple à 16:38:12 Europe/Paris**, statut **`WAITING_FOR_REVIEW`**. Publication automatique après approbation (`AFTER_APPROVAL`) ; cette version n'est pas encore déclarée disponible sur l'App Store.
 
-Statut au moment de la rédaction : builds en cours ; les fiches de version sont préparées, sans soumission finale. Une version envoyée aux stores ne devient disponible qu'après les étapes de traitement et de validation propres à chaque plateforme.
+- Build EAS réussi : `ab481053-64a2-4acd-90d3-2772a7e54e83`.
+- [IPA signé](https://expo.dev/artifacts/eas/iBsp32oq7ZEGL5HY5OMttvmiLiHViGKHvYAdRCn5mvk.ipa).
+- Version App Store Connect : `3f909438-f7fa-4266-a6c5-2870eae275a7`.
+- Build Apple : `44b7f254-d9bb-4fe3-8b08-8d14945c4eca`.
+- Soumission Apple : `8220483f-a1b3-4bdc-a298-314838a02242`.
+
+Le transfert EAS Submit `f76bb504-3bd3-483c-9730-39413267174a`, resté en file, a été annulé avant le transfert direct par l'API officielle Apple `buildUploads`. Un seul transfert a abouti. Le compte et les informations App Review existants ont été conservés ; aucune licence Xcode n'a été acceptée par l'agent.
+
+### Android
+
+L'AAB de production **1.0.2 / versionCode 31** a été construit localement sur le commit exact `648c2fb`, avec le profil EAS production et la clé de signature existante. Signature et structure validées, API production et modules natifs attendus présents. Un APK universel signé a ensuite été généré depuis cet AAB, sans nouvelle compilation. Les secrets temporaires de signature ont été supprimés.
+
+Les binaires et leurs rapports sont conservés localement dans `build/releases/1.0.2/` (hors Git) :
+
+| Artefact | Taille | SHA-256 |
+|---|---:|---|
+| `Molyscan-1.0.2-31-production.aab` | 75 684 981 octets | `e80a914c5198d1c61a78f8eab65cf29ea996bcafd064f31bea550be0391c7d28` |
+| `Molyscan-1.0.2-31-production.apk` | 122 733 207 octets | `a24e74c89d09376ca9b5b676f51dd5b38fc82da530f52dffc753d0be1432ebeb` |
+
+Les jobs EAS AAB `7d106035-0d9c-4e24-8448-b3a0f8970dab` et APK `f2a29b87-7b73-4623-b65e-a94ef9a56c44`, restés en file, ont été annulés après validation des binaires locaux.
+
+Google Play : **version 1.0.2 envoyée pour examen**, confirmée dans la rubrique « Modifications en cours d'examen ». Déploiement complet à **100 %** dans les pays déjà ciblés, publication gérée désactivée : mise à disposition automatique après approbation. Les vérifications rapides de Google précèdent son examen ; cette version n'est pas encore déclarée disponible publiquement.
+
+L'import a accepté le SDK cible 36 sans perte de compatibilité d'appareils signalée. L'avertissement sur l'absence de fichier de désobscurcissement ProGuard/R8 est non bloquant.
 
 ## Sauvegarde et incident de déploiement
 
