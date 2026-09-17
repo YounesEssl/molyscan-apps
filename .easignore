@@ -1,0 +1,107 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env
+.env*.local
+
+# NestJS
+apps/api/dist/
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders (Expo prebuild output)
+/ios
+/android
+apps/mobile/ios/
+apps/mobile/android/
+
+# iOS build artifacts
+**/Pods/
+**/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Android build artifacts
+**/.gradle/
+**/local.properties
+*.apk
+*.aab
+*.keystore
+captures/
+
+# Build outputs
+build/
+**/build/
+
+# Bug reports
+bugreport*.zip
+bugreport-*.txt
+
+# Logs
+*.log
+logs/
+
+# Generated script caches (runtime artifacts)
+apps/api/scripts/.cache/
+
+# Test / coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# IDE / AI-assistant tooling (local only)
+.claude/
+.gemini/
+.vscode/
+.idea/
+*.swp
+*.swo
+.mcp.json
+.playwright-mcp/
+ref_v3_full.png
+
+# OS
+Thumbs.db
+
+# Local scratch work and private App Review notes
+/tmp/
+apps/mobile/store-assets/app-review-*.txt
+
+# EAS archives need application sources, not Git history or store artwork
+.git
+apps/mobile/store-assets/
