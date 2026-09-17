@@ -262,4 +262,4 @@ sudo certbot --nginx -d admin.molyscan.fr
 
 Ce lot ajoute des dépendances natives Expo, notamment `expo-sharing` et `expo-intent-launcher`. Produire de nouveaux binaires iOS et Android avec ces modules ; une mise à jour JavaScript/OTA seule ne suffit pas. Livrer ensemble les versions correspondantes de l’API et du mobile après application des migrations requises.
 
-Le `.app` debug de simulateur iOS et l’APK debug `com.molydal.molyscan.qa` construits pendant la recette sont des preuves de build et de test, pas des artefacts destinés aux stores. Aucun déploiement de production ni aucune publication mobile n’a été effectué. Voir les résultats et limites dans [RECETTE_2026-09-17.md](RECETTE_2026-09-17.md).
+Le `.app` debug de simulateur iOS et l’APK debug `com.molydal.molyscan.qa` construits pendant la recette sont des preuves de build et de test, pas des artefacts destinés aux stores. Voir les résultats et limites dans [RECETTE_2026-09-17.md](RECETTE_2026-09-17.md), puis l'état de la livraison autorisée séparément dans [PRODUCTION_2026-09-17.md](PRODUCTION_2026-09-17.md).
