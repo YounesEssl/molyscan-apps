@@ -2,6 +2,8 @@
 
 Déploiement demandé par Younes après la recette. Les vérifications sur téléphone sont laissées à Younes, conformément à sa demande.
 
+Une livraison complémentaire **1.0.3** désactive ensuite l'édition CRM depuis l'historique, tout en permettant son activation ultérieure côté serveur sans nouveau build. Voir [PRODUCTION_1.0.3_2026-09-17.md](PRODUCTION_1.0.3_2026-09-17.md) pour l'état qui succède à ce rapport.
+
 ## Versions
 
 - Code applicatif : `1944160b824d867264672e4c2e60fa27c647ebae`.
