@@ -214,9 +214,19 @@ const fr = {
     statusPartial: 'Partiel',
     statusNoMatch: 'Sans match',
     defaultBrand: 'Concurrent',
+    defaultScanName: 'ce produit',
     a11yScan:
       'Scan {{brand}}, équivalent {{equiv}}{{confidence}}',
     a11yConfidenceSuffix: ', confiance {{percent}} pour cent',
+    a11yMenu: 'Ouvrir les actions du scan {{product}}',
+    deleteTitle: 'Supprimer ce scan ?',
+    deleteConfirm:
+      'Le scan « {{product}} » sera définitivement supprimé de votre historique.',
+    deleteErrorTitle: 'Suppression impossible',
+    deleteErrorMessage:
+      'Le scan n’a pas pu être supprimé. Vérifiez votre connexion puis réessayez.',
+    deleteLinkedWorkflowError:
+      'Ce scan est lié à une demande de prix et ne peut pas être supprimé.',
   },
   profile: {
     statistics: 'Statistiques',

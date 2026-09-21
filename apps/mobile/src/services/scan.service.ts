@@ -25,6 +25,10 @@ export const scanService = {
     return response.data.data ?? response.data;
   },
 
+  async delete(id: string): Promise<void> {
+    await api.delete(ENDPOINTS.scans.delete(id));
+  },
+
   async getLinkedConversations(id: string): Promise<ScanLinkedConversation[]> {
     const response = await api.get(ENDPOINTS.scans.conversations(id));
     return response.data ?? [];

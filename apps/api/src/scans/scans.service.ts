@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -117,6 +118,38 @@ export class ScansService {
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
     }));
+  }
+
+  async delete(id: string, userId: string) {
+    const scan = await this.prisma.scan.findFirst({
+      where: { id, userId },
+      select: {
+        id: true,
+        photoKey: true,
+        _count: { select: { workflows: true } },
+      },
+    });
+    if (!scan) throw new NotFoundException('Scan not found');
+
+    // A submitted price request is a business record and must not disappear as
+    // a side effect of cleaning the scan history.
+    if (scan._count.workflows > 0) {
+      throw new ConflictException('Scan is linked to a price request');
+    }
+
+    await this.prisma.scan.delete({ where: { id } });
+
+    if (scan.photoKey) {
+      try {
+        await this.storage.delete(scan.photoKey);
+      } catch (error) {
+        // The database deletion is authoritative. A failed object cleanup must
+        // not make the mobile app restore a scan that no longer exists.
+        this.logger.warn(`Scan ${id} deleted, but its photo could not be removed: ${error}`);
+      }
+    }
+
+    return { message: 'Scan deleted' };
   }
 
   async submitEquivalentFeedback(

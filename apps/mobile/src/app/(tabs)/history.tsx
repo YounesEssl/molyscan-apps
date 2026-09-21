@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Platform,
   RefreshControl,
@@ -20,6 +21,7 @@ import { HistoryEmpty } from '@/components/history/HistoryEmpty';
 import { useTabBarSpacing } from '@/hooks/useTabBarSpacing';
 import { colors } from '@/design/tokens/colors';
 import { spacing } from '@/design/tokens/spacing';
+import { haptic } from '@/lib/haptics';
 import { scanService } from '@/services/scan.service';
 import { useOutboxStore } from '@/stores/outbox.store';
 import type { ScanRecord, ScanStatus } from '@/schemas/scan.schema';
@@ -84,6 +86,7 @@ export default function HistoryScreen(): React.JSX.Element {
   const [filter, setFilter] = useState<Filter>('all');
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingScanId, setDeletingScanId] = useState<string | null>(null);
 
   const filters: HistoryFilterOption<Filter>[] = [
     { id: 'all', label: t('history.filterAll') },
@@ -140,15 +143,52 @@ export default function HistoryScreen(): React.JSX.Element {
     [router],
   );
 
+  const handleItemMenuPress = useCallback((scan: ScanRecord) => {
+    const product = scan.scannedProduct?.name ?? t('history.defaultScanName');
+    Alert.alert(
+      t('history.deleteTitle'),
+      t('history.deleteConfirm', { product }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            setDeletingScanId(scan.id);
+            haptic.heavy();
+            void scanService.delete(scan.id)
+              .then(() => {
+                setScans((current) => current.filter((item) => item.id !== scan.id));
+                haptic.success();
+              })
+              .catch((error: unknown) => {
+                haptic.error();
+                const status = (error as { response?: { status?: number } })?.response?.status;
+                Alert.alert(
+                  t('history.deleteErrorTitle'),
+                  status === 409
+                    ? t('history.deleteLinkedWorkflowError')
+                    : t('history.deleteErrorMessage'),
+                );
+              })
+              .finally(() => setDeletingScanId(null));
+          },
+        },
+      ],
+    );
+  }, [t]);
+
   const renderItem = useCallback(
     ({ item }: { item: DateGroup }) => (
       <HistoryDateGroup
         date={item.date}
         items={item.items}
         onItemPress={handleItemPress}
+        onItemMenuPress={handleItemMenuPress}
+        deletingScanId={deletingScanId}
       />
     ),
-    [handleItemPress],
+    [deletingScanId, handleItemMenuPress, handleItemPress],
   );
 
   return (

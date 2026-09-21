@@ -9,19 +9,29 @@ interface HistoryDateGroupProps {
   date: string;
   items: ScanRecord[];
   onItemPress: (id: string) => void;
+  onItemMenuPress: (scan: ScanRecord) => void;
+  deletingScanId?: string | null;
 }
 
 export function HistoryDateGroup({
   date,
   items,
   onItemPress,
+  onItemMenuPress,
+  deletingScanId,
 }: HistoryDateGroupProps): React.JSX.Element {
   return (
     <View style={styles.group}>
       <RNText style={styles.date}>{date}</RNText>
       <View style={styles.items}>
         {items.map((s) => (
-          <HistoryItem key={s.id} scan={s} onPress={() => onItemPress(s.id)} />
+          <HistoryItem
+            key={s.id}
+            scan={s}
+            onPress={() => onItemPress(s.id)}
+            onMenuPress={() => onItemMenuPress(s)}
+            deleting={deletingScanId === s.id}
+          />
         ))}
       </View>
     </View>

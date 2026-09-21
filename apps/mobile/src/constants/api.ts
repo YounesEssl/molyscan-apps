@@ -28,6 +28,7 @@ export const ENDPOINTS = {
     list: '/scans',
     analyzeImage: '/scans/analyze-image',
     detail: (id: string) => `/scans/${id}`,
+    delete: (id: string) => `/scans/${id}`,
     conversations: (id: string) => `/scans/${id}/conversations`,
     equivalentFeedback: (id: string) => `/scans/${id}/equivalent-feedback`,
   },

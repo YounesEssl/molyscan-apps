@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -50,6 +50,12 @@ export class ScansController {
   @ApiOperation({ summary: 'List AI conversations linked to this scan' })
   findConversations(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.scansService.findConversationsByScan(id, user.sub);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete one of the current user scans' })
+  delete(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.scansService.delete(id, user.sub);
   }
 
   @Post(':id/equivalent-feedback')

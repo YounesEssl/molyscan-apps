@@ -1,12 +1,15 @@
 import React, { useCallback } from 'react';
 import {
+  ActivityIndicator,
   View,
   StyleSheet,
   TouchableOpacity,
   Text as RNText,
+  type GestureResponderEvent,
   type ViewStyle,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { MenuDots } from 'react-native-solar-icons/icons/bold-duotone';
 import i18n from '@/i18n';
 import { colors } from '@/design/tokens/colors';
 import { typography } from '@/design/tokens/typography';
@@ -16,6 +19,8 @@ import type { ScanRecord, ScanStatus } from '@/schemas/scan.schema';
 interface HistoryItemProps {
   scan: ScanRecord;
   onPress: () => void;
+  onMenuPress: () => void;
+  deleting?: boolean;
 }
 
 const STATUS_STYLE: Record<ScanStatus, { labelKey: string; bg: string; text: string }> = {
@@ -39,6 +44,8 @@ function formatTime(dateStr: string): string {
 export const HistoryItem = React.memo(function HistoryItem({
   scan,
   onPress,
+  onMenuPress,
+  deleting = false,
 }: HistoryItemProps): React.JSX.Element {
   const { t } = useTranslation();
   const confidence = scan.molydalMatch?.confidence ?? 0;
@@ -50,6 +57,12 @@ export const HistoryItem = React.memo(function HistoryItem({
     haptic.light();
     onPress();
   }, [onPress]);
+
+  const handleMenuPress = useCallback((event: GestureResponderEvent) => {
+    event.stopPropagation();
+    haptic.light();
+    onMenuPress();
+  }, [onMenuPress]);
 
   const accessibilityLabel = t('history.a11yScan', {
     brand,
@@ -64,9 +77,11 @@ export const HistoryItem = React.memo(function HistoryItem({
     <TouchableOpacity
       style={styles.item}
       onPress={handlePress}
+      disabled={deleting}
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: deleting, busy: deleting }}
     >
       {/* Top row: status pill + confidence */}
       <View style={styles.topRow}>
@@ -75,12 +90,32 @@ export const HistoryItem = React.memo(function HistoryItem({
             {t(status.labelKey)}
           </RNText>
         </View>
-        {confidence > 0 ? (
-          <RNText style={styles.conf}>
-            {confidence}
-            <RNText style={styles.confSub}>%</RNText>
-          </RNText>
-        ) : null}
+        <View style={styles.topActions}>
+          {confidence > 0 ? (
+            <RNText style={styles.conf}>
+              {confidence}
+              <RNText style={styles.confSub}>%</RNText>
+            </RNText>
+          ) : null}
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={handleMenuPress}
+            disabled={deleting}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('history.a11yMenu', {
+              product: scan.scannedProduct?.name ?? brand,
+            })}
+            accessibilityState={{ disabled: deleting, busy: deleting }}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color={colors.ink2} />
+            ) : (
+              <MenuDots size={18} color={colors.ink2} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Brand (small caps) */}
@@ -123,6 +158,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
+  },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: -8,
+    marginTop: -8,
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
   },
   pill: {
     paddingHorizontal: 10,

@@ -216,8 +216,18 @@ const en: TranslationKeys = {
     statusPartial: 'Partial',
     statusNoMatch: 'No match',
     defaultBrand: 'Competitor',
+    defaultScanName: 'this product',
     a11yScan: 'Scan {{brand}}, equivalent {{equiv}}{{confidence}}',
     a11yConfidenceSuffix: ', confidence {{percent}} percent',
+    a11yMenu: 'Open actions for the {{product}} scan',
+    deleteTitle: 'Delete this scan?',
+    deleteConfirm:
+      'The “{{product}}” scan will be permanently removed from your history.',
+    deleteErrorTitle: 'Unable to delete',
+    deleteErrorMessage:
+      'The scan could not be deleted. Check your connection and try again.',
+    deleteLinkedWorkflowError:
+      'This scan is linked to a price request and cannot be deleted.',
   },
   profile: {
     statistics: 'Statistics',
