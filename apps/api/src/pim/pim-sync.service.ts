@@ -62,12 +62,18 @@ export class PimSyncService {
       // and is rejected by some Node/proxy combinations. The paginated route is
       // standard, deterministic and remains below the documented rate limit.
       const master = await this.sellbase.getPublishedData(allIds, 0);
-      const overrides = await this.sellbase.getPublishedData(allIds, this.sellbase.publicationId);
+      // baseId=0 is the complete Sellbase catalogue. A configured non-zero
+      // scope intentionally restores the former publication-only behaviour,
+      // including that publication's field overrides.
+      const catalogBaseId = this.sellbase.catalogBaseId;
+      const overrides = catalogBaseId === 0
+        ? {}
+        : await this.sellbase.getPublishedData(allIds, catalogBaseId);
 
       const existing = new Map((await this.prisma.pimProduct.findMany()).map((p) => [p.sellbaseElementId, p]));
       const changedProducts = new Set<number>();
       const seenProducts = new Set<number>();
-      // A product may occur several times in the publication tree. Import the
+      // A product may occur several times in the selected catalogue tree. Import the
       // last occurrence, matching the previous upsert behaviour, but count and
       // process the product only once.
       const uniqueProductRows = new Map<number, SellbaseElement>();
@@ -138,7 +144,7 @@ export class PimSyncService {
       const chunkCount = await this.buildIndex(index.id);
       const validation = await this.validateIndex(index.id);
       await this.activateIndex(index.id, chunkCount, chunkCount, validation);
-      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { status: RagSyncStatus.completed, finishedAt: new Date(), chunksCreated: chunkCount, details: { publicationId: this.sellbase.publicationId } } });
+      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { status: RagSyncStatus.completed, finishedAt: new Date(), chunksCreated: chunkCount, details: { catalogBaseId, scope: catalogBaseId === 0 ? 'master' : 'publication' } } });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`PIM sync ${runId} failed: ${message}`);

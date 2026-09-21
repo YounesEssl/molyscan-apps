@@ -8,10 +8,15 @@ PIM index is activated.
 
 - Manual: Admin → **PIM & RAG** → **Synchroniser maintenant**.
 - Automatic: first day of every month at 03:00 Europe/Paris.
-- Sellbase publication `52903` defines scope: level 4 products, level 5 references.
-- Master values are read from `baseId=0`; publication overrides from `baseId=52903`.
-- Calls are batched by 100 to remain far below Sellbase rate limits.
-- Missing published products are deactivated, never immediately deleted.
+- The complete Sellbase master catalogue (`baseId=0`) defines the default scope:
+  level 4 products and level 5 references. It is not limited to the `SITE WEB
+  MOLYDAL` publication (`52903`).
+- `SELLBASE_CATALOG_BASE_ID` defaults to `0`. Setting it to a non-zero publication
+  ID deliberately restricts the import to that publication and applies its field
+  overrides on top of the master values.
+- Element and data endpoints are paginated so the complete master catalogue is
+  imported even when a level contains more than 1,000 rows.
+- Products missing from the selected source scope are deactivated, never immediately deleted.
 - Every product is hashed. Unchanged chunks reuse the previous embedding.
 
 ## Index safety

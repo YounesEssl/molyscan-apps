@@ -36,8 +36,16 @@ export class SellbaseClient {
     return `${this.origin}/api/${server}/${base}`;
   }
 
-  get publicationId(): number {
-    return Number(this.config.get('SELLBASE_PUBLICATION_ID', '52903'));
+  /**
+   * Sellbase uses baseId=0 for the complete master catalogue. A non-zero value
+   * points to a publication and therefore exposes only that publication's tree.
+   */
+  get catalogBaseId(): number {
+    const value = Number(this.config.get('SELLBASE_CATALOG_BASE_ID', '0'));
+    if (!Number.isInteger(value) || value < 0) {
+      throw new Error('SELLBASE_CATALOG_BASE_ID must be a non-negative integer');
+    }
+    return value;
   }
 
   private async authenticate(): Promise<string> {
@@ -147,18 +155,25 @@ export class SellbaseClient {
 
   async getCharacteristics() {
     const result = await this.request<{ caracs: Record<string, { id: number; libelle: string }> }>(
-      `/carac/getAll?baseId=${this.publicationId}`,
+      `/carac/getAll?baseId=${this.catalogBaseId}`,
     );
     return result.caracs;
   }
 
   async getElements(level: 4 | 5): Promise<SellbaseElement[]> {
-    const query = new URLSearchParams({
-      baseId: String(this.publicationId), level: String(level), page: '0',
-      offset: '1000', orderField: 'id', order: 'ASC',
-    });
-    const result = await this.request<{ elements: SellbaseElement[] }>(`/element/getByLevel?${query}`);
-    return result.elements ?? [];
+    const elements: SellbaseElement[] = [];
+    const offset = 1000;
+    for (let page = 0; ; page++) {
+      const query = new URLSearchParams({
+        baseId: String(this.catalogBaseId), level: String(level), page: String(page),
+        offset: String(offset), orderField: 'id', order: 'ASC',
+      });
+      const result = await this.request<{ elements: SellbaseElement[] }>(`/element/getByLevel?${query}`);
+      const rows = result.elements ?? [];
+      elements.push(...rows);
+      if (rows.length < offset) break;
+    }
+    return elements;
   }
 
   async getData(elementIds: number[], baseId: number): Promise<Record<string, Record<string, SellbaseDatum>>> {
