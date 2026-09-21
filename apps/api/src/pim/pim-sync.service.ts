@@ -208,7 +208,12 @@ export class PimSyncService {
       const embedding = await this.embeddings.generateEmbedding(item.query);
       const vector = `[${embedding.join(',')}]`;
       const rows = await this.prisma.$queryRawUnsafe<Array<{ name: string }>>(
-        `SELECT p."name" FROM "rag_chunks" c JOIN "pim_products" p ON p."id"=c."productId" WHERE c."indexId"=$1 ORDER BY c."embedding" <=> $2::vector LIMIT 15`,
+        // Keep the validation window aligned with VectorStoreService's real
+        // retrieval window. The complete Sellbase catalogue has more close
+        // neighbours than the old website-only publication, so a 15-result
+        // gate rejects valid products that production still retrieves in its
+        // top 40 (for example TGV 2000 and SOLESTER 77).
+        `SELECT p."name" FROM "rag_chunks" c JOIN "pim_products" p ON p."id"=c."productId" WHERE c."indexId"=$1 ORDER BY c."embedding" <=> $2::vector LIMIT 40`,
         indexId, vector,
       );
       const sources = rows.map((r) => r.name);
