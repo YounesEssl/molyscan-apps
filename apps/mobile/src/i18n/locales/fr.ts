@@ -557,7 +557,7 @@ const fr = {
     selectContact: 'Choisir un contact',
     searchContact: 'Rechercher un contact...',
     noContact: 'Aucun contact trouvé',
-    contactLoadError: 'Impossible de charger les contacts. Le premier chargement CRM peut prendre un moment.',
+    contactLoadError: 'Impossible de charger les contacts. Vérifiez la connexion puis réessayez.',
     contactTruncated: '{{shown}} sur {{total}} — affinez la recherche',
     syncStatus: {
       deleted: 'Supprimée du CRM',

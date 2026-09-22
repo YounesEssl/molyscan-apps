@@ -292,6 +292,81 @@ describe('ICy AppStruct communication references', () => {
   });
 });
 
+describe('CRM company-scoped contact lookup', () => {
+  const settings = { CRM_BASE_URL: 'https://crm.example.test', CRM_ENCRYPTION_KEY: 'test' };
+  let service: CrmService;
+  let request: jest.SpyInstance;
+
+  beforeEach(() => {
+    service = new CrmService({
+      crmCredential: {
+        findMany: jest.fn().mockResolvedValue([{ userId: 'user' }]),
+        findUnique: jest.fn().mockResolvedValue({ id: 'credential' }),
+      },
+    } as any, new ConfigService(settings));
+    request = jest.spyOn(service as any, 'authedRequest');
+    jest.spyOn(service, 'getCompanies').mockResolvedValue([
+      { id: 'company-a', name: 'Société A' },
+      { id: 'company-b', name: 'Société B' },
+    ]);
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('asks Sellbase for only the selected company contacts and caches that result', async () => {
+    request.mockResolvedValue({ records: [
+      { pers_personid: 'person-a', pers_companyid: 'company-a', pers_fullname: 'Alice Martin' },
+    ] });
+
+    await expect(service.searchContacts('user', 'company-a', 'alice')).resolves.toEqual({
+      items: [{ id: 'person-a', companyId: 'company-a', companyName: 'Société A', name: 'Alice Martin' }],
+      total: 1,
+    });
+    await service.searchContacts('user', 'company-a', 'martin');
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith('user', 'POST', '/api/Data/person/list', [{
+      fieldName: 'pers_companyid', value: 'company-a', operator: 0, nodeOperator: 0,
+    }]);
+  });
+
+  it('keeps each company cache isolated', async () => {
+    request
+      .mockResolvedValueOnce([{ pers_personid: 'person-a', pers_companyid: 'company-a', pers_fullname: 'Alice' }])
+      .mockResolvedValueOnce([{ pers_personid: 'person-b', pers_companyid: 'company-b', pers_fullname: 'Bob' }]);
+
+    expect((await service.searchContacts('user', 'company-a', '')).items[0].id).toBe('person-a');
+    expect((await service.searchContacts('user', 'company-b', '')).items[0].id).toBe('person-b');
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache a failed contact request, allowing an immediate retry', async () => {
+    request
+      .mockRejectedValueOnce(new ServiceUnavailableException('CRM request failed'))
+      .mockResolvedValueOnce([]);
+
+    await expect(service.searchContacts('user', 'company-a', '')).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(service.searchContacts('user', 'company-a', '')).resolves.toEqual({ items: [], total: 0 });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps global contact search compatible when no company is selected', async () => {
+    request.mockResolvedValue([]);
+    await service.searchContacts('user', '', '');
+    expect(request).toHaveBeenCalledWith('user', 'GET', '/api/Data/person/list');
+  });
+
+  it('warms companies at startup without downloading every contact', async () => {
+    const getCompanies = jest.mocked(service.getCompanies);
+    const getPersons = jest.spyOn(service as any, 'getPersons');
+
+    await service.onModuleInit();
+
+    expect(getCompanies).toHaveBeenCalledWith('user');
+    expect(getPersons).not.toHaveBeenCalled();
+  });
+});
+
 describe('CRM transport and reconciliation', () => {
   const communicationId = '4c99f7a3-6af1-4c6c-8e5c-bf4f916419ee';
   const record = { companyId: 'company', subject: 'Changed', note: 'Changed', datetime: new Date('2026-09-16T08:30:00Z') };

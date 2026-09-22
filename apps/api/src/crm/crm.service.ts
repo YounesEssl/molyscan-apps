@@ -79,6 +79,8 @@ export class CrmService implements OnModuleInit {
   private readonly encryptionKey: string;
   private readonly companyCache = new Map<string, { at: number; data: CrmCompany[] }>();
   private readonly companyRefreshing = new Set<string>();
+  // Les contacts sont mis en cache par utilisateur ET par société. Sellbase
+  // accepte un filtre pers_companyid : inutile de télécharger tout l'annuaire.
   private readonly personCache = new Map<string, { at: number; data: CrmContact[] }>();
   private readonly personRefreshing = new Set<string>();
   private readonly personRefreshPromises = new Map<string, Promise<CrmContact[]>>();
@@ -103,9 +105,6 @@ export class CrmService implements OnModuleInit {
       for (const { userId } of creds) {
         void this.getCompanies(userId).catch((e) =>
           this.logger.warn(`Startup company warm-up failed for ${userId}: ${e}`),
-        );
-        void this.getPersons(userId).catch((e) =>
-          this.logger.warn(`Startup contact warm-up failed for ${userId}: ${e}`),
         );
       }
       if (creds.length) {
@@ -137,9 +136,6 @@ export class CrmService implements OnModuleInit {
     this.getCompanies(userId).catch((e) =>
       this.logger.warn(`Company cache warm-up failed: ${e}`),
     );
-    this.getPersons(userId).catch((e) =>
-      this.logger.warn(`Contact cache warm-up failed: ${e}`),
-    );
 
     return { configured: true, crmUser: session.user ?? null };
   }
@@ -153,9 +149,7 @@ export class CrmService implements OnModuleInit {
     await this.prisma.crmCredential.deleteMany({ where: { userId } });
     this.companyCache.delete(userId);
     this.companyRefreshing.delete(userId);
-    this.personCache.delete(userId);
-    this.personRefreshing.delete(userId);
-    this.personRefreshPromises.delete(userId);
+    this.clearPersonCache(userId);
     this.optionsCache.delete(userId);
     return { configured: false };
   }
@@ -302,9 +296,7 @@ export class CrmService implements OnModuleInit {
     if (!cred) {
       this.companyCache.delete(userId);
       this.companyRefreshing.delete(userId);
-      this.personCache.delete(userId);
-      this.personRefreshing.delete(userId);
-      this.personRefreshPromises.delete(userId);
+      this.clearPersonCache(userId);
       throw new BadRequestException('CRM credentials not configured for this user');
     }
 
@@ -381,7 +373,9 @@ export class CrmService implements OnModuleInit {
     query: string,
     limit = 50,
   ): Promise<{ items: CrmContact[]; total: number }> {
-    const all = await this.getPersons(userId);
+    // Quand une société est choisie, Sellbase applique le filtre en base. C'est
+    // le chemin normal de l'app mobile et il évite le chargement de tout l'annuaire.
+    const all = await this.getPersons(userId, companyId || undefined);
     const q = query.trim().toLowerCase();
     const companyPersons = companyId
       ? all.filter((p) => p.companyId === companyId)
@@ -432,46 +426,72 @@ export class CrmService implements OnModuleInit {
     }
   }
 
-  private async getPersons(userId: string): Promise<CrmContact[]> {
-    const cached = this.personCache.get(userId);
+  private personCacheKey(userId: string, companyId?: string): string {
+    return `${userId}\u0000${companyId ?? '*'}`;
+  }
+
+  private clearPersonCache(userId: string): void {
+    const prefix = `${userId}\u0000`;
+    for (const key of this.personCache.keys()) {
+      if (key.startsWith(prefix)) this.personCache.delete(key);
+    }
+    for (const key of this.personRefreshing) {
+      if (key.startsWith(prefix)) this.personRefreshing.delete(key);
+    }
+    for (const key of this.personRefreshPromises.keys()) {
+      if (key.startsWith(prefix)) this.personRefreshPromises.delete(key);
+    }
+  }
+
+  private async getPersons(userId: string, companyId?: string): Promise<CrmContact[]> {
+    const cacheKey = this.personCacheKey(userId, companyId);
+    const cached = this.personCache.get(cacheKey);
     if (cached) {
       if (Date.now() - cached.at >= PERSON_FRESH_MS) {
-        void this.refreshPersons(userId).catch((e) =>
+        void this.refreshPersons(userId, companyId).catch((e) =>
           this.logger.warn(`Background person refresh failed: ${e}`),
         );
       }
       return cached.data;
     }
-    return this.refreshPersons(userId);
+    return this.refreshPersons(userId, companyId);
   }
 
-  private async refreshPersons(userId: string): Promise<CrmContact[]> {
-    const inFlight = this.personRefreshPromises.get(userId);
+  private async refreshPersons(userId: string, companyId?: string): Promise<CrmContact[]> {
+    const cacheKey = this.personCacheKey(userId, companyId);
+    const inFlight = this.personRefreshPromises.get(cacheKey);
     if (inFlight) return inFlight;
 
-    if (this.personRefreshing.has(userId)) {
-      const current = this.personCache.get(userId);
+    if (this.personRefreshing.has(cacheKey)) {
+      const current = this.personCache.get(cacheKey);
       if (current) return current.data;
     }
 
-    this.personRefreshing.add(userId);
+    this.personRefreshing.add(cacheKey);
 
     const refresh = (async () => {
-      const raw = await this.authedRequest(userId, 'GET', '/api/Data/person/list');
+      const raw = companyId
+        ? await this.authedRequest(userId, 'POST', '/api/Data/person/list', [{
+            fieldName: 'pers_companyid',
+            value: companyId,
+            operator: 0,
+            nodeOperator: 0,
+          }])
+        : await this.authedRequest(userId, 'GET', '/api/Data/person/list');
       const list = this.extractList(raw)
         .map((r) => this.normalizePerson(r))
         .filter((p): p is CrmContact => p !== null);
-      this.personCache.set(userId, { at: Date.now(), data: list });
+      this.personCache.set(cacheKey, { at: Date.now(), data: list });
       return list;
     })();
 
-    this.personRefreshPromises.set(userId, refresh);
+    this.personRefreshPromises.set(cacheKey, refresh);
 
     try {
       return await refresh;
     } finally {
-      this.personRefreshing.delete(userId);
-      this.personRefreshPromises.delete(userId);
+      this.personRefreshing.delete(cacheKey);
+      this.personRefreshPromises.delete(cacheKey);
     }
   }
 
@@ -517,7 +537,7 @@ export class CrmService implements OnModuleInit {
     if (!needle) return null;
 
     try {
-      const persons = await this.getPersons(userId);
+      const persons = await this.getPersons(userId, companyId);
       const companyPersons = persons.filter((p) => p.companyId === companyId);
       const exact = companyPersons.find((p) => p.name.toLowerCase() === needle);
       if (exact) return exact.id;

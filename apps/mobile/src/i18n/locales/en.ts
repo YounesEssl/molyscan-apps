@@ -557,7 +557,7 @@ const en: TranslationKeys = {
     selectContact: 'Choose a contact',
     searchContact: 'Search a contact...',
     noContact: 'No contact found',
-    contactLoadError: 'Could not load contacts. The first CRM load can take a moment.',
+    contactLoadError: 'Could not load contacts. Check the connection and try again.',
     contactTruncated: '{{shown}} of {{total}} — refine your search',
     syncStatus: {
       deleted: 'Deleted from CRM',

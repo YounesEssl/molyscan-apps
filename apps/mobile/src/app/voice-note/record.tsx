@@ -185,8 +185,10 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   const [totalContacts, setTotalContacts] = useState(0);
   const [contactsLoaded, setContactsLoaded] = useState(false);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [contactLoadFailed, setContactLoadFailed] = useState(false);
   const [contactSheetVisible, setContactSheetVisible] = useState(false);
   const [contactQuery, setContactQuery] = useState('');
+  const contactLoadRef = useRef(0);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -359,17 +361,22 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   };
 
   const loadContacts = useCallback(async (selectedCompanyId: string | null, q: string) => {
+    const request = ++contactLoadRef.current;
     setLoadingContacts(true);
+    setContactLoadFailed(false);
     try {
       const res = await crmService.searchContacts(selectedCompanyId, q);
+      if (request !== contactLoadRef.current) return;
       setContacts(res.items);
       setTotalContacts(res.total);
       setContactsLoaded(true);
     } catch (e: any) {
+      if (request !== contactLoadRef.current) return;
       if (isMissingCrmCredentialsError(e)) {
         setContactSheetVisible(false);
         showMissingCrmCredentialsAlert();
       } else {
+        setContactLoadFailed(true);
         logger.error('CRM contacts load failed', {
           status: e?.response?.status,
           data: e?.response?.data,
@@ -378,14 +385,17 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       }
       setContacts([]);
       setTotalContacts(0);
+      setContactsLoaded(false);
     } finally {
-      setLoadingContacts(false);
+      if (request === contactLoadRef.current) setLoadingContacts(false);
     }
   }, []);
 
   const openContactSheet = () => {
     haptic.light();
     setContactQuery('');
+    setContactsLoaded(false);
+    setContactLoadFailed(false);
     setContactSheetVisible(true);
   };
 
@@ -410,6 +420,9 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
     setContacts([]);
     setTotalContacts(0);
     setContactsLoaded(false);
+    setContactLoadFailed(false);
+    setLoadingContacts(false);
+    contactLoadRef.current += 1;
     setCrmFields((f) => ({ ...f, clientName: company.name, contactName: '' }));
     setCompanySheetVisible(false);
   };
@@ -1238,11 +1251,32 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
           placeholder={t('voiceNote.searchContact')}
           style={styles.sheetSearch}
         />
-        {loadingContacts ? (
-          <ActivityIndicator color={COLORS.primary} style={styles.sheetLoader} />
+        {loadingContacts || (!contactsLoaded && !contactLoadFailed) ? (
+          <ActivityIndicator
+            color={COLORS.primary}
+            style={styles.sheetLoader}
+            accessibilityLabel={t('common.loading')}
+          />
+        ) : contactLoadFailed ? (
+          <View style={styles.sheetError} accessibilityLiveRegion="polite">
+            <Text
+              variant="caption"
+              color={COLORS.textMuted}
+              style={styles.sheetEmpty}
+              accessibilityRole="alert"
+            >
+              {t('voiceNote.contactLoadError')}
+            </Text>
+            <Button
+              title={t('common.retry')}
+              variant="secondary"
+              size="sm"
+              onPress={() => void loadContacts(companyId, contactQuery)}
+            />
+          </View>
         ) : contacts.length === 0 ? (
           <Text variant="caption" color={COLORS.textMuted} style={styles.sheetEmpty}>
-            {contactsLoaded ? t('voiceNote.noContact') : t('voiceNote.contactLoadError')}
+            {t('voiceNote.noContact')}
           </Text>
         ) : (
           <>
@@ -1531,6 +1565,10 @@ const styles = StyleSheet.create({
   sheetEmpty: {
     textAlign: 'center',
     paddingVertical: SPACING.xl,
+  },
+  sheetError: {
+    alignItems: 'center',
+    paddingBottom: SPACING.md,
   },
   companyRow: {
     flexDirection: 'row',

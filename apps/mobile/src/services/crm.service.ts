@@ -66,9 +66,11 @@ export const crmService = {
     companyId?: string | null,
     q = '',
   ): Promise<{ items: CrmContact[]; total: number }> {
+    // L'API filtre les contacts dans Sellbase quand une société est fournie.
+    // Le délai reste borné afin que l'écran propose rapidement une relance.
     const response = await api.get(ENDPOINTS.crm.contacts, {
       params: { ...(companyId ? { companyId } : {}), q },
-      timeout: 120000,
+      timeout: 35000,
     });
     return response.data;
   },
