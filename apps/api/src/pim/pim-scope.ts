@@ -3,6 +3,8 @@ import type { SellbaseElement } from './sellbase.client';
 // Verified in the Molydal master catalogue on 2026-09-23: level 2,
 // characteristic 10 = ARCHIVAGE PRODUITS. Element IDs survive folder moves.
 export const MOLYDAL_ARCHIVE_ELEMENT_ID = 25012891;
+// On 2026-09-23 the owner moved the archive folder to this separate publication.
+export const MOLYDAL_ARCHIVE_BASE_ID = 87584;
 
 /** Archive membership wins over other placements of the same product/reference. */
 export function filterCatalogScope(
@@ -10,12 +12,17 @@ export function filterCatalogScope(
   references: SellbaseElement[],
   excludedFolderIds: number[],
   masterRows: SellbaseElement[] = [...products, ...references],
+  excludedBaseIds: number[] = [],
 ) {
+  const excludedBases = new Set(excludedBaseIds);
+  const inExcludedBase = (row: SellbaseElement) => excludedBases.has(Number(row.base_id));
   const excluded = new Set(excludedFolderIds);
   const inExcludedFolder = (row: SellbaseElement) => [1, 2, 3].some(
     (level) => excluded.has(Number(row[`element_id_${level}`])),
   );
-  const classificationRows = [...masterRows, ...products, ...references];
+  // Excluding a publication does not ban the same element from the active
+  // master catalogue. Only archive placements inside an eligible tree prevail.
+  const classificationRows = [...masterRows, ...products, ...references].filter((row) => !inExcludedBase(row));
   const archivedProductIds = new Set(classificationRows.filter(inExcludedFolder)
     .map((row) => Number(row.element_id_4)).filter(Boolean));
   const archivedReferenceIds = new Set(classificationRows
@@ -26,9 +33,9 @@ export function filterCatalogScope(
     .map((row) => [Number(row[`element_id_${level}`]), row]));
   const allProducts = unique(products, 4);
   const allReferences = unique(references, 5);
-  const keptProducts = unique(products.filter((row) => !inExcludedFolder(row)
+  const keptProducts = unique(products.filter((row) => !inExcludedBase(row) && !inExcludedFolder(row)
     && !archivedProductIds.has(Number(row.element_id_4))), 4);
-  const keptReferences = unique(references.filter((row) => !inExcludedFolder(row)
+  const keptReferences = unique(references.filter((row) => !inExcludedBase(row) && !inExcludedFolder(row)
     && !archivedReferenceIds.has(Number(row.element_id_5))
     && keptProducts.has(Number(row.element_id_4))), 5);
   return {
@@ -36,6 +43,7 @@ export function filterCatalogScope(
     references: [...keptReferences.values()],
     details: {
       excludedFolderIds,
+      excludedBaseIds,
       productsExcluded: allProducts.size - keptProducts.size,
       referencesExcluded: allReferences.size - keptReferences.size,
     },

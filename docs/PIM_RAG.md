@@ -21,20 +21,28 @@ PIM index is activated.
 
 ### Archived products
 
-For tenant `c_molydal`, the **ARCHIVAGE PRODUITS** folder is always excluded from
-imports. Its stable element ID is `25012891` (level 2, instance `59727`, French
+For tenant `c_molydal`, the separate **ARCHIVES PRODUITS** publication is excluded
+from imports: base ID `87584`, publication element `25014121`. Selecting it as
+`SELLBASE_CATALOG_BASE_ID` is rejected. Occurrences whose Sellbase `base_id`
+belongs to this publication are also discarded without marking their shared
+element IDs unavailable in another active base.
+
+The legacy **ARCHIVAGE PRODUITS** folder remains excluded inside eligible source
+trees. Its stable element ID is `25012891` (level 2, instance `59727`, French
 label characteristic `10`), verified by read-only Sellbase API calls on
-2026-09-23. The rest of the **données principales** catalogue remains included;
-no folder needs to be moved and no Sellbase data is changed.
+2026-09-23. The rest of **données principales** remains included. Molyscan never
+moves or modifies any Sellbase record.
 
 The filter matches ancestor element IDs at levels 1–3, so descendants remain
 excluded after the folder is moved or renamed. It applies to products and
 references before deduplication. **Archive membership takes precedence over
 another placement of the same element**: for example, AIR S22 AL (`25012844`)
 was present both in the archive and another category on the verification date.
-Its other placement must not reintroduce it. The same rule applies to references
-shared between multiple products. A reference is imported only when its parent
-product is retained, named and active in the current run.
+Its other placement must not reintroduce it while both placements belong to the
+selected eligible tree. The same rule applies to references shared between
+multiple products. A reference is imported only when its parent product is
+retained, named and active in the current run. A placement in the separately
+excluded archive base does not blacklist an element still sold in base `0`.
 
 If a publication is selected, archive membership is still read from the master
 tree, so a stale publication copy cannot restore an archived product. Additional
@@ -84,8 +92,24 @@ Read-only pre-deployment impact on 2026-09-23: 470 active products, 1,512 active
 references and 427 active RAG chunks. The archive contains 141 of those products
 and 352 references. Expected post-sync scope with that snapshot: **329 products,
 1,160 references and 288 lubricant chunks**. These are snapshot counts, not
-hard-coded import limits. Run details report `excludedFolderIds`,
-`productsExcluded` and `referencesExcluded` for subsequent audits.
+hard-coded import limits.
+
+During the same delivery, Axel's follow-up email received at **08:19 UTC** asked
+to exclude the new **ARCHIVES PRODUITS** base. Read-only API checks confirmed the
+folder had moved from base `0` to base `87584` (`update_at` =
+`2026-09-23 10:16:36`). It contains the same 141 product IDs but 349 references.
+AIR S22 AL (`25012844`) now has only its active placement in the master
+(instance `56870`), with references `25012900`, `25012901`, `25013812`; its
+archived placement `63805` and references `25012847`, `25012848` are solely in
+the excluded base. Its active master placement is therefore retained.
+
+The completed sync `c050fbb9-8a8d-4b62-8b0f-92a3091fc4d8` accordingly has
+**330 products, 1,163 references and 289 chunks**, after removing **140 products
+and 349 references** from the previously active catalogue. The source changed
+after the initial snapshot; the difference is not a failed exclusion. This run
+reports zero folder-filter exclusions because the archives had already left
+the source base before it ran. Future run details also record `excludedBaseIds`
+alongside `excludedFolderIds`, `productsExcluded` and `referencesExcluded`.
 
 For this change, back up the Molyscan database, deploy the API, then run
 `npm run rag:sync:pim` from `apps/api` (or use Admin → PIM & RAG). No schema

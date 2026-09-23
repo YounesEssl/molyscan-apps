@@ -87,4 +87,10 @@ describe('Sellbase catalogue scope', () => {
     await client({ SELLBASE_CATALOG_BASE_ID: '52903' }).getElements(4, 0);
     expect(fetchMock.mock.calls[0][0]).toContain('/element/getByLevel?baseId=0&level=4');
   });
+
+  it('rejects the new Molydal archive base as an import scope but does not reuse its ID for other tenants', () => {
+    expect(client().excludedBaseIds).toEqual([87584]);
+    expect(() => client({ SELLBASE_CATALOG_BASE_ID: '87584' }).catalogBaseId).toThrow('excluded archive publication 87584');
+    expect(client({ SELLBASE_BASE: 'c_other', SELLBASE_CATALOG_BASE_ID: '87584' }).catalogBaseId).toBe(87584);
+  });
 });

@@ -55,7 +55,7 @@ function fixture() {
   };
   prisma.$transaction = jest.fn().mockImplementation((fn) => fn(prisma));
   const sellbase = {
-    catalogBaseId: 0, excludedFolderIds: [ARCHIVE],
+    catalogBaseId: 0, excludedFolderIds: [ARCHIVE], excludedBaseIds: [87584],
     getElements: jest.fn().mockImplementation((level) => Promise.resolve(level === 4 ? products : references)),
     getPublishedData: jest.fn().mockResolvedValue(data),
   };
@@ -79,7 +79,7 @@ describe('PIM archive synchronization', () => {
     expect(indexedProducts).not.toContain('p999');
     expect(indexedProducts).not.toContain('p888');
     expect(f.indexState.active).toBe('new-index');
-    expect(f.prisma.ragSyncRun.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'completed', details: { catalogBaseId: 0, scope: 'master', excludedFolderIds: [ARCHIVE], productsExcluded: 1, referencesExcluded: 1 } }) }));
+    expect(f.prisma.ragSyncRun.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'completed', details: { catalogBaseId: 0, scope: 'master', excludedFolderIds: [ARCHIVE], excludedBaseIds: [87584], productsExcluded: 1, referencesExcluded: 1 } }) }));
   });
 
   it('cannot satisfy safety thresholds with duplicate product placements', async () => {

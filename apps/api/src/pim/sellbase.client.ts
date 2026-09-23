@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { request as httpsRequest } from 'https';
 import { chmodSync, readFileSync, writeFileSync } from 'fs';
-import { MOLYDAL_ARCHIVE_ELEMENT_ID } from './pim-scope';
+import { MOLYDAL_ARCHIVE_BASE_ID, MOLYDAL_ARCHIVE_ELEMENT_ID } from './pim-scope';
 
 export type SellbaseDatum = {
   id: number;
@@ -46,7 +46,14 @@ export class SellbaseClient {
     if (!Number.isInteger(value) || value < 0) {
       throw new Error('SELLBASE_CATALOG_BASE_ID must be a non-negative integer');
     }
+    if (this.excludedBaseIds.includes(value)) {
+      throw new Error(`SELLBASE_CATALOG_BASE_ID cannot target excluded archive publication ${value}`);
+    }
     return value;
+  }
+
+  get excludedBaseIds(): number[] {
+    return this.config.get('SELLBASE_BASE', 'c_molydal') === 'c_molydal' ? [MOLYDAL_ARCHIVE_BASE_ID] : [];
   }
 
   get excludedFolderIds(): number[] {

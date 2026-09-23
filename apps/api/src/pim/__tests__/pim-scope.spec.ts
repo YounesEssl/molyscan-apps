@@ -8,7 +8,7 @@ describe('PIM archive scope', () => {
     const result = filterCatalogScope([product(10), product(20, ARCHIVE)], [reference(100, 10), reference(200, 20, ARCHIVE)], [ARCHIVE]);
     expect(result.products.map((row) => row.element_id_4)).toEqual([10]);
     expect(result.references.map((row) => row.element_id_5)).toEqual([100]);
-    expect(result.details).toEqual({ excludedFolderIds: [ARCHIVE], productsExcluded: 1, referencesExcluded: 1 });
+    expect(result.details).toEqual({ excludedFolderIds: [ARCHIVE], excludedBaseIds: [], productsExcluded: 1, referencesExcluded: 1 });
   });
 
   it('gives archive membership priority over a second active placement in either row order', () => {
@@ -43,5 +43,15 @@ describe('PIM archive scope', () => {
     const result = filterCatalogScope([product(10), product(10)], [reference(100, 10), reference(100, 10), reference(101, 99)], [ARCHIVE]);
     expect(result.products).toHaveLength(1);
     expect(result.references.map((row) => row.element_id_5)).toEqual([100]);
+  });
+
+  it('excludes the separate archive base without blacklisting an element still present in the active master', () => {
+    const archiveBase = 87584;
+    const products = [{ ...product(10), base_id: 0 }, { ...product(10, ARCHIVE), base_id: archiveBase }, { ...product(20, ARCHIVE), base_id: archiveBase }];
+    const references = [{ ...reference(100, 10), base_id: 0 }, { ...reference(101, 10, ARCHIVE), base_id: archiveBase }, { ...reference(200, 20, ARCHIVE), base_id: archiveBase }];
+    const result = filterCatalogScope(products, references, [ARCHIVE], [...products, ...references], [archiveBase]);
+    expect(result.products.map((row) => row.element_id_4)).toEqual([10]);
+    expect(result.references.map((row) => row.element_id_5)).toEqual([100]);
+    expect(result.details).toEqual({ excludedFolderIds: [ARCHIVE], excludedBaseIds: [archiveBase], productsExcluded: 1, referencesExcluded: 2 });
   });
 });

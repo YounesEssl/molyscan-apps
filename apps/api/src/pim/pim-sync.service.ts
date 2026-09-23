@@ -62,7 +62,7 @@ export class PimSyncService {
       if (this.ids(masterRows, 'element_id_4').length < 100) {
         throw new Error('Safety stop: incomplete master tree for PIM archive membership');
       }
-      const scope = filterCatalogScope(sourceProducts, sourceReferences, excludedFolderIds, masterRows);
+      const scope = filterCatalogScope(sourceProducts, sourceReferences, excludedFolderIds, masterRows, this.sellbase.excludedBaseIds);
       const level4 = scope.products;
       const level5 = scope.references;
       if (level4.length < 100) throw new Error(`Safety stop: only ${level4.length} distinct products remain in the PIM scope`);
