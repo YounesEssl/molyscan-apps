@@ -2,7 +2,7 @@
   "expo": {
     "name": "Molyscan",
     "slug": "molyscan",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.molydal.molyscan",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.molydal.molyscan",
-      "versionCode": 33,
+      "versionCode": 34,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.READ_MEDIA_IMAGES",
@@ -38,7 +38,7 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#c80632"
       },
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "resize",
@@ -87,8 +87,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#E87722"
+          "icon": "./assets/notification-icon.png",
+          "color": "#c80632"
         }
       ],
       "expo-font",

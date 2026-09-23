@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Loader2, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { api, getApiErrorMessage } from '@/lib/api';
 import { Aura } from '@/components/Aura';
+import { Brand } from '@/components/Brand';
 
 type Phase = 'request' | 'reset' | 'done';
 
@@ -73,12 +74,7 @@ export function ForgotPasswordPage() {
 
       <div className="relative w-full max-w-sm">
         <div className="mb-10">
-          <span className="font-display text-2xl font-semibold tracking-tight text-ink">
-            Molyscan
-          </span>
-          <span className="ml-2 align-middle text-[11px] font-medium uppercase tracking-[0.2em] text-ink-3">
-            Admin
-          </span>
+          <Brand large />
         </div>
 
         {phase === 'done' ? (

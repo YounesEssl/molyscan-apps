@@ -13,6 +13,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import type { AccessRequest } from '@/lib/types';
+import { Brand } from '@/components/Brand';
 
 const navItems = [
   { to: '/access-requests', label: "Demandes d'accès", icon: UserCheck },
@@ -47,14 +48,7 @@ export function Layout() {
     <div className="flex min-h-screen flex-col bg-paper md:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b border-ink-4 bg-paper-2 md:sticky md:top-0 md:h-screen md:w-64 md:border-r md:border-b-0 lg:w-72">
         <div className="flex items-center justify-between px-7 py-5 md:block md:pb-10 md:pt-8">
-          <div className="flex items-baseline gap-2">
-            <span className="font-display text-xl font-semibold tracking-tight text-ink">
-              Molyscan
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-red">
-              Admin
-            </span>
-          </div>
+          <Brand />
           <button
             type="button"
             onClick={logout}

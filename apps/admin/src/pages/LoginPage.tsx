@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { getApiErrorMessage } from '@/lib/api';
 import { Aura } from '@/components/Aura';
+import { Brand } from '@/components/Brand';
 
 export function LoginPage() {
   const { status, login } = useAuth();
@@ -38,12 +39,7 @@ export function LoginPage() {
 
       <div className="relative w-full max-w-sm">
         <div className="mb-10">
-          <span className="font-display text-2xl font-semibold tracking-tight text-ink">
-            Molyscan
-          </span>
-          <span className="ml-2 align-middle text-[11px] font-medium uppercase tracking-[0.2em] text-ink-3">
-            Admin
-          </span>
+          <Brand large />
         </div>
 
         <h1 className="font-display text-[2.4rem] font-medium leading-[1.08] tracking-tight text-ink">

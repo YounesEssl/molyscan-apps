@@ -1,3 +1,5 @@
+import { Brand } from '@/components/Brand';
+
 export function PrivacyPage() {
   return (
     <div className="min-h-screen bg-paper px-6 py-16">
@@ -5,13 +7,8 @@ export function PrivacyPage() {
 
         {/* Header */}
         <div className="mb-12">
-          <div className="mb-8 flex items-baseline gap-2">
-            <span className="font-display text-xl font-semibold tracking-tight text-ink">
-              Molyscan
-            </span>
-            <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-ink-3">
-              by Molydal
-            </span>
+          <div className="mb-8">
+            <Brand label="by Molydal" />
           </div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red">
             Données personnelles
