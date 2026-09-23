@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SearchProductDto } from './dto/search-product.dto';
 import { SellbaseClient, type SellbaseDatum } from '../pim/sellbase.client';
 import { documents as normalizeDocuments } from '../pim/pim.normalizer';
-import { normalizePimProductName } from '../pim/pim-availability';
+import { loadPimAvailability, normalizePimProductName, PimAvailability } from '../pim/pim-availability';
 
 @Injectable()
 export class ProductsService {
@@ -112,14 +112,14 @@ export class ProductsService {
         equivalences: {
           include: { molydalProduct: true },
           orderBy: { confidenceScore: 'desc' },
-          take: 1,
         },
       },
     });
 
     if (!product) throw new NotFoundException('Product not found for this barcode');
 
-    const equivalence = product.equivalences[0] || null;
+    const availability = await loadPimAvailability(this.prisma);
+    const equivalence = this.withAvailableEquivalences(product, availability).equivalences[0] || null;
     return {
       competitorProduct: {
         name: product.name,
@@ -157,14 +157,13 @@ export class ProductsService {
     if (dto.category) where.category = { contains: dto.category, mode: 'insensitive' };
     if (dto.brand) where.brand = { contains: dto.brand, mode: 'insensitive' };
 
-    const [data, total] = await Promise.all([
+    const [data, total, availability] = await Promise.all([
       this.prisma.competitorProduct.findMany({
         where,
         include: {
           equivalences: {
             include: { molydalProduct: true },
             orderBy: { confidenceScore: 'desc' },
-            take: 1,
           },
         },
         skip: dto.skip,
@@ -172,10 +171,11 @@ export class ProductsService {
         orderBy: { name: 'asc' },
       }),
       this.prisma.competitorProduct.count({ where }),
+      loadPimAvailability(this.prisma),
     ]);
 
     return {
-      data,
+      data: data.map((product) => this.withAvailableEquivalences(product, availability)),
       meta: {
         total,
         page: dto.page,
@@ -192,12 +192,21 @@ export class ProductsService {
         equivalences: {
           include: { molydalProduct: true },
           orderBy: { confidenceScore: 'desc' },
-          take: 1,
         },
       },
     });
     if (!product) throw new NotFoundException('Product not found');
-    return product;
+    return this.withAvailableEquivalences(product, await loadPimAvailability(this.prisma));
+  }
+
+  private withAvailableEquivalences<T extends { equivalences: Array<{ molydalProduct: { name: string; reference: string | null } }> }>(
+    product: T, availability: PimAvailability,
+  ): T {
+    return {
+      ...product,
+      equivalences: product.equivalences.filter(({ molydalProduct: candidate }) =>
+        !availability.isInactive(candidate.name) && !availability.isInactiveReference(candidate.reference)).slice(0, 1),
+    };
   }
 }
 

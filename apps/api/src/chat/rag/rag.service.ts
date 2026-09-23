@@ -126,6 +126,10 @@ export class RagService {
     if (!this.prisma) return { expert: null, useScanContext: true };
     // Fail closed if expert decisions cannot be read.
     const all = await this.prisma.expertEquivalence.findMany();
+    const availableExpert = (expert: ExpertEquivalence | null) => {
+      if (!expert || expert.noEquivalent) return expert;
+      return availability.isInactive(expert.molydalEquivalent) ? null : availability.sanitizeExpertNote(expert);
+    };
     const tokens = (value: string) => normalizeProductText(value)
       .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
     const match = (text: string) => {
@@ -156,7 +160,7 @@ export class RagService {
       if (matches.length) {
         const expert = matches.length === 1 ? matches[0] : null;
         return {
-          expert: expert?.noEquivalent || !availability.isInactive(expert?.molydalEquivalent) ? expert : null,
+          expert: availableExpert(expert),
           useScanContext: Boolean(expert && scannedName &&
             equivalenceKey(expert.competitorBrand, expert.competitorName) === equivalenceKey(scannedBrand, scannedName)),
         };
@@ -168,7 +172,7 @@ export class RagService {
     const expert = scannedName
       ? await this.prisma.expertEquivalence.findUnique({ where: { competitorKey: equivalenceKey(scannedBrand, scannedName) } })
       : null;
-    return { expert: expert?.noEquivalent || !availability.isInactive(expert?.molydalEquivalent) ? expert : null, useScanContext: true };
+    return { expert: availableExpert(expert), useScanContext: true };
   }
 
   private explicitProductTarget(text: string): string | undefined {
@@ -408,7 +412,7 @@ ${prompt}`,
       productContext = {
         ...productContext,
         molydalName: inactivePrimary ? null : productContext.molydalName,
-        molydalReference: inactivePrimary ? null : productContext.molydalReference,
+        molydalReference: inactivePrimary || availability.isInactiveReference(productContext.molydalReference) ? null : productContext.molydalReference,
         equivalents: productContext.equivalents?.filter((entry) => !availability.isInactive(entry.name))
           .map((entry) => ({ ...entry, reason: availability.mentionsInactive(entry.reason) ? '' : entry.reason })),
         analysisText: productContext.analysisText && availability.mentionsInactive(productContext.analysisText) ? null : productContext.analysisText,

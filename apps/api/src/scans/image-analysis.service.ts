@@ -163,12 +163,13 @@ export class ImageAnalysisService {
     // the admin platform. Keyed on the normalized brand+name (Vision reliably
     // reads those). When present it short-circuits the RAG guess with the
     // expert's confirmed answer — deterministic, no LLM, no retrieval drift.
-    const expertEquiv = await this.prisma.expertEquivalence.findUnique({
+    let expertEquiv = await this.prisma.expertEquivalence.findUnique({
       where: { competitorKey: equivalenceKey(identification.brand, identification.name) },
     });
-    const unavailableExpert = expertEquiv && !expertEquiv.noEquivalent
-      && (await loadPimAvailability(this.prisma)).isInactive(expertEquiv.molydalEquivalent);
+    const availability = expertEquiv && !expertEquiv.noEquivalent ? await loadPimAvailability(this.prisma) : null;
+    const unavailableExpert = availability?.isInactive(expertEquiv?.molydalEquivalent);
     if (expertEquiv && !unavailableExpert) {
+      if (availability) expertEquiv = availability.sanitizeExpertNote(expertEquiv);
       this.logger.log(
         `🎯 Équivalence experte: "${identification.name}" → ${expertEquiv.molydalEquivalent} (confiance ${expertEquiv.confidence}%)`,
       );

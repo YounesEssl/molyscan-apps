@@ -71,6 +71,22 @@ describe('Scan equivalence integrity', () => {
     expect(vector.dualSearch).not.toHaveBeenCalled();
   });
 
+  test.each([
+    { note: 'Commander OLD25L.', expected: null },
+    { note: 'Convient pour le nettoyage.', expected: 'Convient pour le nettoyage.' },
+  ])('keeps an active expert mapping without repeating a discontinued code from its note: $note', async ({ note, expected }) => {
+    const expert = { molydalEquivalent: 'STARNET+', confidence: 100, noEquivalent: false, note };
+    prisma.expertEquivalence.findUnique.mockResolvedValue(expert);
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET+', active: true,
+      references: [{ code: 'OLD25L', active: false }, { code: 'NEW5L', active: true }] }]);
+    const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
+    expect(result.equivalents[0].name).toBe('STARNET+');
+    expect(JSON.stringify(result)).not.toContain('OLD25L');
+    if (expected) expect(result.equivalents[0].reason).toBe(expected);
+    expect(expert.note).toBe(note);
+    expect(vector.dualSearch).not.toHaveBeenCalled();
+  });
+
   test('empty retrieval does not ask a model to invent an equivalent', async () => {
     const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
     expect(result.equivalents).toEqual([]);

@@ -184,4 +184,63 @@ describe('Expert decisions in assistant conversations', () => {
     expect(mockGetModel.mock.calls[0][0].systemInstruction).toContain(`→ ${name}`);
   });
 
+  test('removes discontinued references from a still-active product context without rewriting its stored history', async () => {
+    prisma.expertEquivalence.findMany.mockResolvedValue([]);
+    prisma.expertEquivalence.findUnique.mockResolvedValue(null);
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET+', active: true,
+      references: [{ code: 'OLD25L', active: false }, { code: 'NEW5L', active: true }] }]);
+    const history = [{ role: 'assistant', text: 'STARNET+ est disponible sous OLD25L, bidon 25 L.' }];
+    const productContext = { scannedName: 'Cleaner', scannedBrand: 'Brand', molydalName: 'STARNET+',
+      molydalReference: 'OLD25L', analysisText: 'Commander OLD25L.', equivalents: [] };
+    await service.generateStreamingResponse('Quelle référence commander ?', history, productContext);
+    const instruction = mockGetModel.mock.calls[0][0].systemInstruction;
+    expect(instruction).toContain('Identified Molydal equivalent: STARNET+');
+    expect(instruction).not.toContain('OLD25L');
+    expect(JSON.stringify(mockGenerateContentStream.mock.calls[0])).not.toContain('OLD25L');
+    expect(history[0].text).toContain('OLD25L');
+    expect(productContext.molydalReference).toBe('OLD25L');
+  });
+
+  test('keeps current or unknown reference context while stripping retired codes from equivalence reasons', async () => {
+    prisma.expertEquivalence.findMany.mockResolvedValue([]);
+    prisma.expertEquivalence.findUnique.mockResolvedValue(null);
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET+', active: true,
+      references: [{ code: 'OLD25L', active: false }, { code: 'NEW5L', active: true }] }]);
+    await service.generateStreamingResponse('Quelle référence commander ?', [], {
+      scannedName: 'Cleaner', scannedBrand: 'Brand', molydalName: 'STARNET+', molydalReference: 'NEW5L',
+      equivalents: [{ name: 'STARNET+', family: 'Cleaner', compatibility: 90, reason: 'Available as OLD25L.' }],
+    });
+    const instruction = mockGetModel.mock.calls[0][0].systemInstruction;
+    expect(instruction).toContain('STARNET+ (Cleaner)');
+    expect(instruction).not.toContain('OLD25L');
+    await service.generateStreamingResponse('Quelle référence commander ?', [], {
+      scannedName: 'Cleaner', scannedBrand: 'Brand', molydalName: 'STARNET+', molydalReference: 'UNKNOWN',
+    });
+    expect(mockGetModel.mock.calls.at(-1)[0].systemInstruction).toContain('(ref. UNKNOWN)');
+  });
+
+  test('also sanitizes retired reference mentions in non-streaming conversation history', async () => {
+    prisma.expertEquivalence.findMany.mockResolvedValue([]);
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET+', active: true,
+      references: [{ code: 'OLD25L', active: false }] }]);
+    await service.generateResponse({ question: 'Quelle référence commander ?', conversationHistory: [{ role: 'assistant', text: 'STARNET+ OLD25L' }] });
+    expect(JSON.stringify(mockGenerateContent.mock.calls[0])).not.toContain('OLD25L');
+  });
+
+  test.each([
+    { note: 'Commander OLD25L.', expected: null },
+    { note: 'Convient pour le nettoyage.', expected: 'Convient pour le nettoyage.' },
+  ])('keeps the active expert target but removes only a note containing retired reference: $note', async ({ note, expected }) => {
+    const expert = { ...decision, noEquivalent: false, molydalEquivalent: 'STARNET+', note };
+    prisma.expertEquivalence.findMany.mockResolvedValue([expert]);
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET+', active: true,
+      references: [{ code: 'OLD25L', active: false }, { code: 'NEW5L', active: true }] }]);
+    await service.generateStreamingResponse('Quel équivalent de Brand Product 68 ?', []);
+    const instruction = mockGetModel.mock.calls[0][0].systemInstruction;
+    expect(instruction).toContain('→ STARNET+');
+    expect(instruction).not.toContain('OLD25L');
+    if (expected) expect(instruction).toContain(expected);
+    expect(expert.note).toBe(note);
+  });
+
 });

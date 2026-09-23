@@ -7,6 +7,7 @@ import { EmbeddingService } from '../chat/rag/embedding.service';
 import { SellbaseClient, SellbaseElement, type SellbaseDatum } from './sellbase.client';
 import { CARAC, buildChunk, detectProductType, documents, hash, latestDate, mergeData, numberValue, productCertifications, text } from './pim.normalizer';
 import { filterCatalogScope } from './pim-scope';
+import { ERP_SLEEP_CHARACTERISTIC_ID, planErpAvailability } from './pim-erp-status';
 
 @Injectable()
 export class PimSyncService {
@@ -85,13 +86,18 @@ export class PimSyncService {
       // Fail before changing catalogue rows if source data is incomplete. In
       // particular, duplicate placements must not satisfy the minimum count.
       const importableRows = level4.filter((row) => text(mergeData(master[String(row.element_id_4)], overrides[String(row.element_id_4)]), CARAC.productName));
-      const lubricantCount = importableRows.filter((row) => {
+      const previousReferences = await this.prisma.pimReference.findMany({
+        where: { sellbaseElementId: { in: referenceIds } }, select: { sellbaseElementId: true, rawData: true },
+      });
+      const erp = planErpAvailability(importableRows, level5, master, previousReferences);
+      const activeProductRows = importableRows.filter((row) => erp.activeProductIds.has(Number(row.element_id_4)));
+      const lubricantCount = activeProductRows.filter((row) => {
         const data = mergeData(master[String(row.element_id_4)], overrides[String(row.element_id_4)]);
         const family = mergeData(master[String(row.element_id_2)], overrides[String(row.element_id_2)]);
         return detectProductType(text(data, CARAC.productName)!, text(family, 10) ?? text(family, 15)) === 'lubricant';
       }).length;
-      if (importableRows.length < 100 || lubricantCount < 100) {
-        throw new Error(`Safety stop: incomplete PIM scope (${importableRows.length} named products, ${lubricantCount} lubricants)`);
+      if (activeProductRows.length < 100 || lubricantCount < 100) {
+        throw new Error(`Safety stop: incomplete active PIM scope (${activeProductRows.length} products, ${lubricantCount} lubricants)`);
       }
       const existing = new Map((await this.prisma.pimProduct.findMany()).map((p) => [p.sellbaseElementId, p]));
       const changedProducts = new Set<number>();
@@ -116,7 +122,7 @@ export class PimSyncService {
           temperatureMin: numberValue(data, CARAC.temperatureMin), temperatureMax: numberValue(data, CARAC.temperatureMax), dropPoint: numberValue(data, CARAC.dropPoint),
           dinClassification: text(data, CARAC.din), isoClassification: text(data, CARAC.iso),
           foodGrade: labels.foodGrade, ecoResponsible: labels.ecoResponsible, moshMoahFree: labels.moshMoahFree,
-          productType: detectProductType(name, family), active: true, rawData: data as unknown as Prisma.InputJsonValue,
+          productType: detectProductType(name, family), active: erp.activeProductIds.has(elementId), rawData: data as unknown as Prisma.InputJsonValue,
         };
         const sourceHash = hash(payload);
         if (existing.get(elementId)?.sourceHash !== sourceHash) changedProducts.add(elementId);
@@ -140,25 +146,33 @@ export class PimSyncService {
       const removed = await this.prisma.pimProduct.updateMany({ where: { sellbaseElementId: { notIn: [...seenProducts] }, active: true }, data: { active: false } });
       const productBySellbase = new Map((await this.prisma.pimProduct.findMany()).map((p) => [p.sellbaseElementId, p]));
       const seenReferences = new Set<number>();
-      for (const row of level5) {
+      for (const row of erp.rows) {
         const elementId = Number(row.element_id_5);
         const parentId = Number(row.element_id_4);
         const product = productBySellbase.get(parentId);
-        if (!elementId || !product?.active || !seenProducts.has(parentId)) continue;
+        if (!elementId || !product || !seenProducts.has(parentId)) continue;
         seenReferences.add(elementId);
         const data = mergeData(master[String(elementId)], overrides[String(elementId)]);
-        const payload = { code: text(data, CARAC.productCode), label: text(data, CARAC.referenceLabel), packaging: text(data, CARAC.packaging), erpStatus: text(data, CARAC.erpStatus) ?? text(data, CARAC.referenceStatus), active: true, rawData: data as unknown as Prisma.InputJsonValue };
+        // Publication overrides may still apply to descriptive fields, never
+        // to ERP availability. Keep rawData consistent with the master status.
+        delete data[String(ERP_SLEEP_CHARACTERISTIC_ID)];
+        const masterStatus = master[String(elementId)]?.[String(ERP_SLEEP_CHARACTERISTIC_ID)];
+        if (masterStatus) data[String(ERP_SLEEP_CHARACTERISTIC_ID)] = masterStatus;
+        const status = erp.states.get(elementId)!;
+        const payload = { code: text(data, CARAC.productCode), label: text(data, CARAC.referenceLabel), packaging: text(data, CARAC.packaging), erpStatus: status.value, active: status.state === 'active', rawData: data as unknown as Prisma.InputJsonValue };
         await this.prisma.pimReference.upsert({ where: { sellbaseElementId: elementId }, create: { sellbaseElementId: elementId, productId: product.id, ...payload, sourceHash: hash(payload), sourceUpdatedAt: latestDate(data) }, update: { productId: product.id, ...payload, sourceHash: hash(payload), sourceUpdatedAt: latestDate(data) } });
       }
       await this.prisma.pimReference.updateMany({ where: { sellbaseElementId: { notIn: [...seenReferences] }, active: true }, data: { active: false } });
 
       const index = await this.prisma.ragIndexVersion.create({ data: { embeddingModel: this.embeddings.model, dimensions: this.embeddings.dimensions } });
       indexId = index.id;
-      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { indexId, status: RagSyncStatus.validating, productsSeen: seenProducts.size, productsChanged: changedProducts.size, productsRemoved: removed.count, referencesSeen: seenReferences.size } });
+      const productsDeactivatedByErp = [...existing.values()].filter((product) => product.active && seenProducts.has(product.sellbaseElementId) && !erp.activeProductIds.has(product.sellbaseElementId)).length;
+      const details = { catalogBaseId, scope: catalogBaseId === 0 ? 'master' : 'publication', ...scope.details, erp: erp.details };
+      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { indexId, status: RagSyncStatus.validating, productsSeen: seenProducts.size, productsChanged: changedProducts.size, productsRemoved: removed.count + productsDeactivatedByErp, referencesSeen: seenReferences.size, details } });
       const chunkCount = await this.buildIndex(index.id);
       const validation = await this.validateIndex(index.id);
       await this.activateIndex(index.id, chunkCount, chunkCount, validation);
-      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { status: RagSyncStatus.completed, finishedAt: new Date(), chunksCreated: chunkCount, details: { catalogBaseId, scope: catalogBaseId === 0 ? 'master' : 'publication', ...scope.details } } });
+      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { status: RagSyncStatus.completed, finishedAt: new Date(), chunksCreated: chunkCount, details } });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`PIM sync ${runId} failed: ${message}`);

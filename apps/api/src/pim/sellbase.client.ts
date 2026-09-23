@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { request as httpsRequest } from 'https';
 import { chmodSync, readFileSync, writeFileSync } from 'fs';
 import { MOLYDAL_ARCHIVE_BASE_ID, MOLYDAL_ARCHIVE_ELEMENT_ID } from './pim-scope';
+import { ERP_SLEEP_CHARACTERISTIC_ID, mergeErpStatusDatum } from './pim-erp-status';
 
 export type SellbaseDatum = {
   id: number;
@@ -11,6 +12,8 @@ export type SellbaseDatum = {
   contenu: string;
   id_langue: number;
   date_de_modification?: string | null;
+  /** Import diagnostic when non-canonical ERP1393 values disagree. */
+  erpStatusConflictingValues?: string[];
 };
 
 export type SellbaseElement = Record<string, number | string | null>;
@@ -224,7 +227,12 @@ export class SellbaseClient {
       const rows = result.datas ?? [];
       for (const datum of rows) {
         if (!wanted.has(datum.id_element)) continue;
-        (grouped[String(datum.id_element)] ??= {})[String(datum.id_valeur)] = datum;
+        const data = (grouped[String(datum.id_element)] ??= {});
+        // Prefer language0 without rejecting real legacy master records whose
+        // only value is language1 (e.g. reference22011534). Never select an
+        // arbitrary translation when non-canonical values contradict each other.
+        data[String(datum.id_valeur)] = datum.id_valeur === ERP_SLEEP_CHARACTERISTIC_ID
+          ? mergeErpStatusDatum(data[String(datum.id_valeur)], datum) : datum;
       }
       if (rows.length < limit) break;
     }

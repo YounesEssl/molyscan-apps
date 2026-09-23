@@ -52,6 +52,12 @@ describe('PIM documents', () => {
     await expect(service.downloadPimDocument(`ref_${refId}_9999`)).rejects.toThrow('Document not found');
   });
 
+  it('refuses an old SDS link after its reference is deactivated while its product stays active', async () => {
+    prisma.pimReference.findUnique.mockResolvedValue({ active: false, rawData: { '39': datum(39, 'old.pdf') }, product: { active: true } });
+    await expect(service.downloadPimDocument(`ref_${refId}_39`)).rejects.toThrow('Document not found');
+    expect(sellbase.downloadDocument).not.toHaveBeenCalled();
+  });
+
   it('rejects HTML error pages served with HTTP 200', async () => {
     prisma.pimDocument.findUnique.mockResolvedValue({ fileName: 'ft.pdf', kind: 'technical_sheet', product: { active: true, sellbaseInstanceId: 7 } });
     sellbase.downloadDocument.mockResolvedValue(new Response('<html>Not found</html>', { headers: { 'content-type': 'application/pdf' } }));

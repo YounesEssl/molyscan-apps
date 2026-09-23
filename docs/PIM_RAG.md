@@ -116,6 +116,62 @@ For this change, back up the Molyscan database, deploy the API, then run
 migration is required. Check the completed run, active counts, the new active
 index and the absence of archived product IDs from active search results.
 
+### ERP reference availability (1393)
+
+Claire confirmed on 2026-09-23 that characteristic **1393, “Est en sommeil?”**,
+is supplied by the ERP on each reference in **donnée principale**: `0` means
+active and `1` means sleeping. Read-only API verification confirmed the numeric
+field and these values. Molyscan uses only this characteristic from **base0**
+for availability, never a publication override or legacy characteristic1083.
+
+- Only explicit numeric `0` (the number or trimmed string) activates a reference.
+- Explicit `1` marks it sleeping and inactive.
+- Missing, empty, conflicting or invalid values leave availability unconfirmed
+  and the reference inactive; a field default is not evidence of availability.
+- A product is active and eligible for recommendations only when at least one
+  of its retained references is active. A product with no references, or only
+  sleeping/unknown references, is retained but inactive.
+- Archive exclusions remain prior constraints. An ERP `0` cannot reintroduce
+  the excluded archive base or a legacy archive-folder placement.
+
+Status and raw data are refreshed for all retained reference/product records,
+including inactive ones, without deleting their history. A later ERP change
+from `1` to `0` reactivates the reference and its parent on the next successful
+synchronization. The parent’s FT and the active references’ FDS/packaging are
+available only while those records are active. New RAG chunks contain only
+active products and active reference packaging.
+
+Sellbase can return multiple language rows for1393. Language0 takes priority
+when present. Otherwise a consistent legacy-language value is accepted:
+reference `22011534` has its master value `0` only in language1. Contradictory
+non-canonical values are marked invalid and preserved as import diagnostics in
+`erpStatusConflictingValues`; row order cannot choose active versus sleeping.
+This language handling does not allow publication overrides of the master.
+
+The complete availability plan is checked **before any catalogue mutation**:
+at least100 active products and100 active lubricants must remain; at least80%
+of eligible references must have a known explicit `0`/`1`; at most10% of
+previously known statuses on references still in scope may become missing or
+invalid. These coverage gates detect an incomplete source response while
+allowing individual `0`→missing changes to deactivate affected references.
+`0`→`1` remains known data and is not a loss of coverage. Failure leaves both
+catalogue and current index unchanged at this preflight stage.
+
+Run `details.erp` records the characteristic/source base, counts for active,
+sleeping, missing and invalid references, known-status coverage, lost prior
+statuses, and products with/without an active reference. `productsSeen` and
+`referencesSeen` still count all refreshed retained records; the status endpoint
+and index counts report active records. `productsRemoved` also counts products
+deactivated by ERP availability.
+
+Read-only preflight for this ERP change: among1,163 references previously
+retained after archive exclusion,965 are active,144 sleeping and54 missing;
+there are no invalid values. Of330 products,282 retain an active reference and
+48 become inactive, leaving245 lubricant chunks. Among the349 references in
+the archive base, six still have ERP `0`, which confirms that ERP status must
+**complement**, not replace, the archive exclusion. These are snapshot counts,
+not fixed import limits.
+
 ## Index safety
 
 Each run builds a separate `RagIndexVersion`. The active version is only changed

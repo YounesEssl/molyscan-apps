@@ -93,4 +93,33 @@ describe('Sellbase catalogue scope', () => {
     expect(() => client({ SELLBASE_CATALOG_BASE_ID: '87584' }).catalogBaseId).toThrow('excluded archive publication 87584');
     expect(client({ SELLBASE_BASE: 'c_other', SELLBASE_CATALOG_BASE_ID: '87584' }).catalogBaseId).toBe(87584);
   });
+
+  it('never lets a translation overwrite the unlocalized ERP1393 datum', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ datas: [
+      { id_element: 10, id_valeur: 1393, id_langue: 1, contenu: '0' },
+      { id_element: 10, id_valeur: 1393, id_langue: 0, contenu: '1' },
+      { id_element: 10, id_valeur: 1393, id_langue: 2, contenu: '0' },
+      { id_element: 11, id_valeur: 1393, id_langue: 1, contenu: '0' },
+    ] })));
+    const data = await client().getPublishedData([10, 11], 0);
+    expect(data['10']['1393']).toMatchObject({ contenu: '1', id_langue: 0 });
+    expect(data['11']['1393']).toMatchObject({ contenu: '0', id_langue: 1 });
+  });
+
+  it('retains real master reference22011534 with only a language1 value and rejects conflicting translations', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ datas: [
+      { id_element: 22011534, id_valeur: 1393, id_langue: 1, contenu: '0' },
+      { id_element: 12, id_valeur: 1393, id_langue: 1, contenu: '1' },
+      { id_element: 12, id_valeur: 1393, id_langue: 2, contenu: '0' },
+      { id_element: 12, id_valeur: 1393, id_langue: 3, contenu: '1' },
+      { id_element: 13, id_valeur: 1393, id_langue: 2, contenu: '0' },
+      { id_element: 13, id_valeur: 1393, id_langue: 1, contenu: '1' },
+      { id_element: 13, id_valeur: 1393, id_langue: 0, contenu: '0' },
+    ] })));
+    const data = await client().getPublishedData([22011534, 12, 13], 0);
+    expect(data['22011534']['1393']).toMatchObject({ contenu: '0', id_langue: 1 });
+    expect(data['12']['1393'].erpStatusConflictingValues).toEqual(['1', '0']);
+    expect(data['13']['1393']).toMatchObject({ contenu: '0', id_langue: 0 });
+    expect(data['13']['1393'].erpStatusConflictingValues).toBeUndefined();
+  });
 });
