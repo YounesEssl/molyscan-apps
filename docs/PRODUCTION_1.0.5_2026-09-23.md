@@ -58,10 +58,10 @@ Artifacts dans `build/releases/1.0.5/` :
 
 Les captures iPhone existantes montrent les écrans scan, assistant, historique, scanner et note sans l'ancien logo. Une capture iPad historique de connexion présente encore l'ancienne goutte ; elle est conservée, l'application étant configurée `supportsTablet=false` et Younes prenant en charge la recette sur appareils. Aucune capture retouchée pour simuler le nouveau logo. Aucune licence Xcode acceptée ; aucun changement de signature.
 
-## Précision ultérieure de Claire — filtre ERP à compléter
+## Précision ultérieure de Claire — filtre ERP déployé
 
 Mail de Claire COLLET reçu à **09:18:29 UTC**, puis vérification Sellbase en lecture seule à **09:44:27 UTC** : la caractéristique **1393**, libellée **« Est en sommeil ? »**, est numérique, issue des données principales. Claire précise **0 = active**, **1 = en sommeil**, alimenté par l'ERP. Les valeurs renseignées observées sont bien uniquement 0 et 1.
 
 Parmi les 1 163 références retenues : **965 à 0, 144 à 1, 54 sans valeur**. Parmi les 349 références archivées : **6 à 0, 336 à 1, 7 sans valeur**. Le filtre ERP complète donc l'exclusion de la base ; il ne doit pas la remplacer. Parmi les 330 produits retenus : 282 ont au moins une référence à 0, 27 n'ont que des références à 1, 13 n'ont que des statuts manquants, 7 n'ont pas de référence et KLS 240 mélange 1 et valeur manquante.
 
-Le code actuel stocke déjà ce champ dans `erpStatus` (avec repli sur 1083), mais ne l'applique pas encore à `active`. **Cette livraison applique l'exclusion des archives uniquement ; le filtre de sommeil reste à ajouter.** La question de Younes portait sur la confirmation de l'information : aucune nouvelle règle de statut n'a été déployée sans définir le traitement des valeurs manquantes. Cette évolution est côté serveur et ne nécessite pas de reconstruire les applications.
+Le filtre a ensuite été appliqué et déployé côté serveur : seule une référence dont le champ 1393 vaut explicitement 0 reste active. Les valeurs absentes restent indisponibles jusqu'à leur renseignement dans Sellbase. Le résultat réel est de **282 produits actifs, 965 références actives et 245 produits dans l'index IA**. Voir [PIM_ERP_2026-09-23.md](PIM_ERP_2026-09-23.md) pour les vérifications et le détail du déploiement. Aucun nouveau build mobile n'a été nécessaire.
