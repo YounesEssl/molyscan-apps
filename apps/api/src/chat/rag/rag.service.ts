@@ -9,6 +9,7 @@ import {
   normalizeProductText,
 } from '../../common/utils/normalize';
 import type { AttachmentEntry } from '../attachment.store';
+import { ACTIVE_CATALOGUE_RULE, loadPimAvailability, PimAvailability } from '../../pim/pim-availability';
 
 interface RagInput {
   question: string;
@@ -120,6 +121,7 @@ export class RagService {
     history: Array<{ role: string; text: string }>,
     scannedBrand?: string | null,
     scannedName?: string | null,
+    availability = new PimAvailability([]),
   ): Promise<{ expert: ExpertEquivalence | null; useScanContext: boolean }> {
     if (!this.prisma) return { expert: null, useScanContext: true };
     // Fail closed if expert decisions cannot be read.
@@ -154,7 +156,7 @@ export class RagService {
       if (matches.length) {
         const expert = matches.length === 1 ? matches[0] : null;
         return {
-          expert,
+          expert: expert?.noEquivalent || !availability.isInactive(expert?.molydalEquivalent) ? expert : null,
           useScanContext: Boolean(expert && scannedName &&
             equivalenceKey(expert.competitorBrand, expert.competitorName) === equivalenceKey(scannedBrand, scannedName)),
         };
@@ -166,7 +168,7 @@ export class RagService {
     const expert = scannedName
       ? await this.prisma.expertEquivalence.findUnique({ where: { competitorKey: equivalenceKey(scannedBrand, scannedName) } })
       : null;
-    return { expert, useScanContext: true };
+    return { expert: expert?.noEquivalent || !availability.isInactive(expert?.molydalEquivalent) ? expert : null, useScanContext: true };
   }
 
   private explicitProductTarget(text: string): string | undefined {
@@ -306,20 +308,22 @@ ${prompt}`,
    * Non-streaming response (for product-linked conversations).
    */
   async generateResponse(input: RagInput): Promise<RagOutput> {
-    const { expert } = await this.resolveExpertContext(input.question, input.conversationHistory, input.productContext?.scannedBrand, input.productContext?.scannedName);
+    const availability = await loadPimAvailability(this.prisma);
+    const conversationHistory = availability.sanitizeHistory(input.conversationHistory);
+    const { expert } = await this.resolveExpertContext(input.question, conversationHistory, input.productContext?.scannedBrand, input.productContext?.scannedName, availability);
     if (expert?.noEquivalent && this.isEquivalenceRequest(input.question)) {
       return this.noEquivalentResponse(expert, input.question, input.conversationHistory);
     }
     const reformulated = await this.reformulateQuery(
       input.question,
-      input.conversationHistory,
+      conversationHistory,
     );
 
-    const chunks = await this.vectorStore.dualSearch(
+    const chunks = (await this.vectorStore.dualSearch(
       input.question,
       reformulated,
       input.retrievalFilters,
-    );
+    )).filter((chunk) => !availability.isInactive(chunk.product_name));
 
     const context =
       chunks.length > 0
@@ -341,10 +345,10 @@ ${prompt}`,
 
     const validatedBlock = this.validatedEquivalenceBlock(expert);
 
-    const systemText = `${SYSTEM_PROMPT}\n\n${validatedBlock}${productDescription}Context — Molydal technical datasheets:\n${context}`;
+    const systemText = `${SYSTEM_PROMPT}\n\n${ACTIVE_CATALOGUE_RULE}\n\n${validatedBlock}${productDescription}Context — Molydal technical datasheets:\n${context}`;
 
     const contents = [
-      ...input.conversationHistory.map((m) => ({
+      ...conversationHistory.map((m) => ({
         role: m.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: m.text }],
       })),
@@ -395,8 +399,21 @@ ${prompt}`,
     stream: AsyncIterable<string>;
     sources: string[];
   }> {
-    const { expert, useScanContext } = await this.resolveExpertContext(question, conversationHistory, productContext?.scannedBrand, productContext?.scannedName);
+    const availability = await loadPimAvailability(this.prisma);
+    conversationHistory = availability.sanitizeHistory(conversationHistory);
+    const { expert, useScanContext } = await this.resolveExpertContext(question, conversationHistory, productContext?.scannedBrand, productContext?.scannedName, availability);
     if (!useScanContext) productContext = undefined;
+    if (productContext) {
+      const inactivePrimary = availability.isInactive(productContext.molydalName);
+      productContext = {
+        ...productContext,
+        molydalName: inactivePrimary ? null : productContext.molydalName,
+        molydalReference: inactivePrimary ? null : productContext.molydalReference,
+        equivalents: productContext.equivalents?.filter((entry) => !availability.isInactive(entry.name))
+          .map((entry) => ({ ...entry, reason: availability.mentionsInactive(entry.reason) ? '' : entry.reason })),
+        analysisText: productContext.analysisText && availability.mentionsInactive(productContext.analysisText) ? null : productContext.analysisText,
+      };
+    }
     if (expert?.noEquivalent && this.isEquivalenceRequest(question)) {
       const response = this.noEquivalentResponse(expert, question, conversationHistory);
       return { sources: [], stream: (async function* () { yield response.text; })() };
@@ -413,11 +430,11 @@ ${prompt}`,
       conversationHistory,
     );
 
-    const chunks = await this.vectorStore.dualSearch(
+    const chunks = (await this.vectorStore.dualSearch(
       contextualQuestion,
       reformulated,
       retrievalFilters,
-    );
+    )).filter((chunk) => !availability.isInactive(chunk.product_name));
 
     const context =
       chunks.length > 0
@@ -492,7 +509,7 @@ ${prompt}`,
     ];
 
     const validatedBlock = this.validatedEquivalenceBlock(expert);
-    const systemText = `${SYSTEM_PROMPT}\n\n${validatedBlock}${productBlock}${reformulationBlock}Context — Molydal technical datasheets:\n${context}`;
+    const systemText = `${SYSTEM_PROMPT}\n\n${ACTIVE_CATALOGUE_RULE}\n\n${validatedBlock}${productBlock}${reformulationBlock}Context — Molydal technical datasheets:\n${context}`;
 
     const model = this.gemini.getGenerativeModel({
       model: process.env.CHAT_MODEL ?? 'gemini-3.1-flash-lite',

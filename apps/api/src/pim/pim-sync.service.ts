@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EmbeddingService } from '../chat/rag/embedding.service';
 import { SellbaseClient, SellbaseElement, type SellbaseDatum } from './sellbase.client';
 import { CARAC, buildChunk, detectProductType, documents, hash, latestDate, mergeData, numberValue, productCertifications, text } from './pim.normalizer';
+import { filterCatalogScope } from './pim-scope';
 
 @Injectable()
 export class PimSyncService {
@@ -51,8 +52,20 @@ export class PimSyncService {
       advisoryLock = lock[0]?.locked === true;
       if (!advisoryLock) throw new Error('Another application instance owns the PIM synchronization lock');
       await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { status: RagSyncStatus.running, startedAt: new Date() } });
-      const [level4, level5] = await Promise.all([this.sellbase.getElements(4), this.sellbase.getElements(5)]);
-      if (level4.length < 100) throw new Error(`Safety stop: Sellbase returned only ${level4.length} products`);
+      const catalogBaseId = this.sellbase.catalogBaseId;
+      const excludedFolderIds = this.sellbase.excludedFolderIds;
+      const [sourceProducts, sourceReferences] = await Promise.all([this.sellbase.getElements(4), this.sellbase.getElements(5)]);
+      // Publication trees may retain a copy of an archived product. Determine
+      // archive membership from the master even when importing a publication.
+      const masterRows = catalogBaseId === 0 ? [...sourceProducts, ...sourceReferences]
+        : (await Promise.all([this.sellbase.getElements(4, 0), this.sellbase.getElements(5, 0)])).flat();
+      if (this.ids(masterRows, 'element_id_4').length < 100) {
+        throw new Error('Safety stop: incomplete master tree for PIM archive membership');
+      }
+      const scope = filterCatalogScope(sourceProducts, sourceReferences, excludedFolderIds, masterRows);
+      const level4 = scope.products;
+      const level5 = scope.references;
+      if (level4.length < 100) throw new Error(`Safety stop: only ${level4.length} distinct products remain in the PIM scope`);
 
       const productIds = this.ids(level4, 'element_id_4');
       const referenceIds = this.ids(level5, 'element_id_5');
@@ -65,24 +78,25 @@ export class PimSyncService {
       // baseId=0 is the complete Sellbase catalogue. A configured non-zero
       // scope intentionally restores the former publication-only behaviour,
       // including that publication's field overrides.
-      const catalogBaseId = this.sellbase.catalogBaseId;
       const overrides = catalogBaseId === 0
         ? {}
         : await this.sellbase.getPublishedData(allIds, catalogBaseId);
 
+      // Fail before changing catalogue rows if source data is incomplete. In
+      // particular, duplicate placements must not satisfy the minimum count.
+      const importableRows = level4.filter((row) => text(mergeData(master[String(row.element_id_4)], overrides[String(row.element_id_4)]), CARAC.productName));
+      const lubricantCount = importableRows.filter((row) => {
+        const data = mergeData(master[String(row.element_id_4)], overrides[String(row.element_id_4)]);
+        const family = mergeData(master[String(row.element_id_2)], overrides[String(row.element_id_2)]);
+        return detectProductType(text(data, CARAC.productName)!, text(family, 10) ?? text(family, 15)) === 'lubricant';
+      }).length;
+      if (importableRows.length < 100 || lubricantCount < 100) {
+        throw new Error(`Safety stop: incomplete PIM scope (${importableRows.length} named products, ${lubricantCount} lubricants)`);
+      }
       const existing = new Map((await this.prisma.pimProduct.findMany()).map((p) => [p.sellbaseElementId, p]));
       const changedProducts = new Set<number>();
       const seenProducts = new Set<number>();
-      // A product may occur several times in the selected catalogue tree. Import the
-      // last occurrence, matching the previous upsert behaviour, but count and
-      // process the product only once.
-      const uniqueProductRows = new Map<number, SellbaseElement>();
-      for (const row of level4) {
-        const elementId = Number(row.element_id_4);
-        if (elementId) uniqueProductRows.set(elementId, row);
-      }
-
-      for (const row of uniqueProductRows.values()) {
+      for (const row of importableRows) {
         const elementId = Number(row.element_id_4);
         const data = mergeData(master[String(elementId)], overrides[String(elementId)]);
         const familyData = mergeData(master[String(Number(row.element_id_2))], overrides[String(Number(row.element_id_2))]);
@@ -130,7 +144,7 @@ export class PimSyncService {
         const elementId = Number(row.element_id_5);
         const parentId = Number(row.element_id_4);
         const product = productBySellbase.get(parentId);
-        if (!elementId || !product) continue;
+        if (!elementId || !product?.active || !seenProducts.has(parentId)) continue;
         seenReferences.add(elementId);
         const data = mergeData(master[String(elementId)], overrides[String(elementId)]);
         const payload = { code: text(data, CARAC.productCode), label: text(data, CARAC.referenceLabel), packaging: text(data, CARAC.packaging), erpStatus: text(data, CARAC.erpStatus) ?? text(data, CARAC.referenceStatus), active: true, rawData: data as unknown as Prisma.InputJsonValue };
@@ -144,7 +158,7 @@ export class PimSyncService {
       const chunkCount = await this.buildIndex(index.id);
       const validation = await this.validateIndex(index.id);
       await this.activateIndex(index.id, chunkCount, chunkCount, validation);
-      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { status: RagSyncStatus.completed, finishedAt: new Date(), chunksCreated: chunkCount, details: { catalogBaseId, scope: catalogBaseId === 0 ? 'master' : 'publication' } } });
+      await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { status: RagSyncStatus.completed, finishedAt: new Date(), chunksCreated: chunkCount, details: { catalogBaseId, scope: catalogBaseId === 0 ? 'master' : 'publication', ...scope.details } } });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`PIM sync ${runId} failed: ${message}`);

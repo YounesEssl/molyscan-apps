@@ -8,9 +8,9 @@ PIM index is activated.
 
 - Manual: Admin → **PIM & RAG** → **Synchroniser maintenant**.
 - Automatic: first day of every month at 03:00 Europe/Paris.
-- The complete Sellbase master catalogue (`baseId=0`) defines the default scope:
-  level 4 products and level 5 references. It is not limited to the `SITE WEB
-  MOLYDAL` publication (`52903`).
+- The Sellbase master catalogue (`baseId=0`) defines the default scope: level 4
+  products and level 5 references, **excluding archived products** as described
+  below. It is not limited to the `SITE WEB MOLYDAL` publication (`52903`).
 - `SELLBASE_CATALOG_BASE_ID` defaults to `0`. Setting it to a non-zero publication
   ID deliberately restricts the import to that publication and applies its field
   overrides on top of the master values.
@@ -18,6 +18,79 @@ PIM index is activated.
   imported even when a level contains more than 1,000 rows.
 - Products missing from the selected source scope are deactivated, never immediately deleted.
 - Every product is hashed. Unchanged chunks reuse the previous embedding.
+
+### Archived products
+
+For tenant `c_molydal`, the **ARCHIVAGE PRODUITS** folder is always excluded from
+imports. Its stable element ID is `25012891` (level 2, instance `59727`, French
+label characteristic `10`), verified by read-only Sellbase API calls on
+2026-09-23. The rest of the **données principales** catalogue remains included;
+no folder needs to be moved and no Sellbase data is changed.
+
+The filter matches ancestor element IDs at levels 1–3, so descendants remain
+excluded after the folder is moved or renamed. It applies to products and
+references before deduplication. **Archive membership takes precedence over
+another placement of the same element**: for example, AIR S22 AL (`25012844`)
+was present both in the archive and another category on the verification date.
+Its other placement must not reintroduce it. The same rule applies to references
+shared between multiple products. A reference is imported only when its parent
+product is retained, named and active in the current run.
+
+If a publication is selected, archive membership is still read from the master
+tree, so a stale publication copy cannot restore an archived product. Additional
+folder IDs can be supplied through `SELLBASE_EXCLUDED_FOLDER_IDS` (positive
+element IDs separated by commas); this adds exclusions and cannot remove the
+built-in Molydal archive rule. The built-in ID is not applied to other tenants.
+
+The next successful synchronization marks previously imported archived products
+and their references inactive, keeping their records for traceability. Document
+lookup and RAG retrieval already require active products/references. A separate
+RAG index is then built from retained active products, validated and activated
+transactionally; the previous index is archived for rollback. Merely restarting
+the API does **not** remove old catalogue entries: a synchronization is required.
+Historical scans/conversation text and expert decisions are not rewritten by
+the import.
+
+New scan/chat answers also check the current PIM availability before reusing an
+expert equivalent or historical suggestion. A known inactive target is ignored
+and the active catalogue is searched again; this does not create an expert
+“no equivalent” decision. Existing explicit “no equivalent” decisions remain
+authoritative. Stale assistant suggestions are removed only from the in-memory
+model context, not from stored conversation history. FT/FDS requests cannot
+silently substitute an active plus grade for its archived base product.
+
+This check uses complete product names while retaining meaningful suffixes:
+`STARNET` and `STARNET+` are different products. If a different PIM element with
+the exact same name is still active, the name remains usable (for example KL
+BIO, KL 111 and H 128 each have both an archived old record and an active record).
+Unknown names are not falsely classified as archived. The read-only audit found
+10 expert decisions naming archived records, but seven still resolve to active
+homonyms; only the three decisions targeting STARNET become ineligible for new
+recommendations. All decisions remain stored unchanged.
+
+Safety checks count distinct retained products, then require at least 100 named
+products and 100 lubricants **before catalogue changes**, preventing duplicate
+placements or incomplete product data from satisfying the minimum. Retrieval
+validation must still pass before index activation. A failed validation leaves
+the previous index active; archived products are nevertheless unavailable to
+retrieval because it also requires `p.active=true`. Catalogue rows may already
+have been refreshed. Returning to the entire previous catalogue therefore needs
+a targeted correction or a selective restoration of the PIM/index tables from
+the pre-sync backup, along with the appropriate code. Do not blindly restore
+the whole database: preserve scans, conversations and other user writes made
+since the backup.
+
+Read-only pre-deployment impact on 2026-09-23: 470 active products, 1,512 active
+references and 427 active RAG chunks. The archive contains 141 of those products
+and 352 references. Expected post-sync scope with that snapshot: **329 products,
+1,160 references and 288 lubricant chunks**. These are snapshot counts, not
+hard-coded import limits. Run details report `excludedFolderIds`,
+`productsExcluded` and `referencesExcluded` for subsequent audits.
+
+For this change, back up the Molyscan database, deploy the API, then run
+`npm run rag:sync:pim` from `apps/api` (or use Admin → PIM & RAG). No schema
+migration is required. Check the completed run, active counts, the new active
+index and the absence of archived product IDs from active search results.
 
 ## Index safety
 

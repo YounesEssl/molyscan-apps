@@ -35,6 +35,13 @@ describe('PIM documents', () => {
     await expect(service.findPimDocumentsByName('AGL 41')).rejects.toThrow('PIM product not found');
   });
 
+  it('keeps a plus suffix distinct from the archived base product', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ id: 'plus', name: 'STARNET+' }]);
+    await expect(service.findPimDocumentsByName('STARNET')).rejects.toThrow('PIM product not found');
+    prisma.pimProduct.findUnique.mockResolvedValue({ id: 'plus', name: 'STARNET+', active: true, documents: [], references: [] });
+    await expect(service.findPimDocumentsByName('STARNET +')).resolves.toMatchObject({ product: { name: 'STARNET+' } });
+  });
+
   it('downloads a reference SDS only from the known reference characteristic', async () => {
     prisma.pimReference.findUnique.mockResolvedValue({ active: true, rawData: { '39': datum(39, 'folder/sds.pdf') }, product: { active: true, sellbaseInstanceId: 7 } });
     sellbase.downloadDocument.mockResolvedValue(new Response('%PDF-1.7\nSDS'));

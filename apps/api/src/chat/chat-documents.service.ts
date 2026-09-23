@@ -5,6 +5,7 @@ import {
   normalizeProductName,
 } from '../products/products.service';
 import { equivalenceKey } from '../common/utils/normalize';
+import { PimAvailability } from '../pim/pim-availability';
 
 type HistoryMessage = { role: string; text: string };
 
@@ -59,10 +60,12 @@ export class ChatDocumentsService {
     const english =
       /\b(please|give|show|send|technical|safety|sheet|the)\b/.test(input) &&
       !/\b(fiche|donne|montre|peux)\b/.test(input);
-    const catalog = await this.prisma.pimProduct.findMany({
-      where: { active: true },
-      select: { name: true },
+    const products = await this.prisma.pimProduct.findMany({
+      select: { name: true, active: true },
     });
+    const availability = new PimAvailability(products);
+    const catalog = products.filter((product) => product.active);
+    if (availability.isInactive(linkedProduct)) linkedProduct = null;
     const findNames = (text: string) => {
       const normalized = ` ${normalizeProductName(text)} `;
       const matches = catalog.filter((p) =>
@@ -96,7 +99,7 @@ export class ChatDocumentsService {
       const withoutNames = names.reduce(
         (text, name) =>
           text.replace(
-            new RegExp(`\\b${normalizeProductName(name)}\\b`, 'g'),
+            new RegExp(`(^|\\s)${normalizeProductName(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$)`, 'g'),
             ' ',
           ),
         input,
@@ -122,6 +125,11 @@ export class ChatDocumentsService {
           );
         }
         if (expert?.molydalEquivalent) {
+          if (availability.isInactive(expert.molydalEquivalent)) {
+            return this.reply(english
+              ? 'The previously suggested Molydal product is no longer active in the catalogue. Please ask for a new equivalent or specify an active product to request its document.'
+              : 'Le produit Molydal proposé auparavant n’est plus actif dans le catalogue. Demandez un nouvel équivalent ou précisez un produit actif pour consulter sa fiche.', []);
+          }
           linkedProduct = expert.molydalEquivalent;
           names = findNames(expert.molydalEquivalent);
         }
@@ -136,7 +144,7 @@ export class ChatDocumentsService {
       const userNames = lastUser ? findNames(lastUser.text) : [];
       const contextualNames = latestNames.length ? latestNames : userNames;
       const withdrawn =
-        latest && WITHDRAWN_EQUIVALENCE.test(normalizeProductName(latest.text));
+        latest && (WITHDRAWN_EQUIVALENCE.test(normalizeProductName(latest.text)) || availability.mentionsInactive(latest.text));
       const unknownSubject =
         (!latestNames.length &&
           latest &&

@@ -19,7 +19,7 @@ describe('Expert decisions in assistant conversations', () => {
   const decision = { competitorBrand: 'Brand', competitorName: 'Product 68', noEquivalent: true, note: null };
   beforeEach(() => {
     jest.clearAllMocks();
-    prisma = { expertEquivalence: { findUnique: jest.fn().mockResolvedValue(decision), findMany: jest.fn().mockResolvedValue([decision]) } };
+    prisma = { expertEquivalence: { findUnique: jest.fn().mockResolvedValue(decision), findMany: jest.fn().mockResolvedValue([decision]) }, pimProduct: { findMany: jest.fn().mockResolvedValue([]) } };
     vector = { dualSearch: jest.fn().mockResolvedValue([]) };
     service = new RagService({ getOrThrow: () => 'test-key' } as any, vector, prisma);
     jest.spyOn(service, 'reformulateQuery').mockImplementation(async (question) => question);
@@ -137,6 +137,51 @@ describe('Expert decisions in assistant conversations', () => {
   test('does not promote product names introduced only by earlier AI messages to expert context', async () => {
     await service.generateStreamingResponse('Une alternative ?', [{ role: 'assistant', text: 'Brand Product 68' }]);
     expect(mockGenerateContentStream).toHaveBeenCalled();
+  });
+
+  test('withdraws an archived expert target and historical scan suggestions while searching current candidates', async () => {
+    const old = { ...decision, noEquivalent: false, molydalEquivalent: 'STARNET' };
+    prisma.expertEquivalence.findMany.mockResolvedValue([old]);
+    prisma.expertEquivalence.findUnique.mockResolvedValue(old);
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET', active: false }, { name: 'STARNET+', active: true }]);
+    vector.dualSearch.mockResolvedValue([{ product_name: 'STARNET+', similarity: 0.9, chunk_text: 'Current datasheet' }]);
+    const history = [{ role: 'assistant', text: 'Je propose STARNET.' }];
+    const result = await service.generateStreamingResponse('Quel équivalent ?', history, {
+      scannedName: 'Product 68', scannedBrand: 'Brand', molydalName: 'STARNET', molydalReference: 'old-ref',
+      equivalents: [{ name: 'STARNET', family: '', compatibility: 100, reason: 'Old mapping' }], analysisText: 'STARNET est conseillé.',
+    });
+    const instruction = mockGetModel.mock.calls[0][0].systemInstruction;
+    expect(instruction).not.toContain('→ STARNET');
+    expect(instruction).not.toContain('Identified Molydal equivalent: STARNET');
+    expect(instruction).not.toContain('STARNET est conseillé');
+    expect(instruction).not.toContain('DÉCISION EXPERTE MOLYDAL : AUCUN ÉQUIVALENT');
+    expect(service.reformulateQuery).toHaveBeenCalledWith('Quel équivalent ?', expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining('recommendation withdrawn') })]));
+    expect(JSON.stringify(mockGenerateContentStream.mock.calls[0])).not.toContain('Je propose STARNET.');
+    expect(history[0].text).toBe('Je propose STARNET.');
+    expect(result.sources).toEqual(['STARNET+']);
+  });
+
+  test('applies the same archive rule to non-streaming chat and stale retrieved chunks', async () => {
+    const old = { ...decision, noEquivalent: false, molydalEquivalent: 'STARNET' };
+    prisma.expertEquivalence.findMany.mockResolvedValue([old]);
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET', active: false }]);
+    vector.dualSearch.mockResolvedValue([{ product_name: 'STARNET', similarity: 0.9, chunk_text: 'Old datasheet' }]);
+    const result = await service.generateResponse({ question: 'Quel équivalent de Brand Product 68 ?', conversationHistory: [{ role: 'assistant', text: 'STARNET convient.' }] });
+    expect(result.sources).toEqual([]);
+    expect(mockGetModel.mock.calls[0][0].systemInstruction).not.toContain('→ STARNET');
+    expect(JSON.stringify(mockGenerateContent.mock.calls[0])).not.toContain('STARNET convient');
+    expect(vector.dualSearch).toHaveBeenCalled();
+  });
+
+  test.each([
+    { name: 'STARNET+', rows: [{ name: 'STARNET', active: false }, { name: 'STARNET+', active: true }] },
+    { name: 'KL BIO', rows: [{ name: 'KL BIO', active: false }, { name: 'KL BIO', active: true }] },
+    { name: 'UNKNOWN', rows: [] },
+  ])('keeps expert authority for $name when it is not known inactive', async ({ name, rows }) => {
+    prisma.expertEquivalence.findMany.mockResolvedValue([{ ...decision, noEquivalent: false, molydalEquivalent: name }]);
+    prisma.pimProduct.findMany.mockResolvedValue(rows);
+    await service.generateStreamingResponse('Quel équivalent de Brand Product 68 ?', []);
+    expect(mockGetModel.mock.calls[0][0].systemInstruction).toContain(`→ ${name}`);
   });
 
 });

@@ -71,4 +71,20 @@ describe('Sellbase catalogue scope', () => {
 
     expect(() => sellbase.catalogBaseId).toThrow('SELLBASE_CATALOG_BASE_ID');
   });
+
+  it('always excludes Molydal archives, supports extra folders, and isolates other tenants', () => {
+    expect(client().excludedFolderIds).toEqual([25012891]);
+    expect(client({ SELLBASE_EXCLUDED_FOLDER_IDS: '44, 25012891,55' }).excludedFolderIds).toEqual([25012891, 44, 55]);
+    expect(client({ SELLBASE_BASE: 'c_other' }).excludedFolderIds).toEqual([]);
+    expect(client({ SELLBASE_BASE: 'c_other', SELLBASE_EXCLUDED_FOLDER_IDS: '44' }).excludedFolderIds).toEqual([44]);
+  });
+
+  it.each(['0', '-1', '1.5', '44,', 'archive', '9007199254740992'])('rejects malformed exclusion IDs: %s', (value) => {
+    expect(() => client({ SELLBASE_EXCLUDED_FOLDER_IDS: value }).excludedFolderIds).toThrow('SELLBASE_EXCLUDED_FOLDER_IDS');
+  });
+
+  it('can read master archive membership independently of the selected publication', async () => {
+    await client({ SELLBASE_CATALOG_BASE_ID: '52903' }).getElements(4, 0);
+    expect(fetchMock.mock.calls[0][0]).toContain('/element/getByLevel?baseId=0&level=4');
+  });
 });

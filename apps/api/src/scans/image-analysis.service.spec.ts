@@ -18,6 +18,7 @@ describe('Scan equivalence integrity', () => {
     prisma = {
       scan: { findUnique: jest.fn(), findMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'scan' }) },
       expertEquivalence: { findUnique: jest.fn().mockResolvedValue(null) },
+      pimProduct: { findMany: jest.fn().mockResolvedValue([]) },
     };
     vector = { dualSearch: jest.fn().mockResolvedValue([]) };
     service = new ImageAnalysisService(
@@ -45,6 +46,29 @@ describe('Scan equivalence integrity', () => {
     expect(prisma.scan.create).toHaveBeenCalledWith({ data: expect.objectContaining({ status: 'no_match', molydalEquivalent: null, equivalentsJson: [] }) });
     expect(vector.dualSearch).not.toHaveBeenCalled();
     expect(mockGenerateContent).not.toHaveBeenCalled();
+  });
+
+  test('ignores an archived expert target and searches active candidates without inventing a no-equivalent decision', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET', active: false }, { name: 'STARNET+', active: true }]);
+    prisma.expertEquivalence.findUnique.mockResolvedValue({ molydalEquivalent: 'STARNET', confidence: 100, noEquivalent: false });
+    vector.dualSearch.mockResolvedValue([{ product_name: 'STARNET+', similarity: 0.9, chunk_text: 'Current datasheet' }]);
+    mockGenerateContent.mockResolvedValue({ response: { text: () => JSON.stringify({ equivalents: [{ name: 'STARNET+', compatibility: 90, family: 'Cleaner', reason: 'Current datasheet' }], analysis: 'Current active product' }) } });
+    const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
+    expect(vector.dualSearch).toHaveBeenCalled();
+    expect(result.equivalents.map((e) => e.name)).toEqual(['STARNET+']);
+    expect(result.analysis).not.toContain('experts');
+  });
+
+  test.each([
+    { name: 'STARNET+', rows: [{ name: 'STARNET', active: false }, { name: 'STARNET+', active: true }] },
+    { name: 'KL BIO', rows: [{ name: 'KL BIO', active: false }, { name: 'KL BIO', active: true }] },
+    { name: 'EXPERT UNKNOWN', rows: [] },
+  ])('preserves valid expert mappings for $name', async ({ name, rows }) => {
+    prisma.pimProduct.findMany.mockResolvedValue(rows);
+    prisma.expertEquivalence.findUnique.mockResolvedValue({ molydalEquivalent: name, confidence: 100, noEquivalent: false });
+    const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
+    expect(result.equivalents[0].name).toBe(name);
+    expect(vector.dualSearch).not.toHaveBeenCalled();
   });
 
   test('empty retrieval does not ask a model to invent an equivalent', async () => {

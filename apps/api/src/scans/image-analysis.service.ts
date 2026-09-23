@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from '../chat/rag/rag.service';
 import { VectorStoreService, RetrievalFilters } from '../chat/rag/vector-store.service';
 import { StorageService } from '../storage/storage.service';
+import { loadPimAvailability } from '../pim/pim-availability';
 import {
   normalizeProductText as normalize,
   equivalenceKey,
@@ -165,7 +166,9 @@ export class ImageAnalysisService {
     const expertEquiv = await this.prisma.expertEquivalence.findUnique({
       where: { competitorKey: equivalenceKey(identification.brand, identification.name) },
     });
-    if (expertEquiv) {
+    const unavailableExpert = expertEquiv && !expertEquiv.noEquivalent
+      && (await loadPimAvailability(this.prisma)).isInactive(expertEquiv.molydalEquivalent);
+    if (expertEquiv && !unavailableExpert) {
       this.logger.log(
         `🎯 Équivalence experte: "${identification.name}" → ${expertEquiv.molydalEquivalent} (confiance ${expertEquiv.confidence}%)`,
       );

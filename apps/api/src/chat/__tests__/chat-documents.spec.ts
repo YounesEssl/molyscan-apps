@@ -10,9 +10,9 @@ describe('Assistant PIM document requests', () => {
         findMany: jest
           .fn()
           .mockResolvedValue([
-            { name: 'AGL 41 NF' },
-            { name: 'LUB 13' },
-            { name: 'LUB 13 EP2' },
+            { name: 'AGL 41 NF', active: true },
+            { name: 'LUB 13', active: true },
+            { name: 'LUB 13 EP2', active: true },
           ]),
       },
       expertEquivalence: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -241,5 +241,30 @@ describe('Assistant PIM document requests', () => {
     expect(result?.text).toContain('/document/en');
     expect(result?.text).toContain('/document/sds-en');
     expect(result?.text).not.toContain('/document/fr');
+  });
+
+  it('does not serve an active plus grade when asked for its archived base name', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET', active: false }, { name: 'STARNET+', active: true }]);
+    expect((await service.answer('FT STARNET', []))?.text).toContain('nom exact');
+    expect(products.findPimDocumentsByName).not.toHaveBeenCalled();
+    expect((await service.answer('FT STARNET +', []))?.text).toContain('/document/doc');
+    expect(products.findPimDocumentsByName).toHaveBeenCalledWith('STARNET+');
+  });
+
+  it('withdraws an archived expert document target without calling it a no-equivalent decision', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET', active: false }, { name: 'STARNET+', active: true }]);
+    prisma.expertEquivalence.findUnique.mockResolvedValue({ molydalEquivalent: 'STARNET', noEquivalent: false });
+    const result = await service.answer('Et sa FT ?', [{ role: 'assistant', text: 'STARNET' }], 'STARNET', { name: 'Competitor', brand: 'Brand' });
+    expect(result?.text).toContain('n’est plus actif');
+    expect(result?.text).toContain('nouvel équivalent');
+    expect(result?.text).not.toContain('Aucun équivalent');
+    expect(products.findPimDocumentsByName).not.toHaveBeenCalled();
+  });
+
+  it('does not revive an older active topic after a recent archived suggestion', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET', active: false }, { name: 'AGL 41 NF', active: true }]);
+    const result = await service.answer('Et sa FT ?', [{ role: 'user', text: 'AGL 41 NF' }, { role: 'assistant', text: 'STARNET' }], 'STARNET');
+    expect(result?.text).toContain('nom exact');
+    expect(products.findPimDocumentsByName).not.toHaveBeenCalled();
   });
 });

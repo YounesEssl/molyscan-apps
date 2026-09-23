@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SearchProductDto } from './dto/search-product.dto';
 import { SellbaseClient, type SellbaseDatum } from '../pim/sellbase.client';
 import { documents as normalizeDocuments } from '../pim/pim.normalizer';
+import { normalizePimProductName } from '../pim/pim-availability';
 
 @Injectable()
 export class ProductsService {
@@ -201,5 +202,5 @@ export class ProductsService {
 }
 
 export function normalizeProductName(value: string): string {
-  return value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return normalizePimProductName(value);
 }

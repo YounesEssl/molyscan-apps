@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { request as httpsRequest } from 'https';
 import { chmodSync, readFileSync, writeFileSync } from 'fs';
+import { MOLYDAL_ARCHIVE_ELEMENT_ID } from './pim-scope';
 
 export type SellbaseDatum = {
   id: number;
@@ -46,6 +47,19 @@ export class SellbaseClient {
       throw new Error('SELLBASE_CATALOG_BASE_ID must be a non-negative integer');
     }
     return value;
+  }
+
+  get excludedFolderIds(): number[] {
+    // This folder belongs to c_molydal, not to other Sellbase tenants.
+    const defaults = this.config.get('SELLBASE_BASE', 'c_molydal') === 'c_molydal'
+      ? [MOLYDAL_ARCHIVE_ELEMENT_ID] : [];
+    const extra = this.config.get<string>('SELLBASE_EXCLUDED_FOLDER_IDS', '').trim();
+    if (!extra) return defaults;
+    const parts = extra.split(',').map((value) => value.trim());
+    if (parts.some((value) => !/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value)))) {
+      throw new Error('SELLBASE_EXCLUDED_FOLDER_IDS must contain positive integer element IDs separated by commas');
+    }
+    return [...new Set([...defaults, ...parts.map(Number)])];
   }
 
   private async authenticate(): Promise<string> {
@@ -160,12 +174,12 @@ export class SellbaseClient {
     return result.caracs;
   }
 
-  async getElements(level: 4 | 5): Promise<SellbaseElement[]> {
+  async getElements(level: 4 | 5, baseId = this.catalogBaseId): Promise<SellbaseElement[]> {
     const elements: SellbaseElement[] = [];
     const offset = 1000;
     for (let page = 0; ; page++) {
       const query = new URLSearchParams({
-        baseId: String(this.catalogBaseId), level: String(level), page: String(page),
+        baseId: String(baseId), level: String(level), page: String(page),
         offset: String(offset), orderField: 'id', order: 'ASC',
       });
       const result = await this.request<{ elements: SellbaseElement[] }>(`/element/getByLevel?${query}`);
