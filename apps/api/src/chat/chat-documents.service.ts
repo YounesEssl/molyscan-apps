@@ -88,8 +88,17 @@ export class ChatDocumentsService {
     const catalog = products.filter((product) => product.active);
     const references = catalog.flatMap((product) => (product.references ?? [])
       .map((reference) => ({ ...reference, productName: product.name })));
+    const productNamesInQuestion = catalog.filter((product) => {
+      const name = normalizeProductName(product.name);
+      return mentions(input, name) || mentions(input, name.replace(/\s+/g, ''));
+    });
     const mentionedReferences = references.filter((reference) => reference.code
-      && mentions(input, normalizeProductName(reference.code)));
+      && mentions(input, normalizeProductName(reference.code))
+      // A code such as "501" or "MICROCUT_240" must not override an
+      // explicitly named active product containing the same designation.
+      && !productNamesInQuestion.some((product) => mentions(
+        normalizeProductName(product.name), normalizeProductName(reference.code!),
+      )));
     const activeMentionedReferences = mentionedReferences.filter((reference) => reference.active);
     if (mentionedReferences.length && !activeMentionedReferences.length) {
       return this.reply(english

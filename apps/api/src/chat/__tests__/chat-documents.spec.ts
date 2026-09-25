@@ -321,6 +321,32 @@ describe('Assistant PIM document requests', () => {
     expect(products.findPimDocumentsByName).not.toHaveBeenCalled();
   });
 
+  it('does not confuse an active product name with a shorter reference code from another product', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([
+      { name: 'LUBA 501', active: true, references: [{ code: 'LUBA501FT', active: true, packaging: 'FUT' }] },
+      { name: 'FONTAINE FUT POUR SOLVANTS', active: true, references: [{ code: '501', active: true, packaging: 'FUT' }] },
+    ]);
+    products.findPimDocumentsByName.mockResolvedValue({ documents: [
+      { id: 'luba-fds', kind: 'safety_sheet', language: 'fr', available: true },
+    ] });
+    const result = await service.answer('FDS LUBA 501', []);
+    expect(products.findPimDocumentsByName).toHaveBeenCalledWith('LUBA 501');
+    expect(result?.text).toContain('/document/luba-fds');
+  });
+
+  it('prefers an active product over an inactive reference with the same designation', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'MICROCUT 240', active: true, references: [
+      { code: 'MICROCUT_240', active: false, packaging: 'JERRYCAN' },
+      { code: 'MICROCUT24020', active: true, packaging: 'JERRYCAN' },
+    ] }]);
+    products.findPimDocumentsByName.mockResolvedValue({ documents: [
+      { id: 'microcut-fds', kind: 'safety_sheet', language: 'fr', available: true },
+    ] });
+    const result = await service.answer('FDS MICROCUT 240', []);
+    expect(products.findPimDocumentsByName).toHaveBeenCalledWith('MICROCUT 240');
+    expect(result?.text).toContain('/document/microcut-fds');
+  });
+
   it('does not serve an active plus grade when asked for its archived base name', async () => {
     prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET', active: false }, { name: 'STARNET+', active: true }]);
     expect((await service.answer('FT STARNET', []))?.text).toContain('nom exact');
