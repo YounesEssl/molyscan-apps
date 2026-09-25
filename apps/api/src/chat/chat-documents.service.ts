@@ -129,6 +129,17 @@ export class ChatDocumentsService {
       ];
     };
     let names = explicitReference ? [explicitReference.productName] : findNames(question);
+    // A packaging word can also be a catalogue product name (PULVERISATEUR).
+    // In a follow-up about that packaging, keep the product named in the
+    // previous answer, provided exactly one such product owns the packaging.
+    if (!explicitReference && names.length && history.at(-1)) {
+      const contextual = findNames(history.at(-1)!.text).filter((name) => !names.includes(name)
+        && references.some((reference) => reference.active && reference.productName === name
+          && reference.packaging && mentions(input, normalizeProductName(reference.packaging))));
+      const namesArePackagings = names.every((name) => references.some((reference) => reference.active
+        && normalizeProductName(reference.packaging ?? '') === normalizeProductName(name)));
+      if (namesArePackagings && contextual.length === 1) names = contextual;
+    }
     // Context fallback is reserved for requests such as "Et sa FDS ?". An
     // explicit unknown product must never return the previous product's sheet.
     const stripPackagings = (value: string) => [...new Set(references

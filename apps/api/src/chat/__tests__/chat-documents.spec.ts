@@ -278,10 +278,13 @@ describe('Assistant PIM document requests', () => {
   });
 
   it('uses the exact spray reference from the previous product answer, despite a misspelled FDS request', async () => {
-    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'KL 9 H', active: true, references: [
-      { code: 'KL9H20', active: true, packaging: 'JERRYCAN' },
-      { code: 'KL9HPULVE', active: true, packaging: 'PULVÉRISATEUR' },
-    ] }]);
+    prisma.pimProduct.findMany.mockResolvedValue([
+      { name: 'KL 9 H', active: true, references: [
+        { code: 'KL9H20', active: true, packaging: 'JERRYCAN' },
+        { code: 'KL9HPULVE', active: true, packaging: 'PULVÉRISATEUR' },
+      ] },
+      { name: 'PULVERISATEUR', active: true, references: [] },
+    ]);
     products.findPimDocumentsByName.mockResolvedValue({ documents: [
       { id: 'spray_fds', kind: 'safety_sheet', language: 'fr', available: true, referenceCode: 'KL9HPULVE' },
     ] });
