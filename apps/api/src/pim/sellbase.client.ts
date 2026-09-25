@@ -272,8 +272,17 @@ export class SellbaseClient {
     // The public Molydal Sellbase archive shards flat filenames by their first
     // one/two lowercase characters. FR/GB AGL 41 NF and other initials were
     // verified against real PDFs; the image archive "molydal_p" is different.
-    if (usePublicSafetySheet && parts.length === 1) {
-      parts.unshift(parts[0].slice(0, 1).toLowerCase(), parts[0].slice(0, 2).toLowerCase());
+    if (usePublicSafetySheet) {
+      const shard = [parts.at(-1)!.slice(0, 1).toLowerCase(), parts.at(-1)!.slice(0, 2).toLowerCase()];
+      if (parts.length === 1) {
+        parts.unshift(...shard);
+      } else if (parts.length === 3 && parts[0].toLowerCase() === shard[0]
+        && parts[1].toLowerCase() === shard[1]) {
+        // A few PIM values contain uppercase shard folders (K/KL, A/AD,
+        // T/TO); the public archive stores those folders in lowercase.
+        parts[0] = shard[0];
+        parts[1] = shard[1];
+      }
     }
     const safePath = parts.map(encodeURIComponent).join('/');
     if (usePublicSafetySheet) {

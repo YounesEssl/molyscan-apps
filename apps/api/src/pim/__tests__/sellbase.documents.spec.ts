@@ -22,6 +22,10 @@ describe('Sellbase document sources', () => {
     ['AGL_41_NF_FDS_GB.pdf', 'a/ag/AGL_41_NF_FDS_GB.pdf'],
     ['BLACK_SEAL_FDS_FR.pdf', 'b/bl/BLACK_SEAL_FDS_FR.pdf'],
     ['a/ag/AGL_41_NF_FDS_FR.pdf', 'a/ag/AGL_41_NF_FDS_FR.pdf'],
+    ['K/KL/KL_420_FDS_FR.pdf', 'k/kl/KL_420_FDS_FR.pdf'],
+    ['A/AD/ADS_530_FDS_FR.pdf', 'a/ad/ADS_530_FDS_FR.pdf'],
+    ['A/AD/ADS_530_FDS_GB.pdf', 'a/ad/ADS_530_FDS_GB.pdf'],
+    ['T/TO/TOP_LUB_-_aérosol_FDS_GB.pdf', 't/to/TOP_LUB_-_a%C3%A9rosol_FDS_GB.pdf'],
     ['AGL 41 NF FDS FR.pdf', 'a/ag/AGL%2041%20NF%20FDS%20FR.pdf'],
   ])('uses the verified public archive for %s without credentials', async (fileName, path) => {
     const { sellbase, authenticate } = client();
