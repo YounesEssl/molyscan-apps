@@ -9,7 +9,7 @@ import { loadPimAvailability, normalizePimProductName, PimAvailability } from '.
 export class ProductsService {
   constructor(private prisma: PrismaService, private sellbase: SellbaseClient) {}
 
-  async findPimDocumentsByName(name: string) {
+  async findPimDocumentsByName(name: string, referenceCode?: string) {
     const normalizedName = normalizeProductName(name);
     // Match punctuation/spacing variants, but never fuzzy-match a different grade.
     const candidates = await this.prisma.pimProduct.findMany({
@@ -21,7 +21,7 @@ export class ProductsService {
       where: { id: matches[0].id },
       include: {
         documents: { orderBy: [{ kind: 'asc' }, { language: 'asc' }] },
-        references: { where: { active: true }, orderBy: { code: 'asc' } },
+        references: { where: { active: true, ...(referenceCode ? { code: referenceCode } : {}) }, orderBy: { code: 'asc' } },
       },
     });
     if (!product?.active) throw new NotFoundException('PIM product not found');

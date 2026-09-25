@@ -31,6 +31,22 @@ describe('PIM documents', () => {
     expect(prisma.pimProduct.findUnique.mock.calls[0][0].include.references.where).toEqual({ active: true });
   });
 
+  it('limits reference documents to the requested active reference', async () => {
+    prisma.pimProduct.findUnique.mockImplementation(({ include }: any) => ({
+      id: 'p', name: 'AGL 41 NF', active: true, documents: [],
+      references: [
+        { id: refId, code: 'AGL41NF150', rawData: { '39': datum(39, 'drum.pdf') } },
+        { id: 'spray', code: 'AGL41SPRAY', rawData: { '39': datum(39, 'spray.pdf') } },
+      ].filter((reference) => reference.code === include.references.where.code),
+    }));
+    const result = await service.findPimDocumentsByName('AGL 41 NF', 'AGL41SPRAY');
+    expect(result.documents).toEqual([expect.objectContaining({
+      id: 'ref_spray_39', fileName: 'spray.pdf', referenceCode: 'AGL41SPRAY',
+    })]);
+    expect(prisma.pimProduct.findUnique.mock.calls[0][0].include.references.where)
+      .toEqual({ active: true, code: 'AGL41SPRAY' });
+  });
+
   it('never substitutes a different product grade', async () => {
     await expect(service.findPimDocumentsByName('AGL 41')).rejects.toThrow('PIM product not found');
   });

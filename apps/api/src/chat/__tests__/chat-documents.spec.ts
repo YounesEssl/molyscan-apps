@@ -243,6 +243,81 @@ describe('Assistant PIM document requests', () => {
     expect(result?.text).not.toContain('/document/fr');
   });
 
+  it('resolves a compact product name and an active PIM reference without changing the requested grade', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([
+      { name: 'KL 9 H', active: true, references: [
+        { code: 'KL9H20', active: true, packaging: 'JERRYCAN' },
+        { code: 'KL9HPULVE', active: true, packaging: 'PULVÉRISATEUR' },
+      ] },
+      { name: 'KL9H', active: false, references: [] },
+    ]);
+    products.findPimDocumentsByName.mockResolvedValue({ documents: [
+      { id: 'ref_fds', kind: 'safety_sheet', language: 'fr', available: true, referenceCode: 'KL9H20' },
+    ] });
+    expect((await service.answer('Donne moi la FDS du KL9H', []))?.text).toContain('/document/ref_fds');
+    expect(products.findPimDocumentsByName).toHaveBeenLastCalledWith('KL 9 H');
+    expect((await service.answer('FDS KL9H20', []))?.text).toContain('/document/ref_fds');
+    expect(products.findPimDocumentsByName).toHaveBeenLastCalledWith('KL 9 H', 'KL9H20');
+    products.findPimDocumentsByName.mockClear();
+    expect((await service.answer('FDS KL9H EP99', []))?.text).toContain('nom exact');
+    expect(products.findPimDocumentsByName).not.toHaveBeenCalled();
+  });
+
+  it('returns the requested FT and FDS even when the question also asks for a missing food certificate', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'KL 9 H', active: true, references: [
+      { code: 'KL9H20', active: true, packaging: 'JERRYCAN' },
+    ] }]);
+    products.findPimDocumentsByName.mockResolvedValue({ documents: [
+      { id: 'ft', kind: 'technical_sheet', language: 'fr', available: true },
+      { id: 'fds', kind: 'safety_sheet', language: 'fr', available: true },
+    ] });
+    const result = await service.answer('KL9H tu peux me donner fds ft et certificat d’alimentarité', []);
+    expect(result?.text).toContain('/document/ft');
+    expect(result?.text).toContain('/document/fds');
+    expect(result?.text).toContain('Aucun certificat d’alimentarité');
+  });
+
+  it('uses the exact spray reference from the previous product answer, despite a misspelled FDS request', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'KL 9 H', active: true, references: [
+      { code: 'KL9H20', active: true, packaging: 'JERRYCAN' },
+      { code: 'KL9HPULVE', active: true, packaging: 'PULVÉRISATEUR' },
+    ] }]);
+    products.findPimDocumentsByName.mockResolvedValue({ documents: [
+      { id: 'spray_fds', kind: 'safety_sheet', language: 'fr', available: true, referenceCode: 'KL9HPULVE' },
+    ] });
+    const result = await service.answer(
+      'Peux tu me donner la fiche de donnés de sécurité (fds) associée au pulvérisateur ?',
+      [{ role: 'assistant', text: 'Le produit KL 9 H existe en pulvérisateur.' }],
+    );
+    expect(products.findPimDocumentsByName).toHaveBeenCalledWith('KL 9 H', 'KL9HPULVE');
+    expect(result?.text).toContain('/document/spray_fds');
+  });
+
+  it('treats a reference code as the answer to its exact-name prompt', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'KL 9 H', active: true, references: [
+      { code: 'KL9HPULVE', active: true, packaging: 'PULVÉRISATEUR' },
+    ] }]);
+    products.findPimDocumentsByName.mockResolvedValue({ documents: [
+      { id: 'spray_fds', kind: 'safety_sheet', language: 'fr', available: true, referenceCode: 'KL9HPULVE' },
+    ] });
+    const result = await service.answer('KL9HPULVE', [
+      { role: 'user', text: 'Donne moi la FDS du pulvérisateur' },
+      { role: 'assistant', text: 'Précisez le nom exact du produit Molydal pour que je retrouve sa fiche dans le PIM.' },
+    ]);
+    expect(products.findPimDocumentsByName).toHaveBeenCalledWith('KL 9 H', 'KL9HPULVE');
+    expect(result?.text).toContain('/document/spray_fds');
+  });
+
+  it('never substitutes an inactive reference for an active one', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'KL 9 H', active: true, references: [
+      { code: 'KL9HLINGETTES', active: false, packaging: 'LINGETTES' },
+      { code: 'KL9HPULVE', active: true, packaging: 'PULVÉRISATEUR' },
+    ] }]);
+    const result = await service.answer('FDS KL9HLINGETTES', []);
+    expect(result?.text).toContain('n’est plus active');
+    expect(products.findPimDocumentsByName).not.toHaveBeenCalled();
+  });
+
   it('does not serve an active plus grade when asked for its archived base name', async () => {
     prisma.pimProduct.findMany.mockResolvedValue([{ name: 'STARNET', active: false }, { name: 'STARNET+', active: true }]);
     expect((await service.answer('FT STARNET', []))?.text).toContain('nom exact');

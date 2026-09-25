@@ -18,14 +18,24 @@ const WITHDRAWN_EQUIVALENCE =
 const SUBJECT_CHANGE =
   /\b(changeons de (?:sujet|produit)|autre produit|nouveau produit|parlons (?:de|d)|passons a|et pour|qu en est il de|what about|switch (?:to|topics)|change (?:the )?(?:subject|product)|different product)\b/;
 
+function mentions(text: string, designation: string): boolean {
+  return !!designation && ` ${text} `.includes(` ${designation} `);
+}
+
+function removeDesignation(text: string, designation: string): string {
+  if (!designation) return text;
+  const escaped = designation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(`(^|\\s)${escaped}(?=\\s|$)`, 'g'), ' ');
+}
+
 function requestRemainder(text: string): string {
   return text
     .replace(
-      /\b(technical data sheets?|technical sheets?|safety data sheets?|safety sheets?|fiches? techniques?|fiches? (?:de |des )?(?:donnees de )?securite)\b/g,
+      /\b(technical data sheets?|technical sheets?|safety data sheets?|safety sheets?|fiches? techniques?|fiches? (?:de |des )?(?:donn(?:ee|e)s? de )?securite|certificats? (?:d |de |du |des )?alimentarite)\b/g,
       '',
     )
     .replace(
-      /\b(ft|tds|fs|fds|sds|msds|et|ou|and|or|la|le|les|l|de|du|des|d|sa|son|ses|ce|ces|cette|cet|produit|produits|molydal|moi|me|je|tu|vous|peux|pouvez|pourrais|pourriez|donne|donner|envoyer|envoie|montre|montrer|consulter|voir|veux|voudrais|souhaite|s|il|te|vous|plait|svp|stp|merci|pour|en|francais|francaise|anglais|anglaise|please|give|send|show|view|open|can|could|i|you|want|would|like|to|for|the|this|that|product|its|it|french|english|une|un|a|an|lien|liens|link|links|pdf|fichier|fichiers|file|files|obtenir|fournir|fournis|fournissez|recuperer|recupere|telecharger|telecharge|telechargement|download|provide|get|have|avoir|acces|access|disponible|available|est|elle|elles|ils|is|are|quelle|quel|quelles|quels)\b/g,
+      /\b(ft|tds|fs|fds|sds|msds|et|ou|and|or|la|le|les|l|de|du|des|d|sa|son|ses|ce|ces|cette|cet|produit|produits|molydal|moi|me|je|tu|vous|peux|pouvez|pourrais|pourriez|donne|donner|envoyer|envoie|montre|montrer|consulter|voir|veux|voudrais|souhaite|s|il|te|vous|plait|svp|stp|merci|pour|en|francais|francaise|anglais|anglaise|please|give|send|show|view|open|can|could|i|you|want|would|like|to|for|the|this|that|product|its|it|french|english|une|un|a|an|au|aux|associe|associee|associes|associees|reference|references|conditionnement|lien|liens|link|links|pdf|fichier|fichiers|file|files|obtenir|fournir|fournis|fournissez|recuperer|recupere|telecharger|telecharge|telechargement|download|provide|get|have|avoir|acces|access|disponible|available|est|elle|elles|ils|is|are|quelle|quel|quelles|quels)\b/g,
       '',
     )
     .trim();
@@ -46,31 +56,60 @@ export class ChatDocumentsService {
     scannedProduct?: { name: string | null; brand: string | null },
   ) {
     const input = normalizeProductName(question);
-    const technical =
+    let technical =
       /\b(ft|tds|technical (?:data )?sheets?|fiches? techniques?)\b/.test(
         input,
       );
-    const safety =
-      /\b(fs|fds|sds|msds|safety (?:data )?sheets?|fiches? (?:de |des )?(?:donnees de )?securite)\b/.test(
+    let safety =
+      /\b(fs|fds|sds|msds|safety (?:data )?sheets?|fiches? (?:de |des )?(?:donn(?:ee|e)s? de )?securite)\b/.test(
         input,
       );
-    if (!technical && !safety) return null;
+    const foodCertificate = /\bcertificats? (?:d |de |du |des )?alimentarite\b/.test(input);
+    // A reference code alone can answer our previous request for the exact
+    // designation. Preserve the sheet kind instead of handing it to the LLM.
+    const lastUser = [...history].reverse().find((message) => message.role === 'user');
+    const awaitingDesignation = /^(precisez le nom exact|please specify the exact)/i
+      .test(normalizeProductName(history.at(-1)?.text ?? ''));
+    if (!technical && !safety && awaitingDesignation && lastUser) {
+      const previous = normalizeProductName(lastUser.text);
+      technical = /\b(ft|tds|fiches? techniques?)\b/.test(previous);
+      safety = /\b(fs|fds|sds|msds|fiches? (?:de |des )?(?:donn(?:ee|e)s? de )?securite)\b/.test(previous);
+    }
+    if (!technical && !safety && !foodCertificate) return null;
     if (DOCUMENT_CONTENT_QUESTION.test(input)) return null;
 
     const english =
       /\b(please|give|show|send|technical|safety|sheet|the)\b/.test(input) &&
       !/\b(fiche|donne|montre|peux)\b/.test(input);
     const products = await this.prisma.pimProduct.findMany({
-      select: { name: true, active: true },
+      select: { name: true, active: true, references: { select: { code: true, active: true, packaging: true } } },
     });
     const availability = new PimAvailability(products);
     const catalog = products.filter((product) => product.active);
+    const references = catalog.flatMap((product) => (product.references ?? [])
+      .map((reference) => ({ ...reference, productName: product.name })));
+    const mentionedReferences = references.filter((reference) => reference.code
+      && mentions(input, normalizeProductName(reference.code)));
+    const activeMentionedReferences = mentionedReferences.filter((reference) => reference.active);
+    if (mentionedReferences.length && !activeMentionedReferences.length) {
+      return this.reply(english
+        ? 'This reference is no longer active in the Molydal catalogue. Please request a current reference.'
+        : 'Cette référence n’est plus active dans le catalogue Molydal. Précisez une référence actuelle.', []);
+    }
+    if (activeMentionedReferences.length > 1) {
+      return this.reply(english
+        ? 'Please specify one Molydal reference at a time.'
+        : 'Précisez une seule référence Molydal à la fois.', []);
+    }
+    const explicitReference = activeMentionedReferences[0];
     if (availability.isInactive(linkedProduct)) linkedProduct = null;
     const findNames = (text: string) => {
       const normalized = ` ${normalizeProductName(text)} `;
-      const matches = catalog.filter((p) =>
-        normalized.includes(` ${normalizeProductName(p.name)} `),
-      );
+      const matches = catalog.filter((p) => {
+        const name = normalizeProductName(p.name);
+        return mentions(normalized.trim(), name)
+          || mentions(normalized.trim(), name.replace(/\s+/g, ''));
+      });
       // A short catalogue name must not capture a different, longer grade.
       return [
         ...new Set(
@@ -89,22 +128,24 @@ export class ChatDocumentsService {
         ),
       ];
     };
-    let names = findNames(question);
+    let names = explicitReference ? [explicitReference.productName] : findNames(question);
     // Context fallback is reserved for requests such as "Et sa FDS ?". An
     // explicit unknown product must never return the previous product's sheet.
-    const remainder = requestRemainder(input);
+    const stripPackagings = (value: string) => [...new Set(references
+      .filter((reference) => reference.active && reference.packaging)
+      .map((reference) => normalizeProductName(reference.packaging!)))]
+      .reduce((text, packaging) => removeDesignation(text, packaging), value);
+    const remainder = requestRemainder(stripPackagings(input));
     // Account for the whole explicit designation, including unknown suffixes.
     // "FT LUB 13 EP99" must not silently select the known base grade LUB 13.
     if (names.length) {
-      const withoutNames = names.reduce(
-        (text, name) =>
-          text.replace(
-            new RegExp(`(^|\\s)${normalizeProductName(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$)`, 'g'),
-            ' ',
-          ),
-        input,
-      );
-      if (requestRemainder(withoutNames)) names = [];
+      const withoutNames = names.reduce((text, name) => {
+        const normalized = normalizeProductName(name);
+        return removeDesignation(removeDesignation(text, normalized), normalized.replace(/\s+/g, ''));
+      }, input);
+      const withoutReference = explicitReference?.code
+        ? removeDesignation(withoutNames, normalizeProductName(explicitReference.code)) : withoutNames;
+      if (requestRemainder(stripPackagings(withoutReference))) names = [];
     }
     if (!names.length && !remainder) {
       if (scannedProduct?.name) {
@@ -137,9 +178,6 @@ export class ChatDocumentsService {
       // Do not resurrect a suggestion from an older exchange after the latest
       // answer explicitly withdrew it or changed the subject.
       const latest = history.at(-1);
-      const lastUser = [...history]
-        .reverse()
-        .find((message) => message.role === 'user');
       const latestNames = latest ? findNames(latest.text) : [];
       const userNames = lastUser ? findNames(lastUser.text) : [];
       const contextualNames = latestNames.length ? latestNames : userNames;
@@ -194,19 +232,31 @@ export class ChatDocumentsService {
     const kinds = [
       ...(technical ? ['technical_sheet'] : []),
       ...(safety ? ['safety_sheet'] : []),
+      ...(foodCertificate ? ['food_certificate'] : []),
     ];
     const lines: string[] = [];
     for (const name of names) {
-      const result = await this.products.findPimDocumentsByName(name);
+      const matchingPackaging = references.filter((reference) => reference.active
+        && reference.productName === name && reference.packaging
+        && mentions(input, normalizeProductName(reference.packaging)));
+      if (!explicitReference && matchingPackaging.length > 1) {
+        lines.push(english
+          ? `Several ${name} references use this packaging. Please specify the reference code.`
+          : `Plusieurs références de **${name}** ont ce conditionnement. Précisez le code de référence.`);
+        continue;
+      }
+      const referenceCode = explicitReference?.code ?? matchingPackaging[0]?.code ?? undefined;
+      const result = referenceCode
+        ? await this.products.findPimDocumentsByName(name, referenceCode)
+        : await this.products.findPimDocumentsByName(name);
       for (const kind of kinds) {
-        const label =
-          kind === 'technical_sheet'
-            ? english
-              ? 'technical sheet'
-              : 'FT'
-            : english
-              ? 'safety data sheet'
-              : 'FDS';
+        const label = kind === 'technical_sheet'
+          ? (english ? 'technical sheet' : 'FT')
+          : kind === 'safety_sheet'
+            ? (english ? 'safety data sheet' : 'FDS')
+            : (english ? 'food-contact certificate' : 'certificat d’alimentarité');
+        const frenchArticle = kind === 'food_certificate' ? 'Le' : 'La';
+        const frenchNone = kind === 'food_certificate' ? 'Aucun' : 'Aucune';
         const sheets = result.documents.filter((d) => d.kind === kind);
         const preferred = sheets.filter((d) => d.language === language);
         const fallback = sheets.filter((d) => d.language === 'fr');
@@ -219,7 +269,7 @@ export class ChatDocumentsService {
           lines.push(
             english
               ? `No ${label} is listed in the PIM for **${name}**.`
-              : `Aucune ${label} n’est renseignée dans le PIM pour **${name}**.`,
+              : `${frenchNone} ${label} n’est renseigné${kind === 'food_certificate' ? '' : 'e'} dans le PIM pour **${name}**.`,
           );
           continue;
         }
@@ -231,14 +281,14 @@ export class ChatDocumentsService {
             lines.push(
               english
                 ? `The ${label} for **${name}**${reference} is listed in the PIM, but its download is currently unavailable. Please contact the Molydal team.`
-                : `La ${label} de **${name}**${reference} est renseignée dans le PIM, mais son téléchargement n’est pas disponible actuellement. Contactez l’équipe Molydal.`,
+                : `${frenchArticle} ${label} de **${name}**${reference} est renseigné${kind === 'food_certificate' ? '' : 'e'} dans le PIM, mais son téléchargement n’est pas disponible actuellement. Contactez l’équipe Molydal.`,
             );
             continue;
           }
           try {
             await this.products.downloadPimDocument(doc.id);
             const linkLabel =
-              `${english ? 'View' : 'Consulter la'} ${label} — ${name}${reference} (${doc.language.toUpperCase()})`.replace(
+              `${english ? 'View' : kind === 'food_certificate' ? 'Consulter le' : 'Consulter la'} ${label} — ${name}${reference} (${doc.language.toUpperCase()})`.replace(
                 /[\[\]\\]/g,
                 '',
               );
@@ -249,7 +299,7 @@ export class ChatDocumentsService {
             lines.push(
               english
                 ? `The ${label} for **${name}**${reference} could not be downloaded. Please try again later.`
-                : `Le téléchargement de la ${label} de **${name}**${reference} a échoué. Réessayez ultérieurement.`,
+                : `Le téléchargement de ${kind === 'food_certificate' ? 'ce' : 'la'} ${label} de **${name}**${reference} a échoué. Réessayez ultérieurement.`,
             );
           }
         }
