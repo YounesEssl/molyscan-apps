@@ -2,7 +2,13 @@
   "expo": {
     "name": "Molyscan",
     "slug": "molyscan",
-    "version": "1.0.5",
+    "version": "1.0.6",
+    "runtimeVersion": { "policy": "fingerprint" },
+    "updates": {
+      "url": "https://u.expo.dev/7541b1aa-1bc7-461b-af82-af68fe640949",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,7 +21,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.molydal.molyscan",
-      "buildNumber": "11",
+      "buildNumber": "12",
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
@@ -29,7 +35,7 @@
     },
     "android": {
       "package": "com.molydal.molyscan",
-      "versionCode": 34,
+      "versionCode": 35,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.READ_MEDIA_IMAGES",

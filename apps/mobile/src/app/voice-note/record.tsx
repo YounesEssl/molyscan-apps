@@ -150,6 +150,8 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   });
   const [saving, setSaving] = useState(false);
   const saveInFlightRef = useRef(false);
+  const createdNoteRef = useRef(false);
+  const abandonedRef = useRef(false);
   const [saveIntent, setSaveIntent] = useState<'local' | 'send'>('local');
   const [loadedNote, setLoadedNote] = useState<VoiceNote | null>(null);
   const [baselineDraft, setBaselineDraft] = useState<VoiceNoteDraft | null>(null);
@@ -250,8 +252,8 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
     return () => { noteLoadRef.current += 1; };
   }, [loadNote]);
 
-  usePreventRemove(isEditing && crmHistoryEditingEnabled && (isDirty || saving), ({ data }) => {
-    if (!editingAllowedRef.current) {
+  usePreventRemove(!isEditing || (crmHistoryEditingEnabled && (isDirty || saving)), ({ data }) => {
+    if (createdNoteRef.current || (isEditing && !editingAllowedRef.current)) {
       navigation.dispatch(data.action);
       return;
     }
@@ -259,9 +261,21 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       Alert.alert(t('voiceNote.operationInProgress'), t('voiceNote.waitForSave'));
       return;
     }
-    Alert.alert(t('voiceNote.unsavedTitle'), t('voiceNote.unsavedBody'), [
-      { text: t('voiceNote.keepEditing'), style: 'cancel' },
-      { text: t('voiceNote.discardChanges'), style: 'destructive', onPress: () => navigation.dispatch(data.action) },
+    Alert.alert(t(isEditing ? 'voiceNote.unsavedTitle' : 'voiceNote.discardNewTitle'),
+      t(isEditing ? 'voiceNote.unsavedBody' : 'voiceNote.discardNewBody'), [
+      { text: t(isEditing ? 'voiceNote.keepEditing' : 'voiceNote.continueNew'), style: 'cancel' },
+      { text: t(isEditing ? 'voiceNote.discardChanges' : 'voiceNote.discardNew'), style: 'destructive', onPress: async () => {
+        abandonedRef.current = true;
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+        if (isRecording) {
+          try {
+            await recorder.stop();
+            await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: false });
+          } catch (error) { logger.error('Voice note discard failed to stop recording', error); }
+        }
+        Keyboard.dismiss();
+        navigation.dispatch(data.action);
+      } },
     ]);
   });
 
@@ -544,6 +558,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       if (!(await requestConsent())) return;
 
       const status = await AudioModule.requestRecordingPermissionsAsync();
+      if (abandonedRef.current) return;
       if (!status.granted) {
         haptic.warning();
         return;
@@ -555,6 +570,10 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       // Indispensable : initialise le fichier de sortie, sinon recorder.uri
       // pointe vers un fichier inexistant après stop (erreur "no such file").
       await recorder.prepareToRecordAsync();
+      if (abandonedRef.current) {
+        await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: false });
+        return;
+      }
 
       haptic.medium();
       recorder.record();
@@ -605,6 +624,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       }
     }
 
+    if (abandonedRef.current) return;
     if (!text) setTranscriptionFailed(true);
     setTranscription(text);
     const nextMeetingAt = roundToNextSlot();
@@ -626,7 +646,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       setTranscriptionFailed(true);
       logger.error('Voice note transcription retry failed', error);
     } finally {
-      setPhase('review');
+      if (!abandonedRef.current) setPhase('review');
     }
   };
 
@@ -657,6 +677,7 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         } as unknown as Blob);
       }
       const saved = await voiceNoteService.create(formData);
+      createdNoteRef.current = true;
       if (saved.syncStatus !== 'synced') {
         haptic.warning();
         Alert.alert(t('voiceNote.savedSyncFailedTitle'), t(voiceNoteSyncMessage(saved)), [

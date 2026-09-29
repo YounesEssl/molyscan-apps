@@ -35,7 +35,7 @@ jest.mock('@/lib/features', () => require('../lib/features'), { virtual: true })
 jest.mock('@/schemas/features.schema', () => require('../schemas/features.schema'), { virtual: true });
 jest.mock('@/services/features.service', () => ({ featuresService: { get: jest.fn() } }), { virtual: true });
 
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { featuresService } from '@/services/features.service';
 import { featuresQueryKey } from '../lib/features';
 import { useFeatures } from './useFeatures';
@@ -44,11 +44,18 @@ const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 describe('feature refresh lifecycle', () => {
   let cleanup: () => void;
+  let unsubscribeQuery: () => void;
 
   beforeEach(() => {
     jest.resetAllMocks();
     mockEffects.length = 0;
     mockClient = new QueryClient();
+    // A mounted useQuery keeps an observer. Without it, gcTime: 0 removes
+    // the test's cache before the assertions, unlike the real screen.
+    const observer = new QueryObserver(mockClient, {
+      queryKey: featuresQueryKey('user-1'), enabled: false,
+    });
+    unsubscribeQuery = observer.subscribe(() => {});
     mockUseQuery.mockReturnValue({ data: undefined, isPending: true, isError: false });
     (featuresService.get as jest.Mock).mockResolvedValue({ crmHistoryEditingEnabled: true });
     useFeatures();
@@ -56,6 +63,7 @@ describe('feature refresh lifecycle', () => {
   });
   afterEach(() => {
     cleanup();
+    unsubscribeQuery();
     mockClient.clear();
   });
 

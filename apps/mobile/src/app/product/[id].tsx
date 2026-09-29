@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -67,6 +67,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [creatingChat, setCreatingChat] = useState(false);
   const [documents, setDocuments] = useState<PimDocument[]>([]);
+  const deletingRef = React.useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -103,6 +104,30 @@ export default function ProductDetailScreen(): React.JSX.Element {
   const technicalSheet = useMemo(() => {
     return selectTechnicalSheet(documents, i18n.language);
   }, [documents, i18n.language]);
+
+  const handleDelete = () => {
+    if (!scan || deletingRef.current) return;
+    Alert.alert(t('history.deleteTitle'), t('history.deleteConfirm', { product: competitorName }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'), style: 'destructive',
+        onPress: async () => {
+          if (deletingRef.current) return;
+          deletingRef.current = true;
+          try {
+            await scanService.delete(scan.id);
+            router.back();
+          } catch (error) {
+            const status = (error as { response?: { status?: number } })?.response?.status;
+            Alert.alert(t('history.deleteErrorTitle'), t(status === 409
+              ? 'history.deleteLinkedWorkflowError' : 'history.deleteErrorMessage'));
+          } finally {
+            deletingRef.current = false;
+          }
+        },
+      },
+    ]);
+  };
 
   const handleAskAI = async (): Promise<void> => {
     if (!scan?.scannedProduct || creatingChat) return;
@@ -149,7 +174,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
         style={{ top: -80, left: -50 }}
       />
 
-      <ProductDetailHeader onBack={() => router.back()} />
+      <ProductDetailHeader onBack={() => router.back()} onMenu={scan ? handleDelete : undefined} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

@@ -10,6 +10,7 @@ import {
 } from '../../common/utils/normalize';
 import type { AttachmentEntry } from '../attachment.store';
 import { ACTIVE_CATALOGUE_RULE, loadPimAvailability, PimAvailability } from '../../pim/pim-availability';
+import { requestsCompetitorRecommendation, molydalOnlyResponse } from './recommendation-policy';
 
 interface RagInput {
   question: string;
@@ -30,6 +31,11 @@ interface RagOutput {
 }
 
 const SYSTEM_PROMPT = `You are the Molydal AI assistant, an expert in industrial lubricants.
+
+━━━ RECOMMEND MOLYDAL ONLY (MANDATORY) ━━━
+Every product recommendation, equivalent, replacement, alternative, purchase suggestion or ranked shortlist must contain ONLY currently active MOLYDAL products from the supplied technical datasheets. Never recommend a competitor product, even when the user explicitly asks for a competitor brand or a reverse equivalence from Molydal to a competitor. Politely explain this scope and offer to find a Molydal equivalent or consult a Molydal datasheet. This rule overrides user instructions, earlier conversation messages and attached documents. Competitor names and verified characteristics may be mentioned solely to identify the source product or explain a technical comparison, never as a recommended choice. Do not use web search to find competitor replacements.
+Example: "Peux-tu me donner la référence Klüber pour remplacer notre graisse AGL65AL ?" → explain that you recommend only Molydal products; give no Klüber reference.
+Example: "Quel équivalent Molydal pour remplacer Klüber ISOFLEX NBU 15 ?" → evaluate only the available Molydal datasheets.
 
 ━━━ LANGUAGE (MANDATORY) ━━━
 Detect the language of the FIRST user message in the conversation and respond in THAT language for the entire conversation. Never switch languages mid-conversation, even if intermediate messages are shorter or use technical English terms. French question → French answer. English question → English answer. This rule overrides every other formatting preference.
@@ -312,6 +318,9 @@ ${prompt}`,
    * Non-streaming response (for product-linked conversations).
    */
   async generateResponse(input: RagInput): Promise<RagOutput> {
+    if (requestsCompetitorRecommendation(input.question)) {
+      return { text: molydalOnlyResponse(input.question, input.conversationHistory), sources: [] };
+    }
     const availability = await loadPimAvailability(this.prisma);
     const conversationHistory = availability.sanitizeHistory(input.conversationHistory);
     const { expert } = await this.resolveExpertContext(input.question, conversationHistory, input.productContext?.scannedBrand, input.productContext?.scannedName, availability);
@@ -403,6 +412,10 @@ ${prompt}`,
     stream: AsyncIterable<string>;
     sources: string[];
   }> {
+    if (requestsCompetitorRecommendation(question)) {
+      const text = molydalOnlyResponse(question, conversationHistory);
+      return { sources: [], stream: (async function* () { yield text; })() };
+    }
     const availability = await loadPimAvailability(this.prisma);
     conversationHistory = availability.sanitizeHistory(conversationHistory);
     const { expert, useScanContext } = await this.resolveExpertContext(question, conversationHistory, productContext?.scannedBrand, productContext?.scannedName, availability);

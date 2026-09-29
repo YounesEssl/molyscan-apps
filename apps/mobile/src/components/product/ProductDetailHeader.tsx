@@ -41,11 +41,11 @@ export function ProductDetailHeader({
         <AltArrowLeft size={18} color={colors.ink} />
       </TouchableOpacity>
       <RNText style={styles.title}>{title ?? t('product.headerDefaultTitle')}</RNText>
-      <TouchableOpacity
+      {onMenu ? <TouchableOpacity
         style={styles.btn}
         onPress={() => {
           haptic.light();
-          onMenu?.();
+          onMenu();
         }}
         activeOpacity={0.8}
         accessibilityRole="button"
@@ -53,7 +53,7 @@ export function ProductDetailHeader({
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
         <MenuDots size={18} color={colors.ink} />
-      </TouchableOpacity>
+      </TouchableOpacity> : <View style={styles.placeholder} />}
     </View>
   );
 }
@@ -84,4 +84,5 @@ const styles = StyleSheet.create({
     color: colors.ink,
     letterSpacing: -0.2,
   },
+  placeholder: { width: 38, height: 38 },
 });

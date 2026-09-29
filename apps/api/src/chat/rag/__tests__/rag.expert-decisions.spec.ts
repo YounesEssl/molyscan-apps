@@ -33,6 +33,29 @@ describe('Expert decisions in assistant conversations', () => {
     expect(vector.dualSearch).not.toHaveBeenCalled();
     expect(mockGenerateContent).not.toHaveBeenCalled();
   });
+  test('rejects the reported reverse equivalence without retrieving or generating competitors', async () => {
+    const result = await service.generateResponse({
+      question: 'Peux-tu me donner la référence Klüber pour remplacer notre graisse AGL65AL ?',
+      conversationHistory: [{ role: 'assistant', text: 'Je peux proposer des références Klüber.' }],
+    });
+    expect(result.text).toContain('uniquement des produits Molydal');
+    expect(result.sources).toEqual([]);
+    expect(vector.dualSearch).not.toHaveBeenCalled();
+    expect(mockGetModel).not.toHaveBeenCalled();
+  });
+  test('applies the same scope to streaming chat with a scan or an attachment', async () => {
+    const result = await service.generateStreamingResponse('Quel équivalent chez Castrol ?', [], {
+      scannedBrand: 'Brand', scannedName: 'Product 68', molydalName: 'AGL 65 AL', molydalReference: '',
+    }, { base64: 'JVBERi0=', filename: 'competitor.pdf' } as any);
+    let text = '';
+    for await (const part of result.stream) text += part;
+    expect(text).toContain('uniquement des produits Molydal');
+    expect(mockGenerateContentStream).not.toHaveBeenCalled();
+  });
+  test('keeps a Molydal-only instruction for all other brand formulations', async () => {
+    await service.generateStreamingResponse('Un remplacement chez AnotherBrand ?', []);
+    expect(mockGetModel.mock.calls[0][0].systemInstruction).toContain('Never recommend a competitor product');
+  });
   test('streams the same decision in free chat', async () => {
     const response = await service.generateStreamingResponse('What is the equivalent of Brand Product 68?', []);
     let text = '';

@@ -4,7 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   Animated,
-  Dimensions,
+  useWindowDimensions,
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
@@ -13,8 +13,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, RADIUS, SPACING } from '@/constants/theme';
 import { TAB_BAR } from '@/constants/layout';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 interface BottomSheetProps {
   visible: boolean;
@@ -28,7 +26,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   children,
 }) => {
   const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const { height: screenHeight } = useWindowDimensions();
+  const translateY = useRef(new Animated.Value(screenHeight)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   // Inner-content bottom padding so the last buttons clear the floating
@@ -54,7 +53,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     } else {
       Animated.parallel([
         Animated.timing(translateY, {
-          toValue: SCREEN_HEIGHT,
+          toValue: screenHeight,
           duration: 250,
           useNativeDriver: true,
         }),
@@ -65,7 +64,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         }),
       ]).start();
     }
-  }, [visible, translateY, opacity]);
+  }, [visible, translateY, opacity, screenHeight]);
 
   // Modal renders at the native root level — guarantees the sheet appears
   // above the floating tab bar (which lives in the tabs layout).
@@ -82,17 +81,19 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           <Animated.View style={[styles.overlay, { opacity }]} />
         </TouchableWithoutFeedback>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
           pointerEvents="box-none"
         >
           <Animated.View
-            style={[styles.sheet, { transform: [{ translateY }] }]}
+            style={[styles.sheet, { maxHeight: '85%', transform: [{ translateY }] }]}
           >
             <View style={styles.handle} />
             <ScrollView
               showsVerticalScrollIndicator={false}
               bounces={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               // Horizontal padding lives on the CONTENT (not the sheet) so
               // child shadows can render into that horizontal space without
               // being clipped by the ScrollView's viewport bounds.
@@ -124,7 +125,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: RADIUS.xxl + 8,
     borderTopRightRadius: RADIUS.xxl + 8,
     paddingTop: SPACING.sm,
-    maxHeight: SCREEN_HEIGHT * 0.85,
+    flexShrink: 1,
   },
   handle: {
     width: 40,
