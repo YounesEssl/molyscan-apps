@@ -129,6 +129,14 @@ export class ImageAnalysisService {
     const identification = await this.identifyProduct(imageBase64, mimeType, userMessage);
     this.logger.log(`✅ Step 1 — Identification (Gemini): ${Date.now() - t0}ms → ${identification.name || 'aucun produit'}`);
 
+    // A brand or a generic product category is not an identifiable reference.
+    // Keep this deterministic even if Vision disregards the prompt above.
+    const identifiedName = normalize(identification.name);
+    const genericName = new Set(['graisse', 'huile', 'lubrifiant', 'grease', 'oil', 'lubricant', 'spray', 'aerosol', 'nettoyant', 'cleaner', 'produit', 'product']);
+    if (identifiedName === normalize(identification.brand) || genericName.has(identifiedName)) {
+      identification.name = '';
+    }
+
     // No product found — persist as no_match and return early
     if (!identification.name || identification.name === 'null' || identification.name === null) {
       this.logger.log(`⚠️ Aucun produit détecté, total: ${Date.now() - t0}ms`);

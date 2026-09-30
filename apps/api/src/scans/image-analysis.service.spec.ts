@@ -93,6 +93,18 @@ describe('Scan equivalence integrity', () => {
     expect(mockGenerateContent).not.toHaveBeenCalled();
   });
 
+  test.each([
+    { name: 'Shell', brand: 'Shell' },
+    { name: 'graisse', brand: 'Shell' },
+  ])('does not propose an equivalent when Vision only reads $name', async ({ name, brand }) => {
+    jest.spyOn(service as any, 'identifyProduct').mockResolvedValue({ ...identified, name, brand });
+    const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
+    expect(result.identified.name).toBe('');
+    expect(result.equivalents).toEqual([]);
+    expect(prisma.scan.create).toHaveBeenCalledWith({ data: expect.objectContaining({ status: 'no_match' }) });
+    expect(vector.dualSearch).not.toHaveBeenCalled();
+  });
+
   test('an idempotency key cannot expose another user’s scan', async () => {
     prisma.scan.findUnique.mockResolvedValue({ id: 'other-scan', userId: 'other-user' });
     await expect(service.analyzeImage('AA==', 'image/jpeg', 'user', undefined, undefined, 'request')).rejects.toThrow('already exists');
