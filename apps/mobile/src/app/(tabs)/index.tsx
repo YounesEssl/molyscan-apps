@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import { colors } from '@/design/tokens/colors';
 import { useAuthStore } from '@/stores/auth.store';
 import { useWorkflowStore } from '@/stores/workflow.store';
 import { scanService } from '@/services/scan.service';
+import { chatFreeService } from '@/services/chatFree.service';
 import { workflowService } from '@/services/workflow.service';
 import { useTabBarSpacing } from '@/hooks/useTabBarSpacing';
 import type { ScanRecord } from '@/schemas/scan.schema';
@@ -28,6 +29,7 @@ export default function DashboardScreen(): React.JSX.Element {
   const workflows = useWorkflowStore((s) => s.workflows);
   const setWorkflows = useWorkflowStore((s) => s.setWorkflows);
   const [scans, setScans] = useState<ScanRecord[]>([]);
+  const [openingVoice, setOpeningVoice] = useState(false);
   const { contentPaddingBottom } = useTabBarSpacing();
 
   // Rafraîchit à chaque retour sur l'onglet Home (l'onglet reste monté en
@@ -62,6 +64,19 @@ export default function DashboardScreen(): React.JSX.Element {
     { label: t('dashboard.requests'), value: String(workflows.length) },
   ];
 
+  const openVoiceAssistant = async () => {
+    if (openingVoice) return;
+    setOpeningVoice(true);
+    try {
+      const conversation = await chatFreeService.createConversation();
+      router.push(`/chat/${conversation.id}`);
+    } catch {
+      Alert.alert(t('chat.newConvErrorTitle'), t('chat.newConvError'));
+    } finally {
+      setOpeningVoice(false);
+    }
+  };
+
   return (
     <ScrollView
       style={styles.root}
@@ -81,7 +96,12 @@ export default function DashboardScreen(): React.JSX.Element {
         <DashboardGreeting firstName={user?.firstName} />
       </SafeAreaView>
 
-      <HeroScanCard onPress={() => router.push('/(tabs)/scanner')} />
+      <HeroScanCard
+        onPress={() => router.push('/(tabs)/scanner')}
+        onVoicePress={() => void openVoiceAssistant()}
+      />
+
+      <AIEntryCard onPress={() => router.push('/(tabs)/chat')} />
 
       {canUpdateCRM && (
         <VoiceNoteEntryCard
@@ -103,7 +123,6 @@ export default function DashboardScreen(): React.JSX.Element {
         onPress={(id) => router.push(`/workflow/${id}`)}
       />
 
-      <AIEntryCard onPress={() => router.push('/(tabs)/chat')} />
     </ScrollView>
   );
 }

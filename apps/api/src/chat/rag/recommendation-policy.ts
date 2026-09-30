@@ -4,6 +4,12 @@
 export function requestsCompetitorRecommendation(question: string): boolean {
   const text = question.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const brand = '(?:kluber|shell|mobil|exxonmobil|total(?:energies)?|fuchs|castrol|interflon|molykote|loctite|elf|igol|crc|wd[ -]?40|jelt|bardahl|cimcool|elkalub|berulube|concurrent(?:e)?s?)';
+  // A factual side-by-side comparison may name a competitor reference. That
+  // must not be mistaken for a request to recommend that competitor.
+  const comparison = /\b(?:compar\w*|tableau\s+(?:technique|comparatif)|differences?|compare|comparison|versus|vs)\b/.test(text);
+  const withoutNegatedRequest = text.replace(/\bsans\s+(?:recommand\w*|propos\w*|conseill\w*|donne\w*|sugger\w*|suggest\w*)[^,.?]*/g, '');
+  const directional = /\b(?:donne\w*|propos\w*|recommand\w*|conseill\w*|cherch\w*|trouv\w*|equivalent|alternative|remplac\w*|recommend\w*|suggest\w*|give|find|replacement)\b/.test(withoutNegatedRequest);
+  if (comparison && !directional) return false;
   const recommendation = /\b(?:donne\w*|propos\w*|recommand\w*|conseill\w*|cherch\w*|trouv\w*|reference|equivalent|alternative|remplac\w*|recommend\w*|suggest\w*|give|find|replacement)\b/.test(text);
   if (!recommendation) return false;
   // In "équivalent Molydal pour remplacer Klüber", the requested destination

@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -19,6 +19,9 @@ describe('Expert equivalence decisions', () => {
     validatedBy: 'expert@example.test',
   };
   let prisma: {
+    $transaction: jest.Mock;
+    scan: { findMany: jest.Mock; updateMany: jest.Mock };
+    aIConversation: { updateMany: jest.Mock };
     expertEquivalence: {
       findUnique: jest.Mock;
       create: jest.Mock;
@@ -29,6 +32,9 @@ describe('Expert equivalence decisions', () => {
   let service: EquivalencesService;
   beforeEach(() => {
     prisma = {
+      $transaction: jest.fn((callback) => callback(prisma)),
+      scan: { findMany: jest.fn(), updateMany: jest.fn() },
+      aIConversation: { updateMany: jest.fn() },
       expertEquivalence: {
         findUnique: jest.fn(),
         create: jest.fn(),
@@ -109,6 +115,52 @@ describe('Expert equivalence decisions', () => {
         molydalEquivalent: ' ',
       }),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('corrects scans with an unread brand when an expert validates them', async () => {
+    const scanId = 'db081aa8-a248-4cd0-b64b-2b46326af239';
+    prisma.expertEquivalence.findUnique.mockResolvedValue(null);
+    prisma.scan.findMany.mockResolvedValue([{ id: scanId, identifiedBrand: null, identifiedName: 'BR-2' }]);
+    prisma.expertEquivalence.create.mockResolvedValue(current);
+    await service.create({
+      competitorBrand: 'Molykote', competitorName: 'BR-2', molydalEquivalent: 'MO/3',
+      sourceScanIds: [scanId], sourceCompetitorKey: '|br 2',
+    });
+    expect(prisma.scan.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: { in: [scanId] } },
+      data: expect.objectContaining({
+        identifiedBrand: 'Molykote', identifiedName: 'BR-2',
+        molydalEquivalent: 'MO/3', status: 'matched',
+      }),
+    }));
+    expect(prisma.aIConversation.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ scannedBrand: 'Molykote', scannedName: 'BR-2' }),
+    }));
+  });
+
+  it('refuses to reassign a scan whose source identity changed', async () => {
+    const scanId = 'db081aa8-a248-4cd0-b64b-2b46326af239';
+    prisma.expertEquivalence.findUnique.mockResolvedValue(null);
+    prisma.scan.findMany.mockResolvedValue([{ id: scanId, identifiedBrand: 'Shell', identifiedName: 'BR-2' }]);
+    await expect(service.create({
+      competitorBrand: 'Molykote', competitorName: 'BR-2', molydalEquivalent: 'MO/3',
+      sourceScanIds: [scanId], sourceCompetitorKey: '|br 2',
+    })).rejects.toThrow(ConflictException);
+    expect(prisma.expertEquivalence.create).not.toHaveBeenCalled();
+    expect(prisma.scan.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('links a pending scan to an identical existing expert decision', async () => {
+    const scanId = 'db081aa8-a248-4cd0-b64b-2b46326af239';
+    prisma.expertEquivalence.findUnique.mockResolvedValue(current);
+    prisma.scan.findMany.mockResolvedValue([{ id: scanId, identifiedBrand: null, identifiedName: 'BR-2' }]);
+    const result = await service.create({
+      competitorBrand: 'Molykote', competitorName: 'BR-2', molydalEquivalent: 'MO/3',
+      sourceScanIds: [scanId], sourceCompetitorKey: '|br 2',
+    });
+    expect(result).toBe(current);
+    expect(prisma.expertEquivalence.create).not.toHaveBeenCalled();
+    expect(prisma.scan.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it('only deletes the targeted expert decision', async () => {

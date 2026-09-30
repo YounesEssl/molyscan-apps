@@ -7,6 +7,8 @@ import type { ExpertEquivalence } from '@/lib/types';
 export interface EquivalenceDraft {
   competitorBrand: string;
   competitorName: string;
+  sourceScanIds?: string[];
+  sourceCompetitorKey?: string;
   molydalEquivalent?: string;
   noEquivalent?: boolean;
 }
@@ -110,6 +112,10 @@ export function EquivalenceEditDrawer({
   const save = useMutation({
     mutationFn: async () => {
       const payload = {
+        ...(!isEdit && prefill?.sourceScanIds?.length && {
+          sourceScanIds: prefill.sourceScanIds,
+          sourceCompetitorKey: prefill.sourceCompetitorKey,
+        }),
         competitorBrand: competitorBrand.trim(),
         competitorName: competitorName.trim(),
         noEquivalent,
@@ -204,7 +210,7 @@ export function EquivalenceEditDrawer({
         {/* Body */}
         <div className="flex-1 space-y-6 overflow-y-auto p-6">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Marque concurrent">
+            <Field label="Marque concurrent" hint={!equivalence && prefill?.sourceScanIds?.length ? 'Corrigez la marque non détectée ou mal lue : les scans concernés seront rattachés à cette décision.' : undefined}>
               <input
                 aria-label="Marque concurrent"
                 value={competitorBrand}

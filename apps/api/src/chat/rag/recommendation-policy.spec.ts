@@ -7,6 +7,7 @@ describe('Molydal recommendation scope', () => {
     'Quel équivalent chez Castrol ?',
     'Give me a Kluber grease to replace our Molydal grease',
     'Une alternative concurrente pour notre graisse ?',
+    'Compare AGL 65 AL et Shell puis propose une graisse Shell pour le remplacer',
   ])('blocks an explicitly competing destination: %s', (question) => {
     expect(requestsCompetitorRecommendation(question)).toBe(true);
   });
@@ -18,6 +19,8 @@ describe('Molydal recommendation scope', () => {
     'Quelle est la viscosité de Klüber ISOFLEX ?',
     'Peux-tu résumer la fiche de sécurité de la graisse Klüber ?',
     'Compare AGL 65 AL et Klüber ISOFLEX sans recommander de référence',
+    'Fais un tableau comparatif technique des références Klüber ISOFLEX et Molydal AGL 65 AL',
+    'Compare la référence Shell Tellus à celle de Molydal sans proposer de remplacement',
   ])('preserves source identification and technical questions: %s', (question) => {
     expect(requestsCompetitorRecommendation(question)).toBe(false);
   });

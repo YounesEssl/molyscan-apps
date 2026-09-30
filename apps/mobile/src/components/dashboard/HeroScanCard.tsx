@@ -22,25 +22,19 @@ import { haptic } from '@/lib/haptics';
 
 interface HeroScanCardProps {
   onPress: () => void;
+  onVoicePress: () => void;
 }
 
-const MODE_ICONS = [Camera, Microphone2];
-
-export function HeroScanCard({ onPress }: HeroScanCardProps): React.JSX.Element {
+export function HeroScanCard({ onPress, onVoicePress }: HeroScanCardProps): React.JSX.Element {
   const { t } = useTranslation();
+  const openScanner = () => {
+    haptic.medium();
+    onPress();
+  };
   return (
     // Outer: shadow only, NO overflow hidden (iOS would clip the shadow)
     <View style={styles.shadowWrap}>
-      <TouchableOpacity
-        onPress={() => {
-          haptic.medium();
-          onPress();
-        }}
-        activeOpacity={0.92}
-        style={styles.clipWrap}
-        accessibilityRole="button"
-        accessibilityLabel={t('dashboard.a11yScanCompetitor')}
-      >
+      <View style={styles.clipWrap}>
         <LinearGradient
           colors={['#fff6e8', '#ffe8dc', '#ffd7c4']}
           start={{ x: 0, y: 0 }}
@@ -63,36 +57,63 @@ export function HeroScanCard({ onPress }: HeroScanCardProps): React.JSX.Element 
         />
 
         <View style={styles.heroInner}>
-          <View style={styles.accentPill}>
-            <Bolt size={11} color={colors.red} />
-            <RNText style={styles.accentPillText}>{t('dashboard.heroPill')}</RNText>
-          </View>
+          <TouchableOpacity
+            onPress={openScanner}
+            activeOpacity={0.92}
+            accessibilityRole="button"
+            accessibilityLabel={t('dashboard.a11yScanCompetitor')}
+          >
+            <View style={styles.accentPill}>
+              <Bolt size={11} color={colors.red} />
+              <RNText style={styles.accentPillText}>{t('dashboard.heroPill')}</RNText>
+            </View>
 
-          <RNText style={styles.heroTitle}>
-            {t('dashboard.heroTitleLine1')}
-            <RNText style={styles.heroTitleItalic}>{t('dashboard.heroTitleItalic')}</RNText>
-          </RNText>
-          <Text style={styles.heroSubtitle}>{t('dashboard.heroSubtitle')}</Text>
+            <RNText style={styles.heroTitle}>
+              {t('dashboard.heroTitleLine1')}
+              <RNText style={styles.heroTitleItalic}>{t('dashboard.heroTitleItalic')}</RNText>
+            </RNText>
+            <Text style={styles.heroSubtitle}>{t('dashboard.heroSubtitle')}</Text>
+          </TouchableOpacity>
 
           <View style={styles.heroBottom}>
             <View style={styles.heroIcons}>
-              {MODE_ICONS.map((Icon, i) => (
-                <View key={i} style={styles.heroIconBtn}>
-                  <Icon size={16} color={colors.ink} />
-                </View>
-              ))}
+              <TouchableOpacity
+                onPress={openScanner}
+                style={styles.heroIconBtn}
+                accessibilityRole="button"
+                accessibilityLabel={t('dashboard.a11yScanCompetitor')}
+              >
+                <Camera size={16} color={colors.ink} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  haptic.medium();
+                  onVoicePress();
+                }}
+                style={styles.heroIconBtn}
+                accessibilityRole="button"
+                accessibilityLabel={t('dashboard.a11yVoiceAssistant')}
+              >
+                <Microphone2 size={16} color={colors.ink} />
+              </TouchableOpacity>
             </View>
-            <LinearGradient
-              colors={[colors.redVivid, colors.red]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroArrowBtn}
+            <TouchableOpacity
+              onPress={openScanner}
+              accessibilityRole="button"
+              accessibilityLabel={t('dashboard.a11yScanCompetitor')}
             >
-              <AltArrowRight size={20} color="#fff" />
-            </LinearGradient>
+              <LinearGradient
+                colors={[colors.redVivid, colors.red]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroArrowBtn}
+              >
+                <AltArrowRight size={20} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -168,8 +189,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   heroIconBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 10,
     backgroundColor: 'rgba(255,253,248,0.7)',
     borderWidth: 1,

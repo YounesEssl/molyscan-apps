@@ -91,6 +91,8 @@ export interface ExpertEquivalence {
 }
 
 export interface PendingEquivalence {
+  scanIds: string[];
+  competitorKey: string;
   competitorBrand: string;
   competitorName: string;
   currentGuess: string | null;

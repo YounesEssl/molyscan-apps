@@ -181,6 +181,8 @@ export function EquivalencesPage() {
               openCreate({
                 competitorBrand: p.competitorBrand,
                 competitorName: p.competitorName,
+                sourceScanIds: p.scanIds,
+                sourceCompetitorKey: p.competitorKey,
                 molydalEquivalent: p.currentGuess ?? undefined,
               })
             }
@@ -188,6 +190,8 @@ export function EquivalencesPage() {
               openCreate({
                 competitorBrand: p.competitorBrand,
                 competitorName: p.competitorName,
+                sourceScanIds: p.scanIds,
+                sourceCompetitorKey: p.competitorKey,
                 noEquivalent: true,
               })
             }
@@ -426,7 +430,7 @@ function PendingTab({
         >
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium uppercase tracking-wide text-ink-3">
-              {p.competitorBrand}
+              {p.competitorBrand || 'Marque non détectée · à renseigner'}
             </p>
             <p className="font-medium text-ink">{p.competitorName}</p>
             <p className="mt-1 text-xs text-ink-2" title={p.requestedBy?.email}>
@@ -467,7 +471,7 @@ function PendingTab({
             className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-gradient-to-br from-red-vivid to-red px-4 py-2 text-sm font-semibold text-white shadow-red transition-all hover:brightness-105"
           >
             <CheckCircle2 className="h-4 w-4" />
-            Valider
+            {p.competitorBrand ? 'Valider' : 'Compléter et valider'}
           </button>
         </div>
       ))}

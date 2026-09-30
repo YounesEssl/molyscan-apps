@@ -7,12 +7,14 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { equivalenceKey } from '../../common/utils/normalize';
+import { equivalenceKey, normalizeProductText } from '../../common/utils/normalize';
 import { CreateEquivalenceDto } from './dto/create-equivalence.dto';
 import { UpdateEquivalenceDto } from './dto/update-equivalence.dto';
 
 /** A scanned competitor product that has no expert-validated equivalence yet. */
 export interface PendingEquivalence {
+  scanIds: string[];
+  competitorKey: string;
   competitorBrand: string;
   competitorName: string;
   currentGuess: string | null;
@@ -57,6 +59,7 @@ export class EquivalencesService {
     const recent = await this.prisma.scan.findMany({
       where: { identifiedName: { not: null } },
       select: {
+        id: true,
         identifiedBrand: true,
         identifiedName: true,
         molydalEquivalent: true,
@@ -87,8 +90,11 @@ export class EquivalencesService {
       const entry = seen.get(key);
       if (entry) {
         entry.scanCount += 1;
+        entry.scanIds.push(s.id);
       } else {
         seen.set(key, {
+          scanIds: [s.id],
+          competitorKey: key,
           competitorBrand: s.identifiedBrand ?? '',
           competitorName: s.identifiedName,
           currentGuess: s.molydalEquivalent,
@@ -117,13 +123,13 @@ export class EquivalencesService {
     const existing = await this.prisma.expertEquivalence.findUnique({
       where: { competitorKey },
     });
-    if (existing) {
+    if (existing && (!dto.sourceScanIds?.length || existing.noEquivalent !== noEquivalent ||
+      (!noEquivalent && normalizeProductText(existing.molydalEquivalent) !== normalizeProductText(molydalEquivalent)))) {
       throw new ConflictException(
         `Une équivalence existe déjà pour ${dto.competitorBrand} ${dto.competitorName}. Modifiez-la.`,
       );
     }
-    return this.prisma.expertEquivalence.create({
-      data: {
+    const data = {
         competitorBrand: dto.competitorBrand.trim(),
         competitorName: dto.competitorName.trim(),
         competitorKey,
@@ -134,7 +140,55 @@ export class EquivalencesService {
         note: dto.note?.trim() || null,
         validatedBy: validatedBy ?? null,
         source: 'expert',
-      },
+      } as const;
+    if (!dto.sourceScanIds?.length) {
+      return this.prisma.expertEquivalence.create({ data });
+    }
+    if (!dto.sourceCompetitorKey) {
+      throw new BadRequestException('Origine des scans manquante.');
+    }
+    const scanIds = [...new Set(dto.sourceScanIds)];
+    return this.prisma.$transaction(async (transaction) => {
+      const scans = await transaction.scan.findMany({
+        where: { id: { in: scanIds } },
+        select: { id: true, identifiedBrand: true, identifiedName: true },
+      });
+      if (scans.length !== scanIds.length || scans.some((scan) =>
+        equivalenceKey(scan.identifiedBrand, scan.identifiedName) !== dto.sourceCompetitorKey)) {
+        throw new ConflictException('Les scans à valider ont changé. Actualisez la liste.');
+      }
+      const decision = existing ?? await transaction.expertEquivalence.create({ data });
+      const reason = decision.note || (decision.noEquivalent
+        ? 'Aucun équivalent confirmé par un expert Molydal.'
+        : 'Équivalence validée par un expert Molydal.');
+      await transaction.scan.updateMany({
+        where: { id: { in: scanIds } },
+        data: {
+          identifiedBrand: dto.competitorBrand.trim(),
+          identifiedName: dto.competitorName.trim(),
+          status: decision.noEquivalent ? 'no_match' : (decision.confidence >= 70 ? 'matched' : 'partial'),
+          molydalEquivalent: decision.noEquivalent ? null : decision.molydalEquivalent,
+          equivalentFamily: decision.noEquivalent ? null : decision.molydalFamily,
+          compatibility: decision.noEquivalent ? null : decision.confidence,
+          equivalentsJson: decision.noEquivalent ? [] : [{
+            name: decision.molydalEquivalent,
+            family: decision.molydalFamily || '',
+            compatibility: decision.confidence,
+            reason,
+          }],
+          analysisText: reason,
+        },
+      });
+      await transaction.aIConversation.updateMany({
+        where: { scanId: { in: scanIds } },
+        data: {
+          scannedBrand: dto.competitorBrand.trim(),
+          scannedName: dto.competitorName.trim(),
+          molydalName: decision.noEquivalent ? null : decision.molydalEquivalent,
+          molydalReference: null,
+        },
+      });
+      return decision;
     });
   }
 

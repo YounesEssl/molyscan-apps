@@ -681,11 +681,11 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       if (saved.syncStatus !== 'synced') {
         haptic.warning();
         Alert.alert(t('voiceNote.savedSyncFailedTitle'), t(voiceNoteSyncMessage(saved)), [
-          { text: t('common.ok'), onPress: () => router.back() },
+          { text: t('common.ok'), onPress: () => router.dismissTo('/(tabs)') },
         ]);
       } else {
         haptic.success();
-        router.back();
+        router.dismissTo('/(tabs)');
       }
     } catch (e) {
       haptic.error();

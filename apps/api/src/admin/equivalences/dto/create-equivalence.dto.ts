@@ -8,11 +8,26 @@ import {
   MinLength,
   MaxLength,
   IsBoolean,
+  IsArray,
+  IsUUID,
+  ArrayMaxSize,
   ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreateEquivalenceDto {
+  @ApiPropertyOptional({ description: 'Scans en attente regroupés sous l’identité corrigée', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID('4', { each: true })
+  sourceScanIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Clé de regroupement des scans avant correction' })
+  @IsOptional()
+  @IsString()
+  sourceCompetitorKey?: string;
+
   @ApiProperty({ example: 'Molykote', description: 'Marque du concurrent' })
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))

@@ -389,6 +389,7 @@ If you see one, return a STRUCTURED JSON with these fields:
 
 METHOD — read the label carefully, then reason about the product's FUNCTION before classifying:
 1. Read every visible text: product name, brand, and especially the stated USE / purpose / "designed for…" line. Read French and English.
+1a. Copy an exact product name or reference only when legible on the image. A brand by itself, a generic category ("graisse", "huile"), or a partly obscured reference is not a product identification. In that case set name to null; do not invent or complete a reference from memory. A future scan of a clearer label is preferable to a wrong equivalence.
 2. The category is driven by what the product DOES (its function), NOT by its physical form. A spray can is NOT automatically a lubricant — a degreaser, a cleaner, a leak detector and a silicone lubricant all come in aerosol cans.
 3. Only fall back to "general_lubricant_spray" / "other" when the stated function is genuinely a generic multi-purpose lubricant or truly unclear. Prefer a specific category whenever the label states a specific purpose.
 
@@ -594,6 +595,7 @@ Selection rules:
 - Retrieval order and similarity scores are NOT evidence of technical compatibility. Compare the actual datasheet specifications, respecting application, certification, viscosity, base oil and thickener.
 - Only use exact product names from Available products. Do not invent product variants, specifications or certifications.
 - If the primary application is unknown or no datasheet supports a compatible product, return an empty equivalents array and explain which information is missing. Never guess from the product name alone.
+- If neither the exact competitor name nor its reference can be verified, return an empty equivalents array and request a clearer photo; do not base an equivalence on the brand alone.
 - If the competitor is an AEROSOL, the equivalent must be an aerosol. If it's a paste, equivalent must be a paste.
 - If the application context says "welding", the equivalent must be a welding product (anti-spatter / protective coating).
 - Never recommend a product from a different family by default.

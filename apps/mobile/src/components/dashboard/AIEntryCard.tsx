@@ -67,14 +67,15 @@ export function AIEntryCard({
 const styles = StyleSheet.create({
   card: {
     marginHorizontal: spacing.section,
-    marginTop: 22,
-    padding: 18,
+    marginTop: 14,
+    minHeight: 100,
+    padding: 20,
     borderRadius: radius.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     borderWidth: 1,
-    borderColor: 'rgba(180,120,60,0.15)',
+    borderColor: 'rgba(91,45,255,0.23)',
     overflow: 'hidden',
     position: 'relative',
   } as ViewStyle,
