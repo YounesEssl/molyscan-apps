@@ -7,7 +7,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
   Keyboard,
   ActivityIndicator,
   Alert,
@@ -150,7 +149,8 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   });
   const [saving, setSaving] = useState(false);
   const saveInFlightRef = useRef(false);
-  const createdNoteRef = useRef(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+  const [returnHome, setReturnHome] = useState(false);
   const abandonedRef = useRef(false);
   const [saveIntent, setSaveIntent] = useState<'local' | 'send'>('local');
   const [loadedNote, setLoadedNote] = useState<VoiceNote | null>(null);
@@ -252,8 +252,8 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
     return () => { noteLoadRef.current += 1; };
   }, [loadNote]);
 
-  usePreventRemove(!isEditing || (crmHistoryEditingEnabled && (isDirty || saving)), ({ data }) => {
-    if (createdNoteRef.current || (isEditing && !editingAllowedRef.current)) {
+  usePreventRemove(!noteSaved && (!isEditing || (crmHistoryEditingEnabled && (isDirty || saving))), ({ data }) => {
+    if (isEditing && !editingAllowedRef.current) {
       navigation.dispatch(data.action);
       return;
     }
@@ -278,6 +278,13 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
       } },
     ]);
   });
+
+  useEffect(() => {
+    if (noteSaved && returnHome) {
+      Keyboard.dismiss();
+      router.dismissTo('/(tabs)');
+    }
+  }, [noteSaved, returnHome, router]);
 
   useEffect(() => {
     if (isEditing && !crmHistoryEditingEnabled && !isCheckingFeatures) {
@@ -677,15 +684,15 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         } as unknown as Blob);
       }
       const saved = await voiceNoteService.create(formData);
-      createdNoteRef.current = true;
+      setNoteSaved(true);
       if (saved.syncStatus !== 'synced') {
         haptic.warning();
         Alert.alert(t('voiceNote.savedSyncFailedTitle'), t(voiceNoteSyncMessage(saved)), [
-          { text: t('common.ok'), onPress: () => router.dismissTo('/(tabs)') },
+          { text: t('common.ok'), onPress: () => setReturnHome(true) },
         ]);
       } else {
         haptic.success();
-        router.dismissTo('/(tabs)');
+        setReturnHome(true);
       }
     } catch (e) {
       haptic.error();
@@ -774,7 +781,6 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.content}>
         {isEditing && loadingNote && !loadedNote && <ActivityIndicator color={COLORS.primary} style={styles.sheetLoader} />}
         {isEditing && loadError && !loadedNote && (
@@ -855,7 +861,10 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         {/* Review phase — transcription + CRM fields */}
         {phase === 'review' && (!isEditing || loadedNote) && (
           <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.reviewContent}
             showsVerticalScrollIndicator={false}
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
           >
             {isEditing && loadedNote && (
@@ -1161,7 +1170,6 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
           </ScrollView>
         )}
       </View>
-      </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
       <BottomSheet visible={optionSheet !== null} onClose={() => setOptionSheet(null)}>
@@ -1462,6 +1470,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: SPACING.lg,
+  },
+  reviewContent: {
+    paddingBottom: SPACING.xl,
   },
   recordingSection: {
     flex: 1,
