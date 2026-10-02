@@ -134,8 +134,12 @@ export function EquivalenceEditDrawer({
       invalidate();
       close();
     },
-    onError: (err) =>
-      setError(getApiErrorMessage(err, 'Enregistrement impossible.')),
+    onError: (err) => {
+      if ((err as { response?: { status?: number } })?.response?.status === 409) {
+        invalidate();
+      }
+      setError(getApiErrorMessage(err, 'Enregistrement impossible.'));
+    },
   });
 
   const remove = useMutation({

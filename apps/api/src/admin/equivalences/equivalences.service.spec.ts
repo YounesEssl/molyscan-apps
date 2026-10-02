@@ -23,6 +23,7 @@ describe('Expert equivalence decisions', () => {
     scan: { findMany: jest.Mock; updateMany: jest.Mock };
     aIConversation: { updateMany: jest.Mock };
     expertEquivalence: {
+      findMany: jest.Mock;
       findUnique: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
@@ -36,6 +37,7 @@ describe('Expert equivalence decisions', () => {
       scan: { findMany: jest.fn(), updateMany: jest.fn() },
       aIConversation: { updateMany: jest.fn() },
       expertEquivalence: {
+        findMany: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -161,6 +163,58 @@ describe('Expert equivalence decisions', () => {
     expect(result).toBe(current);
     expect(prisma.expertEquivalence.create).not.toHaveBeenCalled();
     expect(prisma.scan.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces an existing mapping when the expert explicitly confirms no equivalent for pending scans', async () => {
+    const scanId = 'db081aa8-a248-4cd0-b64b-2b46326af239';
+    prisma.scan.findMany.mockResolvedValue([{ id: scanId, identifiedBrand: null, identifiedName: 'BR-2' }]);
+    prisma.expertEquivalence.findUnique.mockResolvedValue(current);
+    prisma.expertEquivalence.update.mockResolvedValue({
+      ...current, noEquivalent: true, molydalEquivalent: '', molydalFamily: null,
+      confidence: 0, note: null, validatedBy: 'admin@example.test',
+    });
+
+    await service.create({
+      competitorBrand: 'Molykote', competitorName: 'BR-2', noEquivalent: true,
+      sourceScanIds: [scanId], sourceCompetitorKey: '|br 2',
+    }, 'admin@example.test');
+
+    expect(prisma.expertEquivalence.update).toHaveBeenCalledWith({
+      where: { id: current.id },
+      data: expect.objectContaining({
+        noEquivalent: true, molydalEquivalent: '', molydalFamily: null,
+        confidence: 0, validatedBy: 'admin@example.test',
+      }),
+    });
+    expect(prisma.expertEquivalence.create).not.toHaveBeenCalled();
+    expect(prisma.scan.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: { in: [scanId] } },
+      data: expect.objectContaining({
+        identifiedBrand: 'Molykote', status: 'no_match',
+        molydalEquivalent: null, equivalentsJson: [],
+      }),
+    }));
+    expect(prisma.aIConversation.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ molydalName: null }),
+    }));
+  });
+
+  it('does not overwrite an existing mapping from a standalone creation', async () => {
+    prisma.expertEquivalence.findUnique.mockResolvedValue(current);
+    await expect(service.create({
+      competitorBrand: 'Molykote', competitorName: 'BR-2', noEquivalent: true,
+    })).rejects.toThrow(ConflictException);
+    expect(prisma.expertEquivalence.update).not.toHaveBeenCalled();
+  });
+
+  it('removes corrected scans from the pending queue once their expert decision exists', async () => {
+    prisma.scan.findMany.mockResolvedValue([{
+      id: 'db081aa8-a248-4cd0-b64b-2b46326af239',
+      identifiedBrand: 'Molykote', identifiedName: 'BR-2',
+    }]);
+    prisma.expertEquivalence.findMany.mockResolvedValue([{ competitorKey: current.competitorKey }]);
+
+    await expect(service.listPending()).resolves.toEqual([]);
   });
 
   it('only deletes the targeted expert decision', async () => {

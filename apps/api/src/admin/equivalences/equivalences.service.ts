@@ -120,15 +120,6 @@ export class EquivalencesService {
       dto.competitorBrand,
       dto.competitorName,
     );
-    const existing = await this.prisma.expertEquivalence.findUnique({
-      where: { competitorKey },
-    });
-    if (existing && (!dto.sourceScanIds?.length || existing.noEquivalent !== noEquivalent ||
-      (!noEquivalent && normalizeProductText(existing.molydalEquivalent) !== normalizeProductText(molydalEquivalent)))) {
-      throw new ConflictException(
-        `Une équivalence existe déjà pour ${dto.competitorBrand} ${dto.competitorName}. Modifiez-la.`,
-      );
-    }
     const data = {
         competitorBrand: dto.competitorBrand.trim(),
         competitorName: dto.competitorName.trim(),
@@ -142,6 +133,14 @@ export class EquivalencesService {
         source: 'expert',
       } as const;
     if (!dto.sourceScanIds?.length) {
+      const existing = await this.prisma.expertEquivalence.findUnique({
+        where: { competitorKey },
+      });
+      if (existing) {
+        throw new ConflictException(
+          `Une équivalence existe déjà pour ${dto.competitorBrand} ${dto.competitorName}. Modifiez-la.`,
+        );
+      }
       return this.prisma.expertEquivalence.create({ data });
     }
     if (!dto.sourceCompetitorKey) {
@@ -157,7 +156,27 @@ export class EquivalencesService {
         equivalenceKey(scan.identifiedBrand, scan.identifiedName) !== dto.sourceCompetitorKey)) {
         throw new ConflictException('Les scans à valider ont changé. Actualisez la liste.');
       }
-      const decision = existing ?? await transaction.expertEquivalence.create({ data });
+      const existing = await transaction.expertEquivalence.findUnique({
+        where: { competitorKey },
+      });
+      if (existing && !noEquivalent &&
+        (existing.noEquivalent || normalizeProductText(existing.molydalEquivalent) !== normalizeProductText(molydalEquivalent))) {
+        throw new ConflictException(
+          `Une équivalence existe déjà pour ${dto.competitorBrand} ${dto.competitorName}. Modifiez-la.`,
+        );
+      }
+      // The expert explicitly chose "no equivalent" for these pending scans.
+      // If correcting their brand reaches an existing mapping, update that
+      // decision too so the scans and future lookups agree.
+      const decision = existing && noEquivalent && !existing.noEquivalent
+        ? await transaction.expertEquivalence.update({
+            where: { id: existing.id },
+            data: {
+              ...data,
+              validatedBy: validatedBy ?? existing.validatedBy,
+            },
+          })
+        : existing ?? await transaction.expertEquivalence.create({ data });
       const reason = decision.note || (decision.noEquivalent
         ? 'Aucun équivalent confirmé par un expert Molydal.'
         : 'Équivalence validée par un expert Molydal.');
