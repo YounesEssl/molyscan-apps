@@ -6,11 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Aura } from '@/components/ui/Aura';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting';
-import { HeroScanCard } from '@/components/dashboard/HeroScanCard';
+import { DashboardPrimaryActions } from '@/components/dashboard/DashboardPrimaryActions';
 import { StatRow, type StatItem } from '@/components/dashboard/StatRow';
 import { RecentScansSection } from '@/components/dashboard/RecentScansSection';
 import { PendingWorkflowsSection } from '@/components/dashboard/PendingWorkflowsSection';
-import { AIEntryCard } from '@/components/dashboard/AIEntryCard';
 import { VoiceNoteEntryCard } from '@/components/dashboard/VoiceNoteEntryCard';
 import { colors } from '@/design/tokens/colors';
 import { useAuthStore } from '@/stores/auth.store';
@@ -96,12 +95,11 @@ export default function DashboardScreen(): React.JSX.Element {
         <DashboardGreeting firstName={user?.firstName} />
       </SafeAreaView>
 
-      <HeroScanCard
-        onPress={() => router.push('/(tabs)/scanner')}
+      <DashboardPrimaryActions
+        onScanPress={() => router.push('/(tabs)/scanner')}
+        onAssistantPress={() => router.push('/(tabs)/chat')}
         onVoicePress={() => void openVoiceAssistant()}
       />
-
-      <AIEntryCard onPress={() => router.push('/(tabs)/chat')} />
 
       {canUpdateCRM && (
         <VoiceNoteEntryCard
