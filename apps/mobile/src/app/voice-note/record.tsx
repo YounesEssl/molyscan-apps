@@ -180,8 +180,10 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
   const [totalCompanies, setTotalCompanies] = useState(0);
   const [companiesLoaded, setCompaniesLoaded] = useState(false);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [companyLoadFailed, setCompanyLoadFailed] = useState(false);
   const [companySheetVisible, setCompanySheetVisible] = useState(false);
   const [companyQuery, setCompanyQuery] = useState('');
+  const companyLoadRef = useRef(0);
   const [contactId, setContactId] = useState<string | null>(null);
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [totalContacts, setTotalContacts] = useState(0);
@@ -355,29 +357,38 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
 
   // Recherche société côté serveur (≤50 résultats parmi ~17k).
   const loadCompanies = useCallback(async (q: string) => {
+    const request = ++companyLoadRef.current;
     setLoadingCompanies(true);
+    setCompanyLoadFailed(false);
     try {
       const res = await crmService.searchCompanies(q);
+      if (request !== companyLoadRef.current) return;
       setCompanies(res.items);
       setTotalCompanies(res.total);
       setCompaniesLoaded(true);
     } catch (e: any) {
+      if (request !== companyLoadRef.current) return;
       if (isMissingCrmCredentialsError(e)) {
         setCompanySheetVisible(false);
         showMissingCrmCredentialsAlert();
       } else {
+        setCompanyLoadFailed(true);
         logger.error('CRM companies load failed', e);
       }
       setCompanies([]);
       setTotalCompanies(0);
     } finally {
-      setLoadingCompanies(false);
+      if (request === companyLoadRef.current) setLoadingCompanies(false);
     }
   }, []);
 
   const openCompanySheet = () => {
     haptic.light();
+    companyLoadRef.current += 1;
     setCompanyQuery('');
+    setCompaniesLoaded(false);
+    setCompanyLoadFailed(false);
+    setLoadingCompanies(true);
     setCompanySheetVisible(true);
   };
 
@@ -1226,16 +1237,30 @@ export default function VoiceNoteRecordScreen(): React.JSX.Element {
         {optionSheet === 'objective' && <Button title={t('voiceNote.objectivesDone')} onPress={() => setOptionSheet(null)} style={styles.sheetButton} />}
       </BottomSheet>
 
-      <BottomSheet visible={companySheetVisible} onClose={() => setCompanySheetVisible(false)}>
+      <BottomSheet visible={companySheetVisible} onClose={() => {
+        companyLoadRef.current += 1;
+        setCompanySheetVisible(false);
+      }}>
         <Text variant="label" style={styles.sheetTitle}>{t('voiceNote.selectCompany')}</Text>
         <SearchBar
           value={companyQuery}
-          onChangeText={setCompanyQuery}
+          onChangeText={(value) => {
+            companyLoadRef.current += 1;
+            setLoadingCompanies(true);
+            setCompanyQuery(value);
+          }}
           placeholder={t('voiceNote.searchCompany')}
           style={styles.sheetSearch}
         />
         {loadingCompanies ? (
           <ActivityIndicator color={COLORS.primary} style={styles.sheetLoader} />
+        ) : companyLoadFailed ? (
+          <View style={styles.sheetError}>
+            <Text variant="caption" color={COLORS.textMuted} style={styles.sheetEmpty}>
+              {t('voiceNote.companyLoadError')}
+            </Text>
+            <Button title={t('common.retry')} variant="secondary" onPress={() => void loadCompanies(companyQuery)} />
+          </View>
         ) : companies.length === 0 ? (
           <Text variant="caption" color={COLORS.textMuted} style={styles.sheetEmpty}>
             {companiesLoaded ? t('voiceNote.noCompany') : t('voiceNote.companyLoadError')}

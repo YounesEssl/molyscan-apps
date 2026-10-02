@@ -557,7 +557,7 @@ const fr = {
     selectCompany: 'Choisir une société',
     searchCompany: 'Rechercher une société...',
     noCompany: 'Aucune société trouvée',
-    companyLoadError: 'Impossible de charger les sociétés. Vérifiez vos identifiants CRM.',
+    companyLoadError: 'Impossible de charger les sociétés pour le moment. Réessayez.',
     companyTruncated: '{{shown}} sur {{total}} — affinez la recherche',
     selectContact: 'Choisir un contact',
     searchContact: 'Rechercher un contact...',

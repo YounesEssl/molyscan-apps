@@ -53,11 +53,11 @@ export const crmService = {
     q = '',
   ): Promise<{ items: CrmCompany[]; total: number }> {
     // Recherche côté serveur : on ne reçoit que ≤50 résultats (pas les 17k).
-    // Le 1er appel après connexion peut déclencher le fetch CRM (~14s), ensuite
-    // c'est servi depuis le cache serveur → timeout large par sécurité.
+    // Le 1er appel peut charger la liste complète depuis le CRM (~27 Mo).
+    // Laisser au serveur le temps de remplir son cache après un redémarrage.
     const response = await api.get(ENDPOINTS.crm.companies, {
       params: { q },
-      timeout: 30000,
+      timeout: 105000,
     });
     return response.data;
   },

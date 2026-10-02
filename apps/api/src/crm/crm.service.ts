@@ -67,7 +67,8 @@ export interface CrmCommunicationSelection {
 // Marge de sécurité : on rafraîchit le token un peu avant son expiration réelle.
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 const CRM_REQUEST_TIMEOUT_MS = 30_000;
-// La liste des sociétés change peu et l'appel CRM est lent (~14s pour 17k).
+const CRM_COMPANY_REQUEST_TIMEOUT_MS = 90_000;
+// La liste des sociétés change peu et l'appel CRM est lent (~25s pour 17k).
 // Au-delà de ce délai, on rafraîchit EN ARRIÈRE-PLAN sans faire attendre l'appelant.
 const COMPANY_FRESH_MS = 30 * 60_000;
 const PERSON_FRESH_MS = 30 * 60_000;
@@ -78,7 +79,7 @@ export class CrmService implements OnModuleInit {
   private readonly baseUrl: string;
   private readonly encryptionKey: string;
   private readonly companyCache = new Map<string, { at: number; data: CrmCompany[] }>();
-  private readonly companyRefreshing = new Set<string>();
+  private readonly companyRefreshPromises = new Map<string, Promise<CrmCompany[]>>();
   // Les contacts sont mis en cache par utilisateur ET par société. Sellbase
   // accepte un filtre pers_companyid : inutile de télécharger tout l'annuaire.
   private readonly personCache = new Map<string, { at: number; data: CrmContact[] }>();
@@ -102,13 +103,20 @@ export class CrmService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     try {
       const creds = await this.prisma.crmCredential.findMany({ select: { userId: true } });
-      for (const { userId } of creds) {
-        void this.getCompanies(userId).catch((e) =>
-          this.logger.warn(`Startup company warm-up failed for ${userId}: ${e}`),
-        );
-      }
       if (creds.length) {
         this.logger.log(`Warming CRM company cache for ${creds.length} user(s)`);
+        // The CRM returns a ~27 MB company list per account. Sending every
+        // warm-up at once overloads it and makes all requests time out.
+        void (async () => {
+          for (const { userId } of creds) {
+            try {
+              const companies = await this.getCompanies(userId);
+              this.logger.log(`CRM company cache warmed: ${companies.length} companies`);
+            } catch (e) {
+              this.logger.warn(`Startup company warm-up failed for ${userId}: ${e}`);
+            }
+          }
+        })();
       }
     } catch (e) {
       this.logger.warn(`CRM warm-up on init failed: ${e}`);
@@ -148,7 +156,7 @@ export class CrmService implements OnModuleInit {
   async deleteCredentials(userId: string) {
     await this.prisma.crmCredential.deleteMany({ where: { userId } });
     this.companyCache.delete(userId);
-    this.companyRefreshing.delete(userId);
+    this.companyRefreshPromises.delete(userId);
     this.clearPersonCache(userId);
     this.optionsCache.delete(userId);
     return { configured: false };
@@ -295,7 +303,7 @@ export class CrmService implements OnModuleInit {
     });
     if (!cred) {
       this.companyCache.delete(userId);
-      this.companyRefreshing.delete(userId);
+      this.companyRefreshPromises.delete(userId);
       this.clearPersonCache(userId);
       throw new BadRequestException('CRM credentials not configured for this user');
     }
@@ -317,21 +325,23 @@ export class CrmService implements OnModuleInit {
 
   /** Récupère la liste depuis le CRM et met à jour le cache (dédupliqué). */
   private async refreshCompanies(userId: string): Promise<CrmCompany[]> {
-    if (this.companyRefreshing.has(userId)) {
-      // Un rafraîchissement est déjà en cours : on renvoie le cache actuel s'il existe.
-      const current = this.companyCache.get(userId);
-      if (current) return current.data;
-    }
-    this.companyRefreshing.add(userId);
-    try {
+    const inFlight = this.companyRefreshPromises.get(userId);
+    if (inFlight) return inFlight;
+    const refresh = (async () => {
       const raw = await this.authedRequest(userId, 'GET', '/api/Data/company/list');
       const list = this.extractList(raw)
         .map((r) => this.normalizeCompany(r))
         .filter((c): c is CrmCompany => c !== null);
       this.companyCache.set(userId, { at: Date.now(), data: list });
       return list;
+    })();
+    this.companyRefreshPromises.set(userId, refresh);
+    try {
+      return await refresh;
     } finally {
-      this.companyRefreshing.delete(userId);
+      if (this.companyRefreshPromises.get(userId) === refresh) {
+        this.companyRefreshPromises.delete(userId);
+      }
     }
   }
 
@@ -842,7 +852,8 @@ export class CrmService implements OnModuleInit {
     try {
       return await fetch(`${this.baseUrl}${path}`, {
         method,
-        signal: AbortSignal.timeout(CRM_REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(path === '/api/Data/company/list'
+          ? CRM_COMPANY_REQUEST_TIMEOUT_MS : CRM_REQUEST_TIMEOUT_MS),
         headers: {
           Authorization: `Bearer ${token}`,
           ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),

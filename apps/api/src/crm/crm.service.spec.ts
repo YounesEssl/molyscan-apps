@@ -1,6 +1,6 @@
 import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CrmService } from './crm.service';
+import { CrmService, type CrmCompany } from './crm.service';
 
 describe('CRM communication dates and reference lists', () => {
   const base = {
@@ -367,6 +367,63 @@ describe('CRM company-scoped contact lookup', () => {
   });
 });
 
+describe('CRM company list loading', () => {
+  let service: CrmService;
+  let request: jest.SpyInstance;
+
+  beforeEach(() => {
+    service = new CrmService({
+      crmCredential: { findUnique: jest.fn().mockResolvedValue({ id: 'credential' }) },
+    } as any, new ConfigService({ CRM_BASE_URL: 'https://crm.example.test', CRM_ENCRYPTION_KEY: 'test' }));
+    request = jest.spyOn(service as any, 'authedRequest');
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('shares an in-flight list between searches and serves later searches from cache', async () => {
+    let resolveList!: (value: unknown) => void;
+    request.mockReturnValue(new Promise((resolve) => { resolveList = resolve; }));
+
+    const first = service.searchCompanies('user', 'alpha');
+    const second = service.searchCompanies('user', 'beta');
+    await new Promise(setImmediate);
+    expect(request).toHaveBeenCalledTimes(1);
+
+    resolveList([
+      { comp_companyid: 'a', comp_name: 'Alpha' },
+      { comp_companyid: 'b', comp_name: 'Beta' },
+    ]);
+    await expect(first).resolves.toEqual({ items: [{ id: 'a', name: 'Alpha' }], total: 1 });
+    await expect(second).resolves.toEqual({ items: [{ id: 'b', name: 'Beta' }], total: 1 });
+    await expect(service.searchCompanies('user', '')).resolves.toMatchObject({ total: 2 });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a failed list fetch instead of retaining a rejected promise', async () => {
+    request.mockRejectedValueOnce(new ServiceUnavailableException('CRM timeout'))
+      .mockResolvedValueOnce([{ comp_companyid: 'a', comp_name: 'Alpha' }]);
+    await expect(service.searchCompanies('user', '')).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(service.searchCompanies('user', 'alpha')).resolves.toMatchObject({ total: 1 });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts company cache warm-ups one account at a time', async () => {
+    const warmService = new CrmService({
+      crmCredential: { findMany: jest.fn().mockResolvedValue([{ userId: 'first' }, { userId: 'second' }]) },
+    } as any, new ConfigService({ CRM_BASE_URL: 'https://crm.example.test', CRM_ENCRYPTION_KEY: 'test' }));
+    let finishFirst!: (value: CrmCompany[]) => void;
+    const getCompanies = jest.spyOn(warmService, 'getCompanies')
+      .mockReturnValueOnce(new Promise((resolve) => { finishFirst = resolve; }))
+      .mockResolvedValueOnce([]);
+
+    await warmService.onModuleInit();
+    expect(getCompanies).toHaveBeenCalledTimes(1);
+    finishFirst([]);
+    await new Promise(setImmediate);
+    expect(getCompanies).toHaveBeenNthCalledWith(2, 'second');
+  });
+});
+
 describe('CRM transport and reconciliation', () => {
   const communicationId = '4c99f7a3-6af1-4c6c-8e5c-bf4f916419ee';
   const record = { companyId: 'company', subject: 'Changed', note: 'Changed', datetime: new Date('2026-09-16T08:30:00Z') };
@@ -474,7 +531,9 @@ describe('CRM transport and reconciliation', () => {
     expect(fetchMock.mock.calls[0][1].method).toBe('PUT');
   });
 
-  it.each(['login', 'request'])('bounds a %s network request to 30 seconds and handles its abort', async (kind) => {
+  it.each([
+    ['login', 30_000], ['request', 30_000], ['company list', 90_000],
+  ])('bounds a %s network request to %i ms and handles its abort', async (kind, timeoutMs) => {
     const controller = new AbortController();
     const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
     fetchMock.mockImplementation((_url, init: RequestInit) => new Promise((_resolve, reject) => {
@@ -482,9 +541,9 @@ describe('CRM transport and reconciliation', () => {
     }));
     const pending = kind === 'login'
       ? (service as any).login('login', 'password')
-      : (service as any).fetchCrm('GET', '/api/Data/company/list', 'token');
+      : (service as any).fetchCrm('GET', kind === 'company list' ? '/api/Data/company/list' : '/api/AppStruct', 'token');
     const rejected = expect(pending).rejects.toBeInstanceOf(ServiceUnavailableException);
-    expect(timeout).toHaveBeenCalledWith(30_000);
+    expect(timeout).toHaveBeenCalledWith(timeoutMs);
     expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);
     controller.abort();
     await rejected;

@@ -557,7 +557,7 @@ const en: TranslationKeys = {
     selectCompany: 'Choose a company',
     searchCompany: 'Search a company...',
     noCompany: 'No company found',
-    companyLoadError: 'Could not load companies. Check your CRM credentials.',
+    companyLoadError: 'Could not load companies right now. Please try again.',
     companyTruncated: '{{shown}} of {{total}} — refine your search',
     selectContact: 'Choose a contact',
     searchContact: 'Search a contact...',
