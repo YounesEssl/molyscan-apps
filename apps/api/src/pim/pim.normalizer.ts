@@ -172,7 +172,10 @@ export function latestDate(data: DataMap): Date | null {
 
 export function detectProductType(name: string, family: string | null): string {
   const value = `${family ?? ''} ${name}`;
-  return /(mat[ée]riel|pompe|raccord|flexible|graisseur|doseur|enrouleur|couvercle|fontaine|kit de distribution|centrale)/i.test(value)
+  // MLS families are applicators, accessories and spare parts. Their short
+  // catalogue records can otherwise outrank actual lubricants in AI retrieval.
+  return /^MLS\b/i.test(family?.trim() ?? '')
+    || /(mat[ée]riel|pompe|raccord|flexible|graisseur|doseur|enrouleur|couvercle|fontaine|kit de distribution|centrale)/i.test(value)
     ? 'equipment'
     : 'lubricant';
 }

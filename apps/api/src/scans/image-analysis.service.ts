@@ -270,7 +270,7 @@ export class ImageAnalysisService {
 
     const context = chunks.length > 0
       ? chunks
-          .map((c) => `[${c.product_name}] (relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`)
+          .map((c) => `[${c.product_name}] (source: ${c.metadata?.source_kind === 'sellbase_technical_sheet' ? 'original Sellbase FT PDF' : 'Sellbase catalogue fields'}; relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`)
           .join('\n\n---\n\n')
       : 'No relevant technical datasheet found.';
 
@@ -601,6 +601,7 @@ Selection rules:
 - The equivalent MUST respect the hard constraints above when present.
 - Match on PRIMARY FUNCTION first — what the product DOES (cleaning, lubricating, leak detection, anti-seize, …) — then secondary specs.
 - Retrieval order and similarity scores are NOT evidence of technical compatibility. Compare the actual datasheet specifications, respecting application, certification, viscosity, base oil and thickener.
+- Original Sellbase FT PDFs supply technical performance and applications. Current catalogue fields control active references and explicit certification metadata. If they conflict on a decisive characteristic, do not recommend an equivalent.
 - Only use exact product names from Available products. Do not invent product variants, specifications or certifications.
 - If the primary application is unknown or no datasheet supports a compatible product, return an empty equivalents array and explain which information is missing. Never guess from the product name alone.
 - If neither the exact competitor name nor its reference can be verified, return an empty equivalents array and request a clearer photo; do not base an equivalence on the brand alone.

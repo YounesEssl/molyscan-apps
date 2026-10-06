@@ -215,6 +215,7 @@ export class VectorStoreService implements OnModuleInit {
             WHERE c."indexId" = $3
               AND p."active" = true
               AND p."productType" = 'lubricant'
+              AND (p."family" IS NULL OR p."family" NOT ILIKE 'MLS%')
             ORDER BY similarity DESC
             LIMIT $4`,
           vector, query, active.id, matchCount,
@@ -254,7 +255,9 @@ export class VectorStoreService implements OnModuleInit {
     reformulatedQuery: string,
     filters?: RetrievalFilters,
   ): Promise<ChunkResult[]> {
-    const overfetch = filters ? 80 : 40;
+    // Each product can contribute a structured catalogue chunk and an original
+    // FT chunk. Fetch enough rows to keep the same diversity of products.
+    const overfetch = filters ? 120 : 80;
     const [directResults, reformulatedResults] = await Promise.all([
       this.searchChunks(originalQuery, overfetch),
       this.searchChunks(reformulatedQuery, overfetch),

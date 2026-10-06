@@ -199,13 +199,29 @@ certification filters cannot accidentally reuse stale chunk metadata.
 
 Document metadata is synchronized from Sellbase. Mobile clients list documents
 through `/products/pim/by-name/:name/documents` and read PDF content through the
-authenticated Molyscan proxy. Technical sheets use the public Molydal PDF
-endpoint associated with the Sellbase product instance. Safety sheets for the
-`c_molydal` tenant use the verified public Sellbase archive by default, without
-requiring `SELLBASE_MEDIA_BASE_URL` or sending a Sellbase token to that archive.
+authenticated Molyscan proxy. For `c_molydal`, technical sheets now use the
+original PDF named in Sellbase characteristic 364 (or its language equivalent)
+from the public Sellbase archive. The previous Molydal website endpoint generated
+a shorter fiche and is not the same document. Safety sheets use that same verified
+public archive. Neither request sends a Sellbase token to the archive.
 The configured media URL remains an optional authenticated override, and is
 still required for certificates or other secondary files without a verified
 default source.
+
+The RAG index stores a structured catalogue chunk and, when available, a second
+chunk extracted from the original French FT PDF for each active lubricant.
+Retrieval excludes MLS equipment, and the assistant receives the source of each
+chunk. The FT supplies application and technical specifications; current PIM
+fields remain authoritative for active references and explicit certification
+metadata. FDS are available to consult/download, but are not used as equivalence
+evidence: they describe hazards and handling, not a product's full performance.
+A new index is activated only if at least 80% of available FT PDFs are indexed
+and the existing retrieval validation passes.
+
+Read-only check on 2026-10-06: of 245 products previously classed as active
+lubricants, 35 were MLS equipment. The remaining 210 include 193 French FT PDF
+records; all 193 PDF files answered from the Sellbase archive and yielded
+searchable text. These are a pre-synchronization snapshot, not fixed limits.
 
 FT links are offered after scan results, in scan history, and for products cited
 by assistant answers. The assistant resolves FT and FS/FDS requests from the PIM

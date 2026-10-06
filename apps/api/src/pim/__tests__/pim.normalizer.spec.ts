@@ -26,6 +26,8 @@ describe('PIM normalizer', () => {
 
   it('keeps equipment out of the lubricant catalog', () => {
     expect(detectProductType('POMPE MANUELLE', 'Matériel de graissage')).toBe('equipment');
+    expect(detectProductType('FILTRES', 'MLS GRAISSAGE CENTRALISE')).toBe('equipment');
+    expect(detectProductType('JUPE A VISSER INOX', 'MLS DIVERS')).toBe('equipment');
     expect(detectProductType('AGL 41 NF', 'Graisses')).toBe('lubricant');
   });
 

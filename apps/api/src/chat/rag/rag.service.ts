@@ -45,6 +45,7 @@ Detect the language of the FIRST user message in the conversation and respond in
 
 ━━━ INFORMATION SOURCES (STRICT) ━━━
 - **MOLYDAL PRODUCTS**: ONLY the technical datasheets provided in the context below. Never invent anything, never rely on general knowledge. If a Molydal product is not in the context, it does not exist for you.
+- The context distinguishes original Sellbase FT PDFs from structured Sellbase catalogue fields. Use original FTs for technical performance and applications; use current catalogue fields for active references and explicit certification metadata. If the two disagree on a decisive characteristic, state the conflict and do not assert an equivalence.
 - **COMPETITOR PRODUCTS**: if you need to identify a competitor product or obtain its characteristics (viscosity, additives, certifications, application), use Google Search. **Never guess**, NEVER rely on your general knowledge. If the web search returns nothing usable, say so explicitly.
 - **ABSOLUTE RULE**: zero hallucination. Any information about a competitor lubricant must come from a verified web search; any information about a Molydal product must come from the RAG context.
 - **ONLY USE WEB SEARCH FOR**: identifying/documenting a competitor product. Never for answering other questions (lubricant generalities, Molydal, professional advice) — answer using the RAG context alone.
@@ -346,7 +347,7 @@ ${prompt}`,
         ? chunks
             .map(
               (c) =>
-                `[${c.product_name}] (relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
+                `[${c.product_name}] (source: ${c.metadata?.source_kind === 'sellbase_technical_sheet' ? 'original Sellbase FT PDF' : 'Sellbase catalogue fields'}; relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
             )
             .join('\n\n---\n\n')
         : 'No relevant technical datasheet found.';
@@ -461,7 +462,7 @@ ${prompt}`,
         ? chunks
             .map(
               (c) =>
-                `[${c.product_name}] (relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
+                `[${c.product_name}] (source: ${c.metadata?.source_kind === 'sellbase_technical_sheet' ? 'original Sellbase FT PDF' : 'Sellbase catalogue fields'}; relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
             )
             .join('\n\n---\n\n')
         : 'No relevant technical datasheet found.';

@@ -8,6 +8,7 @@ import { SellbaseClient, SellbaseElement, type SellbaseDatum } from './sellbase.
 import { CARAC, buildChunk, detectProductType, documents, hash, latestDate, mergeData, numberValue, productCertifications, text } from './pim.normalizer';
 import { filterCatalogScope } from './pim-scope';
 import { ERP_SLEEP_CHARACTERISTIC_ID, planErpAvailability } from './pim-erp-status';
+import { technicalSheetText } from './technical-sheet-text';
 
 @Injectable()
 export class PimSyncService {
@@ -169,9 +170,12 @@ export class PimSyncService {
       const productsDeactivatedByErp = [...existing.values()].filter((product) => product.active && seenProducts.has(product.sellbaseElementId) && !erp.activeProductIds.has(product.sellbaseElementId)).length;
       const details = { catalogBaseId, scope: catalogBaseId === 0 ? 'master' : 'publication', ...scope.details, erp: erp.details };
       await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { indexId, status: RagSyncStatus.validating, productsSeen: seenProducts.size, productsChanged: changedProducts.size, productsRemoved: removed.count + productsDeactivatedByErp, referencesSeen: seenReferences.size, details } });
-      const chunkCount = await this.buildIndex(index.id);
+      const { chunkCount, productCount, ftAvailable, ftIndexed } = await this.buildIndex(index.id);
+      if (ftAvailable >= 100 && ftIndexed < Math.ceil(ftAvailable * 0.8)) {
+        throw new Error(`RAG FT validation failed: only ${ftIndexed}/${ftAvailable} Sellbase PDFs were indexed`);
+      }
       const validation = await this.validateIndex(index.id);
-      await this.activateIndex(index.id, chunkCount, chunkCount, validation);
+      await this.activateIndex(index.id, productCount, chunkCount, { ...validation, ftAvailable, ftIndexed });
       await this.prisma.ragSyncRun.update({ where: { id: runId }, data: { status: RagSyncStatus.completed, finishedAt: new Date(), chunksCreated: chunkCount, details } });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -188,39 +192,66 @@ export class PimSyncService {
     return [...new Set(rows.map((r) => Number(r[field])).filter(Boolean))];
   }
 
-  private async buildIndex(indexId: string): Promise<number> {
-    const products = await this.prisma.pimProduct.findMany({ where: { active: true, productType: 'lubricant' }, include: { references: { where: { active: true } } } });
+  private async buildIndex(indexId: string) {
+    const products = await this.prisma.pimProduct.findMany({
+      where: { active: true, productType: 'lubricant' },
+      include: {
+        references: { where: { active: true } },
+        documents: { where: { kind: 'technical_sheet', language: 'fr' } },
+      },
+    });
     const previous = await this.prisma.ragIndexVersion.findFirst({ where: { status: RagIndexStatus.active } });
     let count = 0;
-    for (const product of products) {
-      const labels = productCertifications(product.rawData as Record<string, SellbaseDatum>);
-      const content = buildChunk({ ...product, ...labels });
-      const packaging = [...new Set(product.references.map((r) => r.packaging).filter(Boolean))];
-      const metadata = JSON.stringify({ product_name: product.name, family: product.family,
-        food_grade: labels.foodGrade, nsf_categories: labels.nsfCategories, certifications: labels.certifications,
-        eco_responsible: labels.ecoResponsible, product_type: product.productType, packaging, conditionnements: packaging });
-      // Metadata participates in reuse: a newly recognized NSF A1 class must
-      // not keep an older chunk whose text happened to remain identical.
-      const contentHash = hash({ content, metadata, model: this.embeddings.model, normalizationVersion: 2 });
+    let ftAvailable = 0;
+    let ftIndexed = 0;
+    const addChunk = async (productId: string, content: string, metadata: Record<string, unknown>) => {
+      const metadataJson = JSON.stringify(metadata);
+      const contentHash = hash({ content, metadata: metadataJson, model: this.embeddings.model, normalizationVersion: 2 });
       const id = randomUUID();
       if (previous) {
         const copied = await this.prisma.$executeRawUnsafe(
           `INSERT INTO "rag_chunks" ("id","indexId","productId","content","contentHash","metadata","embedding","createdAt") SELECT $1,$2,"productId","content","contentHash","metadata","embedding",NOW() FROM "rag_chunks" WHERE "indexId"=$3 AND "productId"=$4 AND "contentHash"=$5 LIMIT 1 ON CONFLICT DO NOTHING`,
-          id, indexId, previous.id, product.id, contentHash,
+          id, indexId, previous.id, productId, contentHash,
         );
-        if (copied > 0) { count++; continue; }
+        if (copied > 0) { count++; return; }
       }
       const embedding = await this.embeddings.generateEmbedding(content);
-      if (embedding.length !== this.embeddings.dimensions) throw new Error(`Invalid embedding dimension for ${product.name}`);
+      if (embedding.length !== this.embeddings.dimensions) throw new Error('Invalid RAG embedding dimension');
       const vector = `[${embedding.join(',')}]`;
       await this.prisma.$executeRawUnsafe(
         `INSERT INTO "rag_chunks" ("id","indexId","productId","content","contentHash","metadata","embedding","createdAt") VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::vector,NOW())`,
-        id, indexId, product.id, content, contentHash, metadata, vector,
+        id, indexId, productId, content, contentHash, metadataJson, vector,
       );
       count++;
+    };
+    for (const product of products) {
+      const labels = productCertifications(product.rawData as Record<string, SellbaseDatum>);
+      const content = buildChunk({ ...product, ...labels });
+      const packaging = [...new Set(product.references.map((r) => r.packaging).filter(Boolean))];
+      const metadata = { product_name: product.name, family: product.family,
+        food_grade: labels.foodGrade, nsf_categories: labels.nsfCategories, certifications: labels.certifications,
+        eco_responsible: labels.ecoResponsible, product_type: product.productType, packaging, conditionnements: packaging };
+      // Keep the structured PIM chunk for current availability and reference
+      // data, then add the actual Sellbase FT as separate technical evidence.
+      await addChunk(product.id, content, metadata);
+      const ft = product.documents?.[0];
+      if (!ft || !this.sellbase.canDownloadDocument(ft.kind, product.sellbaseInstanceId)) continue;
+      ftAvailable++;
+      try {
+        const response = await this.sellbase.downloadDocument(ft.fileName, {
+          kind: ft.kind, language: ft.language, productInstanceId: product.sellbaseInstanceId,
+        });
+        const extracted = await technicalSheetText(response);
+        await addChunk(product.id, `Product: ${product.name}\nOriginal Sellbase technical sheet:\n${extracted}`, {
+          ...metadata, source_kind: 'sellbase_technical_sheet', source_file: ft.fileName,
+        });
+        ftIndexed++;
+      } catch (error) {
+        this.logger.warn(`FT indexing skipped for ${product.name}: ${(error as Error).message}`);
+      }
     }
-    if (count < 100) throw new Error(`Safety stop: only ${count} lubricant chunks were built`);
-    return count;
+    if (products.length < 100) throw new Error(`Safety stop: only ${products.length} lubricants were indexed`);
+    return { chunkCount: count, productCount: products.length, ftAvailable, ftIndexed };
   }
 
   private async validateIndex(indexId: string) {
@@ -241,7 +272,12 @@ export class PimSyncService {
         // neighbours than the old website-only publication, so a 15-result
         // gate rejects valid products that production still retrieves in its
         // top 40 (for example TGV 2000 and SOLESTER 77).
-        `SELECT p."name" FROM "rag_chunks" c JOIN "pim_products" p ON p."id"=c."productId" WHERE c."indexId"=$1 ORDER BY c."embedding" <=> $2::vector LIMIT 40`,
+        `SELECT name FROM (
+           SELECT p."name" AS name, MIN(c."embedding" <=> $2::vector) AS distance
+             FROM "rag_chunks" c JOIN "pim_products" p ON p."id"=c."productId"
+            WHERE c."indexId"=$1 AND p."active"=true AND p."productType"='lubricant'
+            GROUP BY p."id", p."name"
+         ) ranked ORDER BY distance LIMIT 40`,
         indexId, vector,
       );
       const sources = rows.map((r) => r.name);

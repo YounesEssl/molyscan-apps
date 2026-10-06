@@ -37,13 +37,20 @@ describe('Sellbase document sources', () => {
     expect(authenticate).not.toHaveBeenCalled();
   });
 
-  it('keeps the FT product endpoint and language without authenticating to Sellbase', async () => {
+  it('serves the original Sellbase FT rather than the shortened website-generated sheet', async () => {
     const { sellbase, authenticate } = client();
     expect(sellbase.canDownloadDocument('technical_sheet', 70322)).toBe(true);
     await sellbase.downloadDocument('AGL_41_NF_FT_GB.pdf', { kind: 'technical_sheet', language: 'en', productInstanceId: 70322 });
-    expect(fetchMock).toHaveBeenCalledWith('https://www.molydal.com/en/produit/70322/fiche-technique',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(fetchMock).toHaveBeenCalledWith('https://static.sellbase-plateforme.com/molydal/molydal/a/ag/AGL_41_NF_FT_GB.pdf',
+      expect.objectContaining({ redirect: 'error', signal: expect.any(AbortSignal) }));
     expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  it('retains the existing product endpoint for a different tenant without a media archive', async () => {
+    const { sellbase } = client({ SELLBASE_BASE: 'c_other' });
+    await sellbase.downloadDocument('ft.pdf', { kind: 'technical_sheet', language: 'en', productInstanceId: 70322 });
+    expect(fetchMock).toHaveBeenCalledWith('https://www.molydal.com/en/produit/70322/fiche-technique',
+      expect.objectContaining({ redirect: 'error' }));
   });
 
   it('preserves a configured authenticated media source and its relative paths', async () => {
@@ -60,7 +67,7 @@ describe('Sellbase document sources', () => {
     await expect(sellbase.downloadDocument('AGL_41_NF_FDS_FR.pdf', { kind: 'safety_sheet' })).rejects.toThrow('not configured');
     const molydal = client().sellbase;
     expect(molydal.canDownloadDocument('certificate')).toBe(false);
-    expect(molydal.canDownloadDocument('technical_sheet')).toBe(false);
+    expect(molydal.canDownloadDocument('technical_sheet')).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -73,6 +80,7 @@ describe('Sellbase document sources', () => {
     for (const config of [{}, { SELLBASE_MEDIA_BASE_URL: 'https://media.example.test/files' }]) {
       const { sellbase, authenticate } = client(config);
       await expect(sellbase.downloadDocument(fileName, { kind: 'safety_sheet' })).rejects.toThrow('Invalid Sellbase document path');
+      await expect(sellbase.downloadDocument(fileName, { kind: 'technical_sheet', productInstanceId: 70322 })).rejects.toThrow('Invalid Sellbase document path');
       expect(authenticate).not.toHaveBeenCalled();
     }
     expect(fetchMock).not.toHaveBeenCalled();
