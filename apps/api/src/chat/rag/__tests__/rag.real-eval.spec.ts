@@ -165,11 +165,12 @@ describe('RAG Real Eval — stack complète sans mock', () => {
     skipIfMissing(
       'retourne le bon équivalent avec le vrai vector store',
       async () => {
+        const expectedProducts = evalCase.realExpectedProducts ?? evalCase.expectedProducts;
         // Register before the first await so rejected or timed-out cases remain in the report.
         const entry: RealEvalResult = {
           name: evalCase.name, status: 'running', passed: false,
           foundProduct: null, forbiddenFound: null, retrievedSources: [],
-          expectedProducts: evalCase.expectedProducts, responseHead: '',
+          expectedProducts, responseHead: '',
         };
         results.push(entry);
         try {
@@ -182,7 +183,7 @@ describe('RAG Real Eval — stack complète sans mock', () => {
           // Jest timeouts do not cancel the underlying promise. A late reply must
           // not turn an already reported incomplete case into a success.
           if (entry.status !== 'running') return;
-          const found = containsAny(result.text, evalCase.expectedProducts);
+          const found = containsAny(result.text, expectedProducts);
           const forbidden = containsForbidden(result.text, evalCase.forbiddenProducts ?? []);
           Object.assign(entry, {
             status: 'completed', passed: !!found && !forbidden,

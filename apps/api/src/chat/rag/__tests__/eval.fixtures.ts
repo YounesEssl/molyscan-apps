@@ -22,6 +22,8 @@ export interface EvalCase {
   query: string;
   /** All acceptable product names (at least one must appear in the response). */
   expectedProducts: string[];
+  /** A production expert decision can supersede an older synthetic mock target. */
+  realExpectedProducts?: string[];
   /** Products that MUST NOT be recommended as primary equivalent. */
   forbiddenProducts?: string[];
   chunks: MockChunk[];
@@ -81,11 +83,12 @@ export const EVAL_CASES: EvalCase[] = [
     ],
   },
 
-  // ── 2. Klüber ISOFLEX NBU 15 → TGV 2000 ──────────────────────────────────
+  // ── 2. Klüber ISOFLEX NBU 15 — expert now validates LCH 700 in production ──
   {
-    name: 'Klüber ISOFLEX NBU 15 → graisse haute vitesse (TGV 2000)',
+    name: 'Klüber ISOFLEX NBU 15 → graisse haute vitesse',
     query: 'kluber isoflex nbu 15',
     expectedProducts: ['TGV 2000'],
+    realExpectedProducts: ['LCH 700'],
     forbiddenProducts: ['NB 25', 'NB 1200', 'LUBA 501'],
     chunks: [
       chunk(
