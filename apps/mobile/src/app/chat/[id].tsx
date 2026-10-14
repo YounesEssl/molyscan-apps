@@ -7,6 +7,8 @@ import {
   StyleSheet,
   View,
   type ListRenderItem,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -39,6 +41,8 @@ export default function ChatDetailScreen(): React.JSX.Element {
     useAuthStore((s) => s.user?.role) === 'distributor';
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessageModel>>(null);
+  const followLatestRef = useRef(true);
+  const userScrollingRef = useRef(false);
 
   const [messages, setMessages] = useState<ChatMessageModel[]>([]);
   const [scanContext, setScanContext] = useState<ScanContext | null>(null);
@@ -50,8 +54,25 @@ export default function ChatDetailScreen(): React.JSX.Element {
   const fileAttachment = useFileAttachment();
   const { requestConsent } = useAiDataConsent();
 
+  const scrollToEnd = useCallback((animated: boolean) => {
+    followLatestRef.current = true;
+    setTimeout(() => {
+      if (followLatestRef.current && !userScrollingRef.current) {
+        listRef.current?.scrollToEnd({ animated });
+      }
+    }, 100);
+  }, []);
+
+  const updateFollowLatest = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    userScrollingRef.current = false;
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+    followLatestRef.current = distanceFromBottom <= 24;
+  }, []);
+
   useEffect(() => {
     if (!id) return;
+    followLatestRef.current = true;
     Promise.all([
       chatFreeService.getMessages(id),
       chatFreeService.getConversationById(id),
@@ -62,14 +83,10 @@ export default function ChatDetailScreen(): React.JSX.Element {
           setTitle(conv.title);
         }
         setScanContext(conv.scanContext ?? null);
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 50);
+        scrollToEnd(false);
       })
       .catch(() => {});
-  }, [id]);
-
-  const scrollToEnd = useCallback(() => {
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-  }, []);
+  }, [id, scrollToEnd]);
 
   const handleSend = async (text: string): Promise<void> => {
     const trimmed = text.trim();
@@ -92,7 +109,7 @@ export default function ChatDetailScreen(): React.JSX.Element {
       { id: assistantId, role: 'assistant', content: '', isStreaming: true },
     ]);
     setIsLoading(true);
-    scrollToEnd();
+    scrollToEnd(true);
 
     if (messages.length === 0) {
       const titleSource = trimmed || displayContent;
@@ -113,7 +130,6 @@ export default function ChatDetailScreen(): React.JSX.Element {
             m.id === assistantId ? { ...m, content: fullContent } : m,
           ),
         );
-        scrollToEnd();
       },
       onSources: (sources) => {
         setMessages((prev) =>
@@ -211,9 +227,21 @@ export default function ChatDetailScreen(): React.JSX.Element {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() =>
-            listRef.current?.scrollToEnd({ animated: false })
-          }
+          onScrollBeginDrag={() => {
+            userScrollingRef.current = true;
+            followLatestRef.current = false;
+          }}
+          onScrollEndDrag={updateFollowLatest}
+          onMomentumScrollBegin={() => {
+            userScrollingRef.current = true;
+            followLatestRef.current = false;
+          }}
+          onMomentumScrollEnd={updateFollowLatest}
+          onContentSizeChange={() => {
+            if (followLatestRef.current && !userScrollingRef.current) {
+              listRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
           ListHeaderComponent={
             scanContext ? <ScanContextCard context={scanContext} /> : null
           }
