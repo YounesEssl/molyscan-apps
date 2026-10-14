@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from '../chat/rag/rag.service';
 import { VectorStoreService, RetrievalFilters } from '../chat/rag/vector-store.service';
 import { StorageService } from '../storage/storage.service';
+import { ScanEmailNotificationService } from './scan-email-notification.service';
 import { loadPimAvailability } from '../pim/pim-availability';
 import {
   normalizeProductText as normalize,
@@ -91,6 +92,7 @@ export class ImageAnalysisService {
     private ragService: RagService,
     private vectorStore: VectorStoreService,
     private storage: StorageService,
+    private scanEmailNotification: ScanEmailNotificationService,
   ) {
     this.gemini = new GoogleGenerativeAI(
       this.configService.getOrThrow<string>('GEMINI_API_KEY'),
@@ -141,25 +143,29 @@ export class ImageAnalysisService {
     if (!identification.name || identification.name === 'null' || identification.name === null) {
       this.logger.log(`⚠️ Aucun produit détecté, total: ${Date.now() - t0}ms`);
       const photoKey = await photoUploadPromise;
+      const analysis = language === 'en'
+        ? 'No lubricant product was identified in this image. Try photographing the label or packaging more closely.'
+        : 'Aucun produit lubrifiant n’a été identifié. Essayez de photographier l’étiquette ou l’emballage de plus près.';
       const scan = await this.prisma.scan.create({
         data: {
           clientRequestId,
           status: 'no_match' as any,
           scanMethod: 'image' as any,
+          scanEmailPending: true,
           userId,
           locationLat: location?.lat,
           locationLng: location?.lng,
           locationLabel: location?.label,
           photoKey,
+          analysisText: analysis,
         },
       });
+      this.notifyCompletedScan(scan.id);
       return {
         id: scan.id,
         identified: identification,
         equivalents: [],
-        analysis: language === 'en'
-          ? 'No lubricant product was identified in this image. Try photographing the label or packaging more closely.'
-          : 'Aucun produit lubrifiant n’a été identifié. Essayez de photographier l’étiquette ou l’emballage de plus près.',
+        analysis,
         sources: [],
       };
     }
@@ -204,6 +210,7 @@ export class ImageAnalysisService {
           clientRequestId,
           status: expertEquiv.noEquivalent ? 'no_match' : (expertEquiv.confidence >= 70 ? 'matched' : 'partial'),
           scanMethod: 'image' as any,
+          scanEmailPending: true,
           userId,
           locationLat: location?.lat,
           locationLng: location?.lng,
@@ -220,6 +227,7 @@ export class ImageAnalysisService {
           photoKey,
         },
       });
+      this.notifyCompletedScan(scan.id);
       this.logger.log(`🏁 Analyse (équivalence experte) terminée en ${Date.now() - t0}ms`);
       return {
         id: scan.id,
@@ -300,6 +308,7 @@ export class ImageAnalysisService {
         clientRequestId,
         status: status as any,
         scanMethod: 'image' as any,
+        scanEmailPending: true,
         userId,
         locationLat: location?.lat,
         locationLng: location?.lng,
@@ -317,8 +326,17 @@ export class ImageAnalysisService {
       },
     });
 
+    this.notifyCompletedScan(scan.id);
     this.logger.log(`🏁 Analyse terminée en ${Date.now() - t0}ms — ${identification.name} → ${bestEquiv?.name || 'aucun'} (${bestEquiv?.compatibility || 0}%)`);
     return { ...analysis, id: scan.id };
+  }
+
+  private notifyCompletedScan(scanId: string): void {
+    // Delivery is durable in the database, so the customer need not wait for
+    // the email provider. The cron resumes it if this process stops.
+    void this.scanEmailNotification.notifyCompletedScan(scanId).catch((error) => {
+      this.logger.error(`Notification email du scan ${scanId} échouée: ${error}`);
+    });
   }
 
   /** Map a persisted scan row back into the analysis result shape (idempotency replay). */

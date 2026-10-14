@@ -41,6 +41,24 @@ export interface PriceRequestPayload {
   isFallback: boolean;
 }
 
+export interface CompletedScanPayload {
+  scanId: string;
+  scannedAt: Date;
+  recipients: string[];
+  distributor: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    company?: string | null;
+  };
+  departments: string[];
+  identifiedName?: string | null;
+  identifiedBrand?: string | null;
+  molydalEquivalent?: string | null;
+  equivalents: Array<{ name: string; compatibility: number | null; reason: string | null }>;
+  analysis?: string | null;
+}
+
 /**
  * Wrapper autour de Resend pour l'envoi d'emails transactionnels.
  *
@@ -163,38 +181,102 @@ export class EmailService {
     });
   }
 
+  /** Informs the Molydal representatives covering a distributor's scan. */
+  async sendCompletedScanToCommercials(payload: CompletedScanPayload): Promise<boolean> {
+    if (payload.recipients.length === 0) return false;
+
+    const client = `${payload.distributor.firstName} ${payload.distributor.lastName}`.trim();
+    const product = payload.identifiedName?.trim() || 'Produit non identifié';
+    const brand = payload.identifiedBrand?.trim();
+    const productLabel = brand && !product.toLocaleLowerCase('fr-FR').startsWith(brand.toLocaleLowerCase('fr-FR'))
+      ? `${brand} ${product}` : product;
+    const date = new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    }).format(payload.scannedAt);
+    const equivalents = payload.equivalents.length > 0
+      ? payload.equivalents
+      : payload.molydalEquivalent?.trim()
+        ? [{ name: payload.molydalEquivalent.trim(), compatibility: null, reason: null }]
+        : [];
+    const equivalentLines = equivalents.map((entry) =>
+      `${entry.name}${entry.compatibility === null ? '' : ` (${entry.compatibility} %)`}${entry.reason ? ` — ${entry.reason}` : ''}`,
+    );
+    const answer = equivalentLines.length > 0
+      ? equivalentLines.join('\n') : 'Aucun équivalent proposé.';
+    const analysis = payload.analysis?.trim() || '';
+    const company = payload.distributor.company?.trim();
+
+    const text = [
+      `Nouveau scan Molyscan effectué le ${date}.`,
+      `Client : ${client} (${payload.distributor.email})${company ? ` — ${company}` : ''}`,
+      `Secteur : ${payload.departments.join(', ')}`,
+      `Produit scanné : ${productLabel}`,
+      `Réponse donnée :\n${answer}`,
+      ...(analysis ? [`Analyse :\n${analysis}`] : []),
+    ].join('\n\n');
+    const html = [
+      '<p>Nouveau scan Molyscan.</p>',
+      `<p><strong>Date :</strong> ${escapeHtml(date)}</p>`,
+      `<p><strong>Client :</strong> ${escapeHtml(client)} (${escapeHtml(payload.distributor.email)})${company ? ` — ${escapeHtml(company)}` : ''}</p>`,
+      `<p><strong>Secteur :</strong> ${escapeHtml(payload.departments.join(', '))}</p>`,
+      `<p><strong>Produit scanné :</strong> ${escapeHtml(productLabel)}</p>`,
+      `<p><strong>Réponse donnée :</strong><br>${escapeHtml(answer).replace(/\n/g, '<br>')}</p>`,
+      ...(analysis ? [`<p><strong>Analyse :</strong><br>${escapeHtml(analysis).replace(/\n/g, '<br>')}</p>`] : []),
+    ].join('\n');
+
+    return this.send({
+      to: payload.recipients,
+      subject: `Nouveau scan Molyscan — ${productLabel.replace(/[\r\n]+/g, ' ').slice(0, 120)}`,
+      html,
+      text,
+      context: `scan:${payload.scanId}`,
+      // A replay or a transient provider timeout must not generate a second email.
+      idempotencyKey: `molyscan-scan-${payload.scanId}`,
+    });
+  }
+
   private async send(params: {
     to: string[];
     subject: string;
     html: string;
+    text?: string;
     context: string;
-  }): Promise<void> {
+    idempotencyKey?: string;
+  }): Promise<boolean> {
     if (!this.resend) {
       this.logger.warn(
         `Email non envoyé (Resend non configuré) — ${params.context}`,
       );
-      return;
+      return false;
     }
 
     try {
-      const { error } = await this.resend.emails.send({
+      const { data, error } = await this.resend.emails.send({
         from: this.fromEmail,
         to: params.to,
         subject: params.subject,
         html: params.html,
-      });
+        ...(params.text ? { text: params.text } : {}),
+      }, params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : undefined);
 
       if (error) {
         this.logger.error(
           `Échec d'envoi Resend (${params.context}): ${error.name} — ${error.message}`,
         );
-        return;
+        return false;
+      }
+      if (!data?.id) {
+        this.logger.error(`Réponse Resend sans identifiant (${params.context}).`);
+        return false;
       }
 
       this.logger.log(`Email envoyé (${params.context}) → ${params.to.join(', ')}`);
+      return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur inconnue';
       this.logger.error(`Exception d'envoi Resend (${params.context}): ${message}`);
+      return false;
     }
   }
 

@@ -280,6 +280,13 @@ model Scan {
   equivalentsJson     Json?
   photoKey            String?
 
+  // New scans opt in to email delivery; historical scans stay excluded.
+  scanEmailPending       Boolean   @default(false)
+  scanEmailPayload       Json?
+  scanEmailAttemptCount  Int       @default(0)
+  scanEmailNextAttemptAt DateTime?
+  scanEmailSentAt        DateTime?
+
   user              User               @relation(fields: [userId], references: [id])
   competitorProduct CompetitorProduct?  @relation(fields: [competitorProductId], references: [id])
 
@@ -292,6 +299,7 @@ model Scan {
   createdAt DateTime @default(now())
 
   @@index([identifiedName, identifiedBrand])
+  @@index([scanEmailPending, scanEmailNextAttemptAt])
   @@map("scans")
 }
 

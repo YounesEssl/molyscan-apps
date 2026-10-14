@@ -12,6 +12,7 @@ describe('Scan equivalence integrity', () => {
   let service: ImageAnalysisService;
   let prisma: any;
   let vector: any;
+  let scanEmailNotification: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -21,10 +22,11 @@ describe('Scan equivalence integrity', () => {
       pimProduct: { findMany: jest.fn().mockResolvedValue([]) },
     };
     vector = { dualSearch: jest.fn().mockResolvedValue([]) };
+    scanEmailNotification = { notifyCompletedScan: jest.fn().mockResolvedValue(undefined) };
     service = new ImageAnalysisService(
       { getOrThrow: () => 'test-key' } as any, prisma,
       { reformulateQuery: jest.fn().mockResolvedValue('oil ISO 68') } as any,
-      vector, { upload: jest.fn() } as any,
+      vector, { upload: jest.fn() } as any, scanEmailNotification,
     );
     jest.spyOn(service as any, 'identifyProduct').mockResolvedValue(identified);
   });
@@ -34,6 +36,9 @@ describe('Scan equivalence integrity', () => {
     prisma.expertEquivalence.findUnique.mockResolvedValue({ molydalEquivalent: 'H 125 AL', confidence: 100, noEquivalent: false });
     const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
     expect(result.equivalents[0].name).toBe('H 125 AL');
+    expect(prisma.scan.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ scanEmailPending: true }),
+    });
     expect(prisma.scan.findMany).not.toHaveBeenCalled();
     expect(vector.dualSearch).not.toHaveBeenCalled();
   });
@@ -43,9 +48,10 @@ describe('Scan equivalence integrity', () => {
     const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
     expect(result.equivalents).toEqual([]);
     expect(result.analysis).toContain('pas d’équivalent');
-    expect(prisma.scan.create).toHaveBeenCalledWith({ data: expect.objectContaining({ status: 'no_match', molydalEquivalent: null, equivalentsJson: [] }) });
+    expect(prisma.scan.create).toHaveBeenCalledWith({ data: expect.objectContaining({ status: 'no_match', molydalEquivalent: null, equivalentsJson: [], scanEmailPending: true }) });
     expect(vector.dualSearch).not.toHaveBeenCalled();
     expect(mockGenerateContent).not.toHaveBeenCalled();
+    expect(scanEmailNotification.notifyCompletedScan).toHaveBeenCalledWith('scan');
   });
 
   test('ignores an archived expert target and searches active candidates without inventing a no-equivalent decision', async () => {
@@ -69,6 +75,34 @@ describe('Scan equivalence integrity', () => {
     const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
     expect(result.equivalents[0].name).toBe(name);
     expect(vector.dualSearch).not.toHaveBeenCalled();
+  });
+
+  test('saves the answer and notifies after an unrecognized scan', async () => {
+    jest.spyOn(service as any, 'identifyProduct').mockResolvedValue({ ...identified, name: '' });
+    const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
+    expect(prisma.scan.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ analysisText: result.analysis, status: 'no_match', scanEmailPending: true }),
+    });
+    expect(scanEmailNotification.notifyCompletedScan).toHaveBeenCalledWith('scan');
+  });
+
+  test('an offline replay returns the saved scan without sending another email', async () => {
+    prisma.scan.findUnique.mockResolvedValue({
+      id: 'scan', userId: 'user', identifiedName: 'Competitor 68',
+      identifiedBrand: 'Brand', identifiedType: 'oil', identifiedSpecs: 'ISO 68',
+      analysisText: 'Existing answer', equivalentsJson: [],
+    });
+    const result = await service.analyzeImage('AA==', 'image/jpeg', 'user', undefined, undefined, 'request');
+    expect(result.analysis).toBe('Existing answer');
+    expect(prisma.scan.create).not.toHaveBeenCalled();
+    expect(scanEmailNotification.notifyCompletedScan).not.toHaveBeenCalled();
+  });
+
+  test('a notification failure never turns a saved scan into a failed request', async () => {
+    scanEmailNotification.notifyCompletedScan.mockRejectedValue(new Error('provider unavailable'));
+    prisma.expertEquivalence.findUnique.mockResolvedValue({ molydalEquivalent: 'H 125 AL', confidence: 100, noEquivalent: false });
+    await expect(service.analyzeImage('AA==', 'image/jpeg', 'user')).resolves.toMatchObject({ id: 'scan' });
+    expect(prisma.scan.create).toHaveBeenCalledTimes(1);
   });
 
   test.each([
