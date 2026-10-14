@@ -6,6 +6,7 @@ import { api } from '@/lib/axios';
 import { storage } from '@/lib/storage';
 import { API_CONFIG } from '@/constants/api';
 import { createChatStreamParser } from '@/lib/chatStream';
+import { getDeviceDocumentLanguage } from '@/lib/deviceDocumentLanguage';
 
 export interface ScanContext {
   id: string;
@@ -167,7 +168,7 @@ export const chatFreeService = {
           reject(new Error('Network error'));
         };
 
-        xhr.send(JSON.stringify({ text, ...(attachmentId ? { attachmentId } : {}) }));
+        xhr.send(JSON.stringify({ text, documentLanguage: getDeviceDocumentLanguage(), ...(attachmentId ? { attachmentId } : {}) }));
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Network error';

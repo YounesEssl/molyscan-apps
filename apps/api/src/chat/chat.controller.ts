@@ -132,7 +132,7 @@ export class ChatController {
     @Param('id') id: string,
     @Body() dto: SendMessageDto,
   ) {
-    return this.chatService.sendMessage(id, user.sub, dto.text);
+    return this.chatService.sendMessage(id, user.sub, dto.text, dto.documentLanguage);
   }
 
   // ── Free chat SSE streaming ────────────────────────────────────
@@ -160,6 +160,7 @@ export class ChatController {
         user.sub,
         dto.text,
         attachment,
+        dto.documentLanguage,
       );
 
       let fullContent = '';

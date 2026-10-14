@@ -7,9 +7,10 @@ import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/Text';
 import { colors } from '@/design/tokens/colors';
 import { productService, selectTechnicalSheet } from '@/services/product.service';
+import { getDeviceDocumentLanguage } from '@/lib/deviceDocumentLanguage';
 
 export function TechnicalSheetButton({ productName, showProductName = false }: { productName: string; showProductName?: boolean }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const router = useRouter();
   const { data, isError, refetch } = useQuery({
     queryKey: ['pim-documents', productName],
@@ -18,7 +19,7 @@ export function TechnicalSheetButton({ productName, showProductName = false }: {
     staleTime: 5 * 60_000,
     retry: false,
   });
-  const document = selectTechnicalSheet(data ?? [], i18n.language);
+  const document = selectTechnicalSheet(data ?? [], getDeviceDocumentLanguage());
   if (!document && !isError) return null;
   return (
     <Pressable

@@ -203,7 +203,7 @@ export class ChatService {
     return messages.map((m) => this.formatMessage(m));
   }
 
-  async sendMessage(conversationId: string, userId: string, text: string) {
+  async sendMessage(conversationId: string, userId: string, text: string, preferredDocumentLanguage?: string) {
     const conversation = await this.prisma.aIConversation.findFirst({
       where: { id: conversationId, userId },
     });
@@ -224,7 +224,7 @@ export class ChatService {
     });
 
     // Generate AI response
-    const aiResult = await this.documents.answer(text, history, conversation.molydalName, { name: conversation.scannedName, brand: conversation.scannedBrand }) ?? await this.ragService.generateResponse({
+    const aiResult = await this.documents.answer(text, history, conversation.molydalName, { name: conversation.scannedName, brand: conversation.scannedBrand }, preferredDocumentLanguage) ?? await this.ragService.generateResponse({
       question: text,
       productContext: conversation.type === 'product' ? {
         scannedName: conversation.scannedName ?? '',
@@ -264,6 +264,7 @@ export class ChatService {
     userId: string,
     text: string,
     attachment?: AttachmentEntry,
+    preferredDocumentLanguage?: string,
   ): Promise<{
     stream: AsyncIterable<string>;
     sources: string[];
@@ -290,7 +291,7 @@ export class ChatService {
     await this.updateConversationMeta(conversationId, text, conversation.title);
 
     const documentReply = !attachment
-      ? await this.documents.answer(text, history, conversation.molydalName, { name: conversation.scannedName, brand: conversation.scannedBrand })
+      ? await this.documents.answer(text, history, conversation.molydalName, { name: conversation.scannedName, brand: conversation.scannedBrand }, preferredDocumentLanguage)
       : null;
     if (documentReply) {
       return {

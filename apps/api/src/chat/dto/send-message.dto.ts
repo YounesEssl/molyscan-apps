@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, MaxLength, IsOptional, MinLength } from 'class-validator';
+import { IsIn, IsString, MaxLength, IsOptional, MinLength } from 'class-validator';
 
 export class SendMessageDto {
   @ApiProperty({ maxLength: 1000 })
@@ -12,4 +12,9 @@ export class SendMessageDto {
   @IsString()
   @IsOptional()
   attachmentId?: string;
+
+  @ApiPropertyOptional({ description: 'Preferred language for PIM document links' })
+  @IsIn(['fr', 'en', 'es', 'de', 'it'])
+  @IsOptional()
+  documentLanguage?: string;
 }

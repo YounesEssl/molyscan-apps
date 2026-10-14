@@ -237,6 +237,15 @@ before calling the language model. It asks for a product name when context is
 ambiguous and respects expert decisions that withdraw or correct an equivalent.
 Document IDs survive subsequent PIM synchronizations.
 
+FT links use the phone's preferred language when the corresponding Sellbase PDF
+exists (`fr`, `en`, `es`, `de`, `it`), regardless of the Molyscan interface
+language. A request that explicitly names a language takes priority in chat.
+If the requested FT is absent or unavailable, the resolver tries an existing
+English PDF, then French, then another available language; the link/button
+displays the actual language. It never translates or fabricates a PDF. A
+read-only production check on 2026-10-14 found 159 active lubricants with an
+Spanish FT and 163 with a German FT, and downloaded both PDFs for AGL 41 NF.
+
 Safety data sheets are stored on **level-5 references** in Sellbase. The API
 exposes them from the already synchronized `PimReference.rawData`, deduplicating
 identical files while retaining distinct reference-specific sheets. Confirmed

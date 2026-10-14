@@ -80,6 +80,38 @@ describe('Assistant PIM document requests', () => {
     expect(result?.text).toContain('HOTLIFE S 119');
     expect(result?.text).toContain('/document/doc');
   });
+  it('selects the PIM FT in the requested or preferred language', async () => {
+    products.findPimDocumentsByName.mockResolvedValue({ documents: [
+      { id: 'fr-doc', kind: 'technical_sheet', language: 'fr', available: true },
+      { id: 'es-doc', kind: 'technical_sheet', language: 'es', available: true },
+      { id: 'de-doc', kind: 'technical_sheet', language: 'de', available: true },
+    ] });
+    const spanish = await service.answer('FT AGL 41 NF', [], null, undefined, 'es-ES');
+    expect(spanish?.text).toContain('/document/es-doc');
+    expect(spanish?.text).not.toContain('/document/fr-doc');
+    const german = await service.answer('FT AGL 41 NF en allemand', [], null, undefined, 'es');
+    expect(german?.text).toContain('/document/de-doc');
+    expect(german?.text).not.toContain('/document/es-doc');
+  });
+
+  it('falls back to an existing English FT when the requested translation is missing', async () => {
+    products.findPimDocumentsByName.mockResolvedValue({ documents: [
+      { id: 'fr-doc', kind: 'technical_sheet', language: 'fr', available: true },
+      { id: 'en-doc', kind: 'technical_sheet', language: 'en', available: true },
+    ] });
+    const result = await service.answer('FT AGL 41 NF en espagnol', []);
+    expect(result?.text).toContain('/document/en-doc');
+    expect(result?.text).toContain('(EN)');
+  });
+  it('falls back when the preferred PIM document is listed but unavailable', async () => {
+    products.findPimDocumentsByName.mockResolvedValue({ documents: [
+      { id: 'es-doc', kind: 'technical_sheet', language: 'es', available: false },
+      { id: 'en-doc', kind: 'technical_sheet', language: 'en', available: true },
+    ] });
+    const result = await service.answer('FT AGL 41 NF', [], null, undefined, 'es');
+    expect(result?.text).toContain('/document/en-doc');
+    expect(result?.text).not.toContain('/document/es-doc');
+  });
   it.each([
     'La FT de AGL 41 NF indique-t-elle une certification NSF H1 ?',
     'Selon la FDS de LUB 13, quelles précautions faut-il prendre ?',

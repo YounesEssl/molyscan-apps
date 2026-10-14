@@ -22,6 +22,7 @@ import { scanService, type ScanLinkedConversation } from '@/services/scan.servic
 import { chatFreeService } from '@/services/chatFree.service';
 import { useAuthStore } from '@/stores/auth.store';
 import { productService, selectTechnicalSheet, type PimDocument } from '@/services/product.service';
+import { getDeviceDocumentLanguage } from '@/lib/deviceDocumentLanguage';
 import { TechnicalSheetCTA } from '@/components/product/TechnicalSheetCTA';
 
 interface ScanDetail {
@@ -61,7 +62,7 @@ export default function ProductDetailScreen(): React.JSX.Element {
   // Seuls les distributeurs peuvent émettre une demande de prix.
   const isDistributor = useAuthStore((s) => s.user?.role) === 'distributor';
   const [priceModalOpen, setPriceModalOpen] = useState(false);
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [scan, setScan] = useState<ScanDetail | null>(null);
   const [conversations, setConversations] = useState<ScanLinkedConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,8 +103,8 @@ export default function ProductDetailScreen(): React.JSX.Element {
   }, [productName]);
 
   const technicalSheet = useMemo(() => {
-    return selectTechnicalSheet(documents, i18n.language);
-  }, [documents, i18n.language]);
+    return selectTechnicalSheet(documents, getDeviceDocumentLanguage());
+  }, [documents]);
 
   const handleDelete = () => {
     if (!scan || deletingRef.current) return;

@@ -32,4 +32,13 @@ describe('Product context in non-streaming chat', () => {
     expect(response.aiResponse.text).toBe('Document vérifié');
     expect(rag.generateResponse).not.toHaveBeenCalled();
   });
+
+  it('passes the phone document language to the PIM document resolver', async () => {
+    documents.answer.mockResolvedValue({ text: 'FT espagnole', sources: [] });
+    await service.sendMessage('conversation', 'user', 'FT AGL 41 NF', 'es');
+    expect(documents.answer).toHaveBeenCalledWith(
+      'FT AGL 41 NF', [], product.molydalName,
+      { name: product.scannedName, brand: product.scannedBrand }, 'es',
+    );
+  });
 });

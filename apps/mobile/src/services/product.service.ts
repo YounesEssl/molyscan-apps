@@ -2,6 +2,7 @@ import { api } from '@/lib/axios';
 import { ENDPOINTS } from '@/constants/api';
 import { ProductSchema, PimDocumentsResponseSchema, type Product, type PimDocument } from '@/schemas/product.schema';
 import { File, Paths } from 'expo-file-system';
+import { selectTechnicalSheet } from '@/lib/documentLanguage';
 
 export const productService = {
   getByBarcode: async (barcode: string): Promise<Product> => {
@@ -31,7 +32,4 @@ export const productService = {
 
 export type { PimDocument };
 
-export function selectTechnicalSheet(documents: PimDocument[], language: string): PimDocument | undefined {
-  const sheets = documents.filter((d) => d.kind === 'technical_sheet' && d.available);
-  return sheets.find((d) => d.language === language.split('-')[0]) ?? sheets.find((d) => d.language === 'fr') ?? sheets.find((d) => d.language === 'en') ?? sheets[0];
-}
+export { selectTechnicalSheet };

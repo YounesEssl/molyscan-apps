@@ -17,6 +17,26 @@ const WITHDRAWN_EQUIVALENCE =
   /\b(?:(?:aucun|aucune|pas d|sans) (?:equivalent|equivalence|correspondance)|(?:no|not an?) (?:suitable |validated |molydal )*(?:equivalent|match)|(?:retire|retirons|withdraw) (?:cette |ma |la |the )?(?:equivalence|proposition|suggestion|recommandation|recommendation)|(?:equivalence|proposition|suggestion|recommandation|recommendation) (?:est |is )?(?:retiree|withdrawn|invalide))\b/;
 const SUBJECT_CHANGE =
   /\b(changeons de (?:sujet|produit)|autre produit|nouveau produit|parlons (?:de|d)|passons a|et pour|qu en est il de|what about|switch (?:to|topics)|change (?:the )?(?:subject|product)|different product)\b/;
+const SHEET_LANGUAGES = ['fr', 'en', 'es', 'de', 'it'] as const;
+type SheetLanguage = (typeof SHEET_LANGUAGES)[number];
+const EXPLICIT_SHEET_LANGUAGE: Array<{ language: SheetLanguage; pattern: RegExp }> = [
+  { language: 'es', pattern: /\b(?:en|in) (?:espagnol|espagnole|espanol|spanish)\b/ },
+  { language: 'de', pattern: /\b(?:(?:en|in) (?:allemand|allemande|german)|auf deutsch)\b/ },
+  { language: 'it', pattern: /\b(?:en|in) (?:italien|italienne|italiano|italian)\b/ },
+  { language: 'en', pattern: /\b(?:en|in) (?:anglais|anglaise|english)\b/ },
+  { language: 'fr', pattern: /\b(?:en|in) (?:francais|francaise|french)\b/ },
+];
+
+function requestedSheetLanguage(input: string, preferredLanguage?: string | null): SheetLanguage | null {
+  const explicit = EXPLICIT_SHEET_LANGUAGE.find(({ pattern }) => pattern.test(input));
+  if (explicit) return explicit.language;
+  const preferred = preferredLanguage?.toLowerCase().split(/[-_]/)[0];
+  return SHEET_LANGUAGES.find((language) => language === preferred) ?? null;
+}
+
+function stripSheetLanguage(text: string): string {
+  return EXPLICIT_SHEET_LANGUAGE.reduce((value, { pattern }) => value.replace(pattern, ''), text);
+}
 
 function mentions(text: string, designation: string): boolean {
   if (!designation) return false;
@@ -31,7 +51,7 @@ function removeDesignation(text: string, designation: string): string {
 }
 
 function requestRemainder(text: string): string {
-  return text
+  return stripSheetLanguage(text)
     .replace(/\b(?:si\s+)?tu as(?: bien)?\b/g, '')
     .replace(
       /\b(technical data sheets?|technical sheets?|safety data sheets?|safety sheets?|fiches? techniques?|fiches? (?:de |des )?(?:donn(?:ee|e)s? de )?securite|certificats? (?:d |de |du |des )?alimentarite)\b/g,
@@ -57,6 +77,7 @@ export class ChatDocumentsService {
     history: HistoryMessage[],
     linkedProduct?: string | null,
     scannedProduct?: { name: string | null; brand: string | null },
+    preferredLanguage?: string | null,
   ) {
     const input = normalizeProductName(question);
     let technical =
@@ -245,13 +266,7 @@ export class ChatDocumentsService {
       );
     }
 
-    const language = /\b(anglais|anglaise|english)\b/.test(input)
-      ? 'en'
-      : /\b(francais|francaise|french)\b/.test(input)
-        ? 'fr'
-        : english
-          ? 'en'
-          : 'fr';
+    const language = requestedSheetLanguage(input, preferredLanguage) ?? (english ? 'en' : 'fr');
     const kinds = [
       ...(technical ? ['technical_sheet'] : []),
       ...(safety ? ['safety_sheet'] : []),
@@ -281,13 +296,17 @@ export class ChatDocumentsService {
         const frenchArticle = kind === 'food_certificate' ? 'Le' : 'La';
         const frenchNone = kind === 'food_certificate' ? 'Aucun' : 'Aucune';
         const sheets = result.documents.filter((d) => d.kind === kind);
-        const preferred = sheets.filter((d) => d.language === language);
-        const fallback = sheets.filter((d) => d.language === 'fr');
+        const candidates = sheets.some((d) => d.available) ? sheets.filter((d) => d.available) : sheets;
+        const preferred = candidates.filter((d) => d.language === language);
+        const fallback = candidates.filter((d) => d.language === 'en');
+        const frenchFallback = candidates.filter((d) => d.language === 'fr');
         const selected = preferred.length
           ? preferred
           : fallback.length
             ? fallback
-            : sheets.slice(0, 1);
+            : frenchFallback.length
+              ? frenchFallback
+              : candidates.slice(0, 1);
         if (!selected.length) {
           lines.push(
             english
