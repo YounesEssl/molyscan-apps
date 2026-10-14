@@ -56,6 +56,30 @@ describe('Expert decisions in assistant conversations', () => {
     await service.generateStreamingResponse('Un remplacement chez AnotherBrand ?', []);
     expect(mockGetModel.mock.calls[0][0].systemInstruction).toContain('Never recommend a competitor product');
   });
+  test('pins the exact active product for the reported SOLESTER follow-up', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'SOLESTER 550', active: true }]);
+    await service.generateStreamingResponse('And solester550?', [
+      { role: 'user', text: 'Which product should I use?' },
+      { role: 'assistant', text: 'I can compare a few grades.' },
+    ]);
+    expect(vector.dualSearch).toHaveBeenCalledWith(
+      'And solester550?', 'And solester550?', undefined, ['SOLESTER 550'],
+    );
+    expect(mockGetModel.mock.calls[0][0].systemInstruction).toContain('Absence from a ranked search result is NOT evidence');
+  });
+  test('pins products from the previous answer for a comparison table', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([
+      { name: 'LCH 700', active: true }, { name: 'HOTLIFE S 119', active: true },
+      { name: 'OLD GRADE', active: false },
+    ]);
+    await service.generateStreamingResponse('Peux tu me faire tableau comparatif', [
+      { role: 'assistant', text: 'LCH 700, HOTLIFE S 119 et OLD GRADE.' },
+    ]);
+    expect(vector.dualSearch).toHaveBeenCalledWith(
+      'Peux tu me faire tableau comparatif', 'Peux tu me faire tableau comparatif',
+      undefined, ['LCH 700', 'HOTLIFE S 119'],
+    );
+  });
   test('streams the same decision in free chat', async () => {
     const response = await service.generateStreamingResponse('What is the equivalent of Brand Product 68?', []);
     let text = '';
@@ -115,7 +139,7 @@ describe('Expert decisions in assistant conversations', () => {
     expect(systemInstruction).toContain('DÉCISION EXPERTE MOLYDAL : AUCUN ÉQUIVALENT');
     expect(systemInstruction).toContain('Brand Product 68');
     expect(systemInstruction).not.toContain('OLD GUESS');
-    expect(vector.dualSearch).toHaveBeenCalledWith(question, question, undefined);
+    expect(vector.dualSearch).toHaveBeenCalledWith(question, question, undefined, []);
     expect(mockGenerateContentStream).toHaveBeenCalledWith({ contents: [{ role: 'user', parts: [
       { inlineData: { mimeType: 'application/pdf', data: attachment.base64 } }, { text: question },
     ] }] });
@@ -145,7 +169,7 @@ describe('Expert decisions in assistant conversations', () => {
     const instruction = mockGetModel.mock.calls[0][0].systemInstruction;
     expect(instruction).not.toContain('DÉCISION EXPERTE MOLYDAL : AUCUN ÉQUIVALENT');
     expect(instruction).not.toContain('SCAN CONTEXT');
-    expect(vector.dualSearch).toHaveBeenCalledWith(question, question, undefined);
+    expect(vector.dualSearch).toHaveBeenCalledWith(question, question, undefined, []);
   });
   test('does not revive an earlier veto after a user has switched to an uncurated product', async () => {
     await service.generateStreamingResponse('Peux-tu proposer le plus proche ?', [

@@ -9,7 +9,7 @@ import {
   normalizeProductText,
 } from '../../common/utils/normalize';
 import type { AttachmentEntry } from '../attachment.store';
-import { ACTIVE_CATALOGUE_RULE, loadPimAvailability, PimAvailability } from '../../pim/pim-availability';
+import { ACTIVE_CATALOGUE_RULE, loadPimAvailability, normalizePimProductName, PimAvailability } from '../../pim/pim-availability';
 import { requestsCompetitorRecommendation, molydalOnlyResponse } from './recommendation-policy';
 
 interface RagInput {
@@ -44,7 +44,8 @@ When asked to compare a competitor with a Molydal product, provide a compact Mar
 Detect the language of the FIRST user message in the conversation and respond in THAT language for the entire conversation. Never switch languages mid-conversation, even if intermediate messages are shorter or use technical English terms. French question → French answer. English question → English answer. This rule overrides every other formatting preference.
 
 ━━━ INFORMATION SOURCES (STRICT) ━━━
-- **MOLYDAL PRODUCTS**: ONLY the technical datasheets provided in the context below. Never invent anything, never rely on general knowledge. If a Molydal product is not in the context, it does not exist for you.
+- **MOLYDAL PRODUCTS**: ONLY the technical datasheets provided in the context below. Never invent anything, never rely on general knowledge. Absence from a ranked search result is NOT evidence that a product or its FT is absent from the PIM. If an exact product was not retrieved, say that its technical sheet was not available for this answer; do not claim the product is nonexistent or inactive without explicit catalogue evidence.
+- An excerpt marked "exact active PIM product match" proves that the named product is active in the current catalogue. Never say it is missing or inactive. This proves identity only, not suitability for the user's application.
 - The context distinguishes original Sellbase FT PDFs from structured Sellbase catalogue fields. Use original FTs for technical performance and applications; use current catalogue fields for active references and explicit certification metadata. If the two disagree on a decisive characteristic, state the conflict and do not assert an equivalence.
 - **COMPETITOR PRODUCTS**: if you need to identify a competitor product or obtain its characteristics (viscosity, additives, certifications, application), use Google Search. **Never guess**, NEVER rely on your general knowledge. If the web search returns nothing usable, say so explicitly.
 - **ABSOLUTE RULE**: zero hallucination. Any information about a competitor lubricant must come from a verified web search; any information about a Molydal product must come from the RAG context.
@@ -207,6 +208,23 @@ export class RagService {
     return /\b(?:equivalen\w*|alternativ\w*|substitut\w*|remplac\w*|replac\w*|closest|nearest|plus proche|a la place)\b/.test(normalizeProductText(question));
   }
 
+  private namesToKeepInContext(
+    question: string,
+    history: Array<{ role: string; text: string }>,
+    availability: PimAvailability,
+  ): string[] {
+    const explicit = availability.findActiveNamesInText(question);
+    if (explicit.length) return explicit;
+    // A short comparison or correction refers to the products in the last
+    // answer. Re-retrieve their current FT instead of treating the next
+    // similarity shortlist as proof that those products disappeared.
+    const followUp = /\b(tableau|compar\w*|pourquoi|precedent\w*|ceux|celles|ces|why|previous|those|these)\b/
+      .test(normalizePimProductName(question));
+    if (!followUp) return [];
+    const lastAnswer = [...history].reverse().find((message) => message.role === 'assistant');
+    return lastAnswer ? availability.findActiveNamesInText(lastAnswer.text) : [];
+  }
+
   private validatedEquivalenceBlock(eq: ExpertEquivalence | null): string {
     if (!eq) return '';
     if (eq.noEquivalent) {
@@ -335,11 +353,13 @@ ${prompt}`,
       input.question,
       conversationHistory,
     );
+    const pinnedNames = this.namesToKeepInContext(input.question, input.conversationHistory, availability);
 
     const chunks = (await this.vectorStore.dualSearch(
       input.question,
       reformulated,
       input.retrievalFilters,
+      pinnedNames,
     )).filter((chunk) => !availability.isInactive(chunk.product_name));
 
     const context =
@@ -347,7 +367,7 @@ ${prompt}`,
         ? chunks
             .map(
               (c) =>
-                `[${c.product_name}] (source: ${c.metadata?.source_kind === 'sellbase_technical_sheet' ? 'original Sellbase FT PDF' : 'Sellbase catalogue fields'}; relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
+                `[${c.product_name}] (source: ${c.metadata?.source_kind === 'sellbase_technical_sheet' ? 'original Sellbase FT PDF' : 'Sellbase catalogue fields'}; ${c.metadata?.exact_catalogue_match ? 'exact active PIM product match' : `relevance: ${(c.similarity * 100).toFixed(0)}%`})\n${c.chunk_text}`,
             )
             .join('\n\n---\n\n')
         : 'No relevant technical datasheet found.';
@@ -421,6 +441,7 @@ ${prompt}`,
       return { sources: [], stream: (async function* () { yield text; })() };
     }
     const availability = await loadPimAvailability(this.prisma);
+    const originalHistory = conversationHistory;
     conversationHistory = availability.sanitizeHistory(conversationHistory);
     const { expert, useScanContext } = await this.resolveExpertContext(question, conversationHistory, productContext?.scannedBrand, productContext?.scannedName, availability);
     if (!useScanContext) productContext = undefined;
@@ -450,11 +471,13 @@ ${prompt}`,
       contextualQuestion,
       conversationHistory,
     );
+    const pinnedNames = this.namesToKeepInContext(question, originalHistory, availability);
 
     const chunks = (await this.vectorStore.dualSearch(
       contextualQuestion,
       reformulated,
       retrievalFilters,
+      pinnedNames,
     )).filter((chunk) => !availability.isInactive(chunk.product_name));
 
     const context =
@@ -462,7 +485,7 @@ ${prompt}`,
         ? chunks
             .map(
               (c) =>
-                `[${c.product_name}] (source: ${c.metadata?.source_kind === 'sellbase_technical_sheet' ? 'original Sellbase FT PDF' : 'Sellbase catalogue fields'}; relevance: ${(c.similarity * 100).toFixed(0)}%)\n${c.chunk_text}`,
+                `[${c.product_name}] (source: ${c.metadata?.source_kind === 'sellbase_technical_sheet' ? 'original Sellbase FT PDF' : 'Sellbase catalogue fields'}; ${c.metadata?.exact_catalogue_match ? 'exact active PIM product match' : `relevance: ${(c.similarity * 100).toFixed(0)}%`})\n${c.chunk_text}`,
             )
             .join('\n\n---\n\n')
         : 'No relevant technical datasheet found.';

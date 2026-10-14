@@ -47,7 +47,7 @@ describe('Assistant PIM document requests', () => {
     expect(products.downloadPimDocument).toHaveBeenCalledWith('doc');
     expect(result?.text).toContain('](/document/doc)');
   });
-  it.each(['FT LUB 13 EP99', 'FT LUB 13 EXTRA', 'FT AGL 41 NF 46'])(
+  it.each(['FT LUB 13 EP99', 'FT LUB 13 EXTRA', 'FT LUB 13 AS', 'FT AGL 41 NF 46'])(
     'never substitutes a known base name for an unknown explicit grade: %s',
     async (question) => {
       const result = await service.answer(
@@ -66,6 +66,18 @@ describe('Assistant PIM document requests', () => {
       [],
     );
     expect(products.findPimDocumentsByName).toHaveBeenCalledWith('LUB 13 EP2');
+    expect(result?.text).toContain('/document/doc');
+  });
+  it('returns both PIM FTs when the user corrects a false missing-sheet claim', async () => {
+    prisma.pimProduct.findMany.mockResolvedValue([
+      { name: 'LCH 700', active: true }, { name: 'HOTLIFE S 119', active: true },
+    ]);
+    const result = await service.answer('Si, Tu as les fiches techniques de la LCH700 et la hotlife s119', []);
+    expect(products.findPimDocumentsByName).toHaveBeenCalledWith('LCH 700');
+    expect(products.findPimDocumentsByName).toHaveBeenCalledWith('HOTLIFE S 119');
+    expect(products.findPimDocumentsByName).toHaveBeenCalledTimes(2);
+    expect(result?.text).toContain('LCH 700');
+    expect(result?.text).toContain('HOTLIFE S 119');
     expect(result?.text).toContain('/document/doc');
   });
   it.each([

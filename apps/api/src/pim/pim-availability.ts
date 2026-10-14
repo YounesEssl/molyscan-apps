@@ -8,11 +8,13 @@ export function normalizePimProductName(value: string): string {
 
 export class PimAvailability {
   private readonly active: Set<string>;
+  private readonly activeProductNames: string[];
   private readonly inactive: Set<string>;
   private readonly activeReferences: Set<string>;
   private readonly inactiveReferences: Set<string>;
 
   constructor(rows: Array<{ name: string; active: boolean; references?: Array<{ code: string | null; active: boolean }> }>) {
+    this.activeProductNames = [...new Set(rows.filter((row) => row.active).map((row) => row.name))];
     this.active = new Set(rows.filter((row) => row.active).map((row) => normalizePimProductName(row.name)));
     // Different element IDs may have the same name: an active homonym remains
     // available even when an older PIM record with that name was archived.
@@ -32,6 +34,29 @@ export class PimAvailability {
 
   isInactiveReference(code?: string | null): boolean {
     return !!code && this.inactiveReferences.has(normalizePimProductName(code));
+  }
+
+  /** Resolve explicit active product designations, including compact forms such as LCH700. */
+  findActiveNamesInText(text: string, limit = 6): string[] {
+    const normalizedText = normalizePimProductName(text);
+    const matches = this.activeProductNames.flatMap((name) => {
+      const normalizedName = normalizePimProductName(name);
+      if (normalizedName.replace(/[^a-z0-9]/g, '').length < 4) return [];
+      const tokens = normalizedName.match(/[a-z0-9+]+/g) ?? [];
+      const pattern = tokens.map((token) => token.replace(/\+/g, '\\+')).join('\\s*');
+      const match = new RegExp(`(^|[^a-z0-9+])(${pattern})(?=$|[^a-z0-9+])`).exec(normalizedText);
+      if (!match) return [];
+      const start = match.index + match[1].length;
+      return [{ name, start, end: start + match[2].length }];
+    }).sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+
+    const selected: typeof matches = [];
+    for (const match of matches) {
+      if (selected.some((existing) => match.start < existing.end && match.end > existing.start)) continue;
+      selected.push(match);
+      if (selected.length >= limit) break;
+    }
+    return selected.map((match) => match.name);
   }
 
   sanitizeExpertNote<T extends { note?: string | null }>(expert: T): T {

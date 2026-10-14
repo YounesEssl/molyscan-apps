@@ -19,17 +19,20 @@ const SUBJECT_CHANGE =
   /\b(changeons de (?:sujet|produit)|autre produit|nouveau produit|parlons (?:de|d)|passons a|et pour|qu en est il de|what about|switch (?:to|topics)|change (?:the )?(?:subject|product)|different product)\b/;
 
 function mentions(text: string, designation: string): boolean {
-  return !!designation && ` ${text} `.includes(` ${designation} `);
+  if (!designation) return false;
+  const pattern = designation.split(/\s+/).map((token) => token.replace(/\+/g, '\\+')).join('\\s*');
+  return new RegExp(`(^|[^a-z0-9+])${pattern}(?=$|[^a-z0-9+])`).test(text);
 }
 
 function removeDesignation(text: string, designation: string): string {
   if (!designation) return text;
-  const escaped = designation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return text.replace(new RegExp(`(^|\\s)${escaped}(?=\\s|$)`, 'g'), ' ');
+  const pattern = designation.split(/\s+/).map((token) => token.replace(/\+/g, '\\+')).join('\\s*');
+  return text.replace(new RegExp(`(^|[^a-z0-9+])${pattern}(?=$|[^a-z0-9+])`, 'g'), ' ');
 }
 
 function requestRemainder(text: string): string {
   return text
+    .replace(/\b(?:si\s+)?tu as(?: bien)?\b/g, '')
     .replace(
       /\b(technical data sheets?|technical sheets?|safety data sheets?|safety sheets?|fiches? techniques?|fiches? (?:de |des )?(?:donn(?:ee|e)s? de )?securite|certificats? (?:d |de |du |des )?alimentarite)\b/g,
       '',

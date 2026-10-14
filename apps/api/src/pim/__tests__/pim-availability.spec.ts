@@ -14,6 +14,18 @@ describe('Current PIM product availability', () => {
     expect(availability.isInactive('STARNET SPECIAL')).toBe(false);
     expect(normalizePimProductName('STARNET +')).toBe('starnet+');
   });
+  it('recognizes active PIM designations in compact spelling and keeps distinct grades', () => {
+    const current = new PimAvailability([
+      { name: 'LCH 700', active: true }, { name: 'HOTLIFE S 119', active: true },
+      { name: 'SOLESTER 550', active: true }, { name: 'SOLESTER 530', active: false },
+      { name: 'STARNET', active: false }, { name: 'STARNET+', active: true },
+    ]);
+    expect(current.findActiveNamesInText('Tu as la FT de la LCH700 et la hotlife s119 ?'))
+      .toEqual(['LCH 700', 'HOTLIFE S 119']);
+    expect(current.findActiveNamesInText('And solester550?')).toEqual(['SOLESTER 550']);
+    expect(current.findActiveNamesInText('SOLESTER 5500 ou SOLESTER 530 ?')).toEqual([]);
+    expect(current.findActiveNamesInText('STARNET+ et STARNET')).toEqual(['STARNET+']);
+  });
   it.each(['STARNET+ convient.', 'STARNET + convient.', 'ABC AL convient.', 'KL BIO convient.'])('does not match an archived base inside the active grade: %s', (text) => {
     expect(availability.mentionsInactive(text)).toBe(false);
   });

@@ -174,6 +174,14 @@ not fixed import limits.
 
 ## Index safety
 
+When an assistant question explicitly names an active PIM product (including
+compact spellings such as `LCH700` or `solester550`), retrieval includes its
+indexed original FT and catalogue chunk even if semantic ranking omits it. A
+short comparison follow-up also rechecks active products named in the previous
+answer. Hard certification and format filters still apply. A product absent
+from one answer's shortlist is never evidence that its FT or product is absent
+from the PIM. Direct FT requests are resolved against PIM document records.
+
 Each run builds a separate `RagIndexVersion`. The active version is only changed
 inside a database transaction after structural validation. Previous versions are
 archived and retained for rollback. Query and document embeddings share the same

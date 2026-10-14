@@ -254,13 +254,15 @@ export class VectorStoreService implements OnModuleInit {
     originalQuery: string,
     reformulatedQuery: string,
     filters?: RetrievalFilters,
+    pinnedProductNames: string[] = [],
   ): Promise<ChunkResult[]> {
     // Each product can contribute a structured catalogue chunk and an original
     // FT chunk. Fetch enough rows to keep the same diversity of products.
     const overfetch = filters ? 120 : 80;
-    const [directResults, reformulatedResults] = await Promise.all([
+    const [directResults, reformulatedResults, pinnedResults] = await Promise.all([
       this.searchChunks(originalQuery, overfetch),
       this.searchChunks(reformulatedQuery, overfetch),
+      this.findPinnedChunks(pinnedProductNames, filters),
     ]);
 
     // Merge and deduplicate, keeping highest similarity per chunk
@@ -309,7 +311,8 @@ export class VectorStoreService implements OnModuleInit {
     // not erase otherwise relevant candidates retrieved by their properties.
     const reranked = await this.rerank(reformulatedQuery, candidatesForRerank, 15);
 
-    return [
+    const combined = [
+      ...pinnedResults,
       ...reranked,
       ...extras
         .filter((c) =>
@@ -317,5 +320,53 @@ export class VectorStoreService implements OnModuleInit {
         )
         .slice(0, 15),
     ];
+    const seen = new Set<string>();
+    return combined.filter((chunk) => {
+      const key = `${chunk.product_name}::${chunk.chunk_text.slice(0, 100)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 30);
+  }
+
+  private async findPinnedChunks(names: string[], filters?: RetrievalFilters): Promise<ChunkResult[]> {
+    if (!this.prisma || names.length === 0) return [];
+    const active = await this.prisma.ragIndexVersion.findFirst({
+      where: { status: 'active' }, orderBy: { activatedAt: 'desc' }, select: { id: true },
+    });
+    if (!active) return [];
+    const selectedNames = [...new Set(names)].slice(0, 6);
+    const rows = await this.prisma.ragChunk.findMany({
+      where: {
+        indexId: active.id,
+        product: { active: true, productType: 'lubricant', name: { in: selectedNames } },
+      },
+      select: {
+        content: true, metadata: true,
+        product: { select: { name: true, family: true } },
+      },
+    });
+    const ordered = rows
+      .filter((row) => selectedNames.includes(row.product.name) && !/^MLS/i.test(row.product.family ?? ''))
+      .sort((a, b) => selectedNames.indexOf(a.product.name) - selectedNames.indexOf(b.product.name)
+        || Number(b.metadata && typeof b.metadata === 'object' && !Array.isArray(b.metadata) && b.metadata.source_kind === 'sellbase_technical_sheet')
+        - Number(a.metadata && typeof a.metadata === 'object' && !Array.isArray(a.metadata) && a.metadata.source_kind === 'sellbase_technical_sheet'));
+    const counts = new Map<string, number>();
+    return ordered.flatMap((row) => {
+      const count = counts.get(row.product.name) ?? 0;
+      if (count >= 2) return [];
+      const metadata = row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+        ? row.metadata as Record<string, unknown> : {};
+      const chunk: ChunkResult = {
+        product_name: row.product.name,
+        product_family: row.product.family ?? '',
+        chunk_text: row.content,
+        similarity: 1,
+        metadata: { ...metadata, exact_catalogue_match: true },
+      };
+      if (!chunkMatchesFilters(chunk, filters)) return [];
+      counts.set(row.product.name, count + 1);
+      return [chunk];
+    });
   }
 }
