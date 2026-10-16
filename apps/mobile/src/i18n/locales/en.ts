@@ -42,6 +42,7 @@ const en: TranslationKeys = {
     scanLabel: 'Scan a product',
   },
   auth: {
+    sessionUnavailable: 'The server is unavailable. Your session has been kept. Check your connection and try again.',
     tagline: 'Identify Molydal equivalents instantly',
     email: 'Email',
     emailPlaceholder: 'you@molydal.fr',

@@ -1,7 +1,54 @@
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { API_CONFIG } from '@/constants/api';
 import { storage } from '@/lib/storage';
 import { logger } from '@/lib/logger';
+import { expireSession, getSessionRevision, isSessionRejection, replaceAccessToken } from '@/lib/session';
+
+const PUBLIC_AUTH_ROUTES = new Set([
+  '/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password', '/auth/refresh',
+]);
+let refreshInFlight: { revision: number; promise: Promise<string> } | null = null;
+type SessionRequest = InternalAxiosRequestConfig & { _sessionRevision?: number; _retry?: boolean };
+
+async function refreshAccessToken(failedToken: string | undefined, revision: number): Promise<string> {
+  if (revision !== getSessionRevision()) throw new Error('Session changed');
+  const currentToken = await storage.getToken();
+  if (revision !== getSessionRevision()) throw new Error('Session changed');
+  // Another request may already have replaced the expired access token.
+  if (currentToken && `Bearer ${currentToken}` !== failedToken) return currentToken;
+  if (refreshInFlight?.revision === revision) return refreshInFlight.promise;
+
+  const promise = (async () => {
+    const refreshToken = await storage.getRefreshToken();
+    if (!refreshToken) {
+      await expireSession(revision);
+      throw new Error('No refresh token');
+    }
+    try {
+      const { data } = await axios.post(
+        `${API_CONFIG.baseURL}/auth/refresh`,
+        { refreshToken },
+        { timeout: API_CONFIG.timeout },
+      );
+      const accessToken = data?.data?.accessToken ?? data?.accessToken;
+      if (typeof accessToken !== 'string' || !accessToken) throw new Error('Invalid refresh response');
+      await replaceAccessToken(accessToken, revision);
+      return accessToken;
+    } catch (error) {
+      // Offline, timeout, rate limiting and server failures must remain
+      // retryable. Only a rejected refresh credential ends the session.
+      if (isSessionRejection(error)) await expireSession(revision);
+      throw error;
+    }
+  })();
+  const flight = { revision, promise };
+  refreshInFlight = flight;
+  try {
+    return await promise;
+  } finally {
+    if (refreshInFlight === flight) refreshInFlight = null;
+  }
+}
 
 // One-time startup log so you can confirm which backend the bundle was built
 // against. EXPO_PUBLIC_* vars are baked in at Metro start — reload isn't
@@ -21,8 +68,12 @@ export const api = axios.create({
 
 api.interceptors.request.use(
   async (config) => {
+    const request = config as SessionRequest;
+    const revision = request._sessionRevision ?? getSessionRevision();
     const token = await storage.getToken();
-    if (token) {
+    if (revision !== getSessionRevision()) throw new Error('Session changed');
+    request._sessionRevision = revision;
+    if (token && !PUBLIC_AUTH_ROUTES.has(config.url ?? '')) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -32,6 +83,8 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => {
+    const revision = (response.config as SessionRequest)._sessionRevision;
+    if (revision !== undefined && revision !== getSessionRevision()) throw new Error('Session changed');
     // Unwrap API envelope { data: T } from TransformInterceptor
     if (response.data && typeof response.data === 'object' && 'data' in response.data && !('meta' in response.data)) {
       response.data = response.data.data;
@@ -41,31 +94,20 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry
+      && !PUBLIC_AUTH_ROUTES.has(originalRequest.url ?? '')) {
       originalRequest._retry = true;
 
       try {
-        const refreshToken = await storage.getRefreshToken();
-        if (!refreshToken) {
-          await storage.clearTokens();
-          return Promise.reject(error);
-        }
-
-        const { data: refreshResponse } = await axios.post(
-          `${API_CONFIG.baseURL}/auth/refresh`,
-          { refreshToken },
-        );
-        // Unwrap envelope from raw axios call (not through our interceptor)
-        const newAccessToken = refreshResponse?.data?.accessToken ?? refreshResponse?.accessToken;
-
-        await storage.setToken(newAccessToken);
+        const newAccessToken = await refreshAccessToken(originalRequest.headers?.Authorization, originalRequest._sessionRevision);
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
         return api(originalRequest);
       } catch (refreshError) {
-        logger.error('Token refresh failed', refreshError);
-        await storage.clearTokens();
-        return Promise.reject(error);
+        logger.warn('Session renewal unavailable');
+        // Surface the refresh failure: a network failure must not look like
+        // a definitive 401 to session restoration.
+        return Promise.reject(refreshError);
       }
     }
 

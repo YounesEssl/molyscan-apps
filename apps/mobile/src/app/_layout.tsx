@@ -1,6 +1,6 @@
 import '@/i18n';
 import { loadStoredLanguage } from '@/i18n';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
@@ -11,8 +11,11 @@ import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { useOutbox } from '@/hooks/useOutbox';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAuthStore } from '@/stores/auth.store';
-import { authService } from '@/services/auth.service';
-import { storage } from '@/lib/storage';
+import { useSessionRestoration } from '@/hooks/useSessionRestoration';
+import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/Button';
+import { Text } from '@/components/ui/Text';
+import { spacing } from '@/design/tokens/spacing';
 import { COLORS } from '@/constants/theme';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { AiDataConsentProvider } from '@/providers/AiDataConsentProvider';
@@ -28,33 +31,12 @@ function AppHooks(): null {
 function AuthGuard({ children }: { children: React.ReactNode }): React.JSX.Element {
   const segments = useSegments();
   const router = useRouter();
-  const { isAuthenticated, setUser } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(true);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { status, retry } = useSessionRestoration();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    (async () => {
-      try {
-        const token = await storage.getToken();
-        if (token && !isAuthenticated) {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 3000);
-          try {
-            const me = await authService.getMe({ signal: controller.signal });
-            setUser(me);
-          } finally {
-            clearTimeout(timeout);
-          }
-        }
-      } catch {
-        await storage.clearTokens();
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (isLoading) return;
+    if (status !== 'ready' && !isAuthenticated) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
@@ -63,12 +45,19 @@ function AuthGuard({ children }: { children: React.ReactNode }): React.JSX.Eleme
     } else if (isAuthenticated && inAuthGroup) {
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, segments, isLoading]);
+  }, [isAuthenticated, segments, status, router]);
 
-  if (isLoading) {
+  if (status !== 'ready' && !isAuthenticated) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xxxl, gap: spacing.xxl, backgroundColor: COLORS.background }}>
+        {status === 'loading' ? (
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        ) : (
+          <>
+            <Text accessibilityRole="alert" style={{ textAlign: 'center' }}>{t('auth.sessionUnavailable')}</Text>
+            <Button label={t('common.retry')} onPress={retry} />
+          </>
+        )}
       </View>
     );
   }

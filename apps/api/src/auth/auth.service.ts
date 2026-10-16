@@ -100,19 +100,30 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
+    const now = new Date();
     const stored = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
       include: { user: true },
     });
 
-    if (!stored || stored.expiresAt < new Date()) {
+    if (!stored || stored.expiresAt <= now) {
       if (stored) {
-        await this.prisma.refreshToken.delete({ where: { id: stored.id } });
+        await this.prisma.refreshToken.deleteMany({ where: { id: stored.id } });
       }
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
     this.assertAccountApproved(stored.user.status);
+
+    // Sliding inactivity window, including already-issued valid sessions.
+    // A concurrent logout/password reset must never recreate a removed token.
+    const renewed = await this.prisma.refreshToken.updateMany({
+      where: { id: stored.id, expiresAt: { gt: now } },
+      data: { expiresAt: this.refreshExpiresAt(now) },
+    });
+    if (renewed.count !== 1) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
 
     const accessToken = this.jwtService.sign({
       sub: stored.user.id,
@@ -295,18 +306,22 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload);
 
     const refreshToken = randomUUID();
-    const refreshExpiration = this.configService.get<string>(
-      'JWT_REFRESH_EXPIRATION',
-      '7d',
-    );
-    const expiresAt = new Date();
-    const days = parseInt(refreshExpiration) || 7;
-    expiresAt.setDate(expiresAt.getDate() + days);
+    const expiresAt = this.refreshExpiresAt(new Date());
 
     await this.prisma.refreshToken.create({
       data: { token: refreshToken, userId, expiresAt },
     });
 
     return { accessToken, refreshToken };
+  }
+
+  private refreshExpiresAt(now: Date): Date {
+    const duration = this.configService.get<string>('JWT_REFRESH_EXPIRATION', '7d');
+    const match = /^(\d+)(s|m|h|d|w)?$/.exec(duration.trim());
+    const units = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 };
+    const milliseconds = match
+      ? Number(match[1]) * units[(match[2] || 'd') as keyof typeof units]
+      : 0;
+    return new Date(now.getTime() + (milliseconds > 0 ? milliseconds : 7 * units.d));
   }
 }

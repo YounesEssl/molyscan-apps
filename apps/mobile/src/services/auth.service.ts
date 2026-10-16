@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { api } from '@/lib/axios';
-import { storage } from '@/lib/storage';
+import { clearSession, saveSession } from '@/lib/session';
 import { ENDPOINTS } from '@/constants/api';
 import {
   UserSchema,
@@ -25,8 +25,7 @@ export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthTokens> => {
     const { data } = await api.post(ENDPOINTS.auth.login, credentials);
     const tokens = AuthTokensSchema.parse(data);
-    await storage.setToken(tokens.accessToken);
-    await storage.setRefreshToken(tokens.refreshToken);
+    await saveSession(tokens.accessToken, tokens.refreshToken);
     return tokens;
   },
 
@@ -59,11 +58,11 @@ export const authService = {
   },
 
   logout: async (): Promise<void> => {
-    await storage.clearTokens();
+    await clearSession();
   },
 
   deleteAccount: async (): Promise<void> => {
     await api.delete(ENDPOINTS.auth.deleteAccount);
-    await storage.clearTokens();
+    await clearSession();
   },
 } as const;

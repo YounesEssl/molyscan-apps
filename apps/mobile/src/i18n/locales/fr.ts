@@ -40,6 +40,7 @@ const fr = {
     scanLabel: 'Scanner un produit',
   },
   auth: {
+    sessionUnavailable: 'Connexion au serveur indisponible. Votre session est conservée. Vérifiez votre connexion et réessayez.',
     tagline: 'Identifiez les équivalents Molydal instantanément',
     email: 'Email',
     emailPlaceholder: 'vous@molydal.fr',

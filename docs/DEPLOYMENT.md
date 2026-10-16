@@ -192,6 +192,15 @@ RESEND_FROM_EMAIL="Molyscan <noreply@molyscan.fr>"
 ADMIN_WEB_URL="https://admin.molyscan.fr"
 ```
 
+`JWT_REFRESH_EXPIRATION` est la fenêtre d'inactivité d'une session : chaque
+renouvellement réussi repousse son expiration (par défaut de sept jours).
+Les sessions expirées ou révoquées restent invalides. Le mot de passe oublié
+continue à invalider les sessions lors de la réinitialisation effective.
+Le mobile conserve ses identifiants sécurisés sur une erreur réseau, un délai
+dépassé ou une indisponibilité serveur, puis réessaie au retour du réseau ou
+de l'application au premier plan. Une session rejetée par le serveur revient
+à la connexion. Ces corrections JavaScript peuvent être livrées par EAS Update.
+
 `ADMIN_WEB_URL` sert à construire le lien « Examiner la demande » dans l'email
 envoyé aux admins lors d'une demande d'accès. `RESEND_*` est optionnel : si la clé
 est absente, l'`EmailService` passe en no-op (aucun email, aucune erreur).
