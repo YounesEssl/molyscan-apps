@@ -1,3 +1,5 @@
+import { isTechnicalComparison } from './comparison-policy';
+
 /** Catch explicit requests for a competing recommendation before calling the LLM.
  * The system instruction covers other brands and less explicit formulations.
  */
@@ -6,9 +8,10 @@ export function requestsCompetitorRecommendation(question: string): boolean {
   const brand = '(?:kluber|shell|mobil|exxonmobil|total(?:energies)?|fuchs|castrol|interflon|molykote|loctite|elf|igol|crc|wd[ -]?40|jelt|bardahl|cimcool|elkalub|berulube|concurrent(?:e)?s?)';
   // A factual side-by-side comparison may name a competitor reference. That
   // must not be mistaken for a request to recommend that competitor.
-  const comparison = /\b(?:compar\w*|tableau\s+(?:technique|comparatif)|differences?|compare|comparison|versus|vs)\b/.test(text);
+  const comparison = isTechnicalComparison(question);
   const withoutNegatedRequest = text.replace(/\bsans\s+(?:recommand\w*|propos\w*|conseill\w*|donne\w*|sugger\w*|suggest\w*)[^,.?]*/g, '');
-  const directional = /\b(?:donne\w*|propos\w*|recommand\w*|conseill\w*|cherch\w*|trouv\w*|equivalent|alternative|remplac\w*|recommend\w*|suggest\w*|give|find|replacement)\b/.test(withoutNegatedRequest);
+  const withoutTableRequest = withoutNegatedRequest.replace(/\b(?:donne\w*|propos\w*|give|show|provide)\s*(?:-\s*)?(?:(?:moi|nous|me|us)\s+)?(?:(?:un|une|le|la|les|des|du|a|an|the)\s+)?(?:tableau|comparatif|comparaison|table|comparison|comparative table)\b/g, '');
+  const directional = /\b(?:donne\w*|propos\w*|recommand\w*|conseill\w*|cherch\w*|trouv\w*|equivalent|alternative|remplac\w*|recommend\w*|suggest\w*|give|find|replacement)\b/.test(withoutTableRequest);
   if (comparison && !directional) return false;
   const recommendation = /\b(?:donne\w*|propos\w*|recommand\w*|conseill\w*|cherch\w*|trouv\w*|reference|equivalent|alternative|remplac\w*|recommend\w*|suggest\w*|give|find|replacement)\b/.test(text);
   if (!recommendation) return false;

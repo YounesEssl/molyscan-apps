@@ -80,6 +80,64 @@ describe('Expert decisions in assistant conversations', () => {
       undefined, ['LCH 700', 'HOTLIFE S 119'],
     );
   });
+  test.each(['stream', 'non-stream'])('retrieves the exact original FT and excludes alternatives for the reported Bardahl / PERF 80 comparison (%s)', async (mode) => {
+    prisma.pimProduct.findMany.mockResolvedValue([
+      { name: 'PERF 80', active: false }, { name: 'PERF 80 NF', active: true },
+      { name: 'PERF 83', active: true }, { name: 'TEFLUB', active: true },
+    ]);
+    const expert = { competitorBrand: 'Bardahl', competitorName: 'HP DRY', molydalEquivalent: 'PERF 80 NF', noEquivalent: false };
+    prisma.expertEquivalence.findMany.mockResolvedValue([expert]);
+    prisma.expertEquivalence.findUnique.mockResolvedValue(expert);
+    vector.dualSearch.mockResolvedValue([
+      { product_name: 'PERF 80 NF', chunk_text: 'Original PERF 80 NF FT: -50 °C to +270 °C; NSF H1', metadata: { source_kind: 'sellbase_technical_sheet', exact_catalogue_match: true } },
+      { product_name: 'PERF 83', chunk_text: 'UNRELATED PERF 83 DATASHEET', metadata: {} },
+      { product_name: 'TEFLUB', chunk_text: 'UNRELATED TEFLUB DATASHEET', metadata: {} },
+    ]);
+    const question = 'Fais-moi un tableau comparatif du Bardal HP Dry avec le Perf 80.';
+    const product = { scannedName: 'HP DRY', scannedBrand: 'Bardahl', molydalName: 'PERF 80 NF', molydalReference: '' };
+    const response = mode === 'stream'
+      ? await service.generateStreamingResponse(question, [], product)
+      : await service.generateResponse({ question, conversationHistory: [], productContext: product });
+    expect(vector.dualSearch.mock.calls[0][3]).toEqual(['PERF 80 NF']);
+    expect(response.sources).toEqual(['PERF 80 NF']);
+    const instruction = mockGetModel.mock.calls.find(([config]) => config.systemInstruction.includes('FACTUAL COMPARISON'))![0].systemInstruction;
+    expect(instruction).toContain('Original PERF 80 NF FT');
+    expect(instruction).toContain('FACTUAL COMPARISON, NOT A PRODUCT SEARCH');
+    expect(instruction).toContain('"PERF 80" refers to "PERF 80 NF"');
+    expect(instruction).not.toContain('UNRELATED');
+    expect(instruction).not.toContain('[PERF 83]');
+    expect(instruction).not.toContain('[TEFLUB]');
+  });
+  test('does not treat a factual comparison of equivalents as a request to bypass an expert veto', async () => {
+    await service.generateStreamingResponse('Fais un tableau comparatif des équivalents', [], {
+      scannedBrand: 'Brand', scannedName: 'Product 68', molydalName: 'OLD GUESS', molydalReference: '',
+    });
+    expect(mockGenerateContentStream).toHaveBeenCalled();
+    expect(mockGetModel.mock.calls[0][0].systemInstruction).toContain('DÉCISION EXPERTE MOLYDAL : AUCUN ÉQUIVALENT');
+    expect(mockGetModel.mock.calls[0][0].systemInstruction).toContain('FACTUAL COMPARISON');
+  });
+  test.each(['stream', 'non-stream'])('passes only grounded search claims into a comparison and appends their actual source (%s)', async (mode) => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'PERF 80 NF', active: true }]);
+    prisma.expertEquivalence.findMany.mockResolvedValue([]);
+    mockGenerateContent.mockResolvedValue({ response: {
+      text: () => 'An unsupported competitor claim must not become evidence.',
+      candidates: [{ groundingMetadata: {
+        groundingChunks: [{ web: { uri: 'https://manufacturer.example/ft', title: 'Manufacturer FT' } }],
+        groundingSupports: [{ segment: { text: 'The supported operating range is -35 to +270 degrees.' }, groundingChunkIndices: [0] }],
+      } }],
+    } });
+    const question = 'Compare HP DRY avec PERF 80 NF';
+    const result = mode === 'stream'
+      ? await service.generateStreamingResponse(question, [])
+      : await service.generateResponse({ question, conversationHistory: [] });
+    let text = 'text' in result ? result.text : '';
+    if ('stream' in result) for await (const delta of result.stream) text += delta;
+    const instruction = mockGetModel.mock.calls.find(([config]) => config.systemInstruction.includes('FACTUAL COMPARISON'))![0].systemInstruction;
+    expect(instruction).toContain('The supported operating range');
+    expect(instruction).not.toContain('An unsupported competitor claim');
+    expect(text).toContain('[Manufacturer FT](https://manufacturer.example/ft)');
+    expect(mockGetModel.mock.calls.at(-1)[0].tools).toBeUndefined();
+  });
   test('streams the same decision in free chat', async () => {
     const response = await service.generateStreamingResponse('What is the equivalent of Brand Product 68?', []);
     let text = '';

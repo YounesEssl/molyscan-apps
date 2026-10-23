@@ -84,6 +84,31 @@ Les rapports distinguent les cas tentés, terminés, en erreur et incomplets. Un
 
 Les suites `sellbase.documents.spec.ts` et `products.documents.spec.ts` passent **31 tests API** : chemins FDS publics, compatibilité FT, surcharge authentifiée, isolation par tenant, validation des chemins, signature PDF, refus des redirections et limite de taille. Une vérification distincte en lecture réelle a téléchargé quatre FDS avec HTTP 200, type `application/pdf` et signature PDF valide : AGL 41 NF FR/GB, BLACK SEAL et AN 310. Le tenant `c_molydal` utilise par défaut l’archive publique Sellbase et les sous-dossiers dérivés du nom de fichier fourni par le PIM ; `SELLBASE_MEDIA_BASE_URL` est une surcharge facultative pour d’autres environnements. Aucun identifiant Sellbase n’est envoyé à cette archive publique. Voir [PIM_RAG.md](PIM_RAG.md) pour les sources et les tailles vérifiées.
 
+## Comparatifs techniques après un scan
+
+Les tests `comparison-policy.spec.ts` et `rag.expert-decisions.spec.ts` couvrent
+le retour Bardahl HP DRY / PERF 80 : dans cette conversation, la désignation
+abrégée est résolue vers **PERF 80 NF**, présent sur le scan et dans la décision
+experte. Cela ne crée pas d'alias global pour l'ancien PERF 80 archivé. Les
+grades différents, les désignations ambiguës et les changements explicites de
+produit restent distincts.
+
+Une comparaison utilise seulement les FT/catalogue des produits demandés et ne
+déclenche pas une nouvelle sélection d'équivalents. Les valeurs concurrentes
+proviennent d'une recherche dédiée dont seules les affirmations effectivement
+attribuées par les métadonnées Google Search sont transmises à la synthèse.
+En l'absence de preuve, les cellules restent « Non vérifié ». Les liens des
+sources effectivement utilisées sont ajoutés à la réponse.
+
+Après un build API, une recette réelle en lecture seule est disponible :
+`node -r dotenv/config scripts/check-comparisons.cjs` depuis `apps/api`.
+Elle teste trois répétitions du cas signalé, un suivi implicite, la reprise
+après une mauvaise réponse, un changement de produit, deux produits Molydal,
+l'anglais, l'absence de résultats web et le refus d'une recommandation concurrente.
+`COMPARISON_EVAL_DIST` permet de tester un build candidat isolé avant sa mise
+en service ; `COMPARISON_EVAL_REPORT` conserve le rapport JSON. Aucun compte,
+scan ni message client n'est créé ou modifié par cette recette.
+
 ## Ajouter un signalement reproductible
 
 Conserver le nom et la marque exacts du concurrent, la réponse obtenue, la fiche ou l’usage à l’origine du besoin et la correction confirmée par l’équipe Molydal. Les signalements mobiles et les conversations transmises sont visibles avec leur auteur dans « Signalements IA » de l’admin.

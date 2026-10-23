@@ -21,6 +21,10 @@ describe('Molydal recommendation scope', () => {
     'Compare AGL 65 AL et Klüber ISOFLEX sans recommander de référence',
     'Fais un tableau comparatif technique des références Klüber ISOFLEX et Molydal AGL 65 AL',
     'Compare la référence Shell Tellus à celle de Molydal sans proposer de remplacement',
+    'Fais-moi un tableau comparatif du Bardal HP Dry avec le Perf 80.',
+    'Donne-moi un tableau comparatif de la graisse Shell et de la graisse Molydal',
+    'Peux-tu me donner un tableau comparatif du produit Bardahl HP Dry et du PERF 80 NF ?',
+    'Give me a comparison table of Shell grease and Molydal grease',
   ])('preserves source identification and technical questions: %s', (question) => {
     expect(requestsCompetitorRecommendation(question)).toBe(false);
   });
