@@ -10,6 +10,10 @@ export function scanLanguage(language?: string): ScanLanguage {
 export function isAdhesiveOrSealant(product: {
   name?: string | null; type?: string | null; category?: string | null;
 }): boolean {
+  // Removing adhesive/sealant is a cleaning function, not a bonding/sealing
+  // product. Keep these cleaners eligible even if Vision uses a broad category.
+  const type = normalizeProductText(product.type);
+  if (/\b(?:(?:adhesive|glue|sealant)\s+(?:residue\s+)?(?:remover|cleaner)|(?:remover|cleaner|solvent)\s+for\s+(?:adhesives?|glues?|sealants?)|(?:nettoyant|decapant|dissolvant)\s+(?:(?:pour|de|des|les)\s+)*(?:colles?|mastics?|adhesifs?))\b/.test(type)) return false;
   if (['adhesive', 'sealant', 'glue'].includes(product.category ?? '')) return true;
   const text = normalizeProductText(`${product.name ?? ''} ${product.type ?? ''}`)
     .replace(/\b(?:anti\s*adhesive|non\s*adhesive|anti\s*adhesif\w*|antiadherent\w*)\b/g, '')

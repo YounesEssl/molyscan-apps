@@ -21,6 +21,8 @@ describe('Adhesive and sealant exclusion by primary function', () => {
     { type: 'antiadhésif silicone de démoulage' }, { type: 'joint sealing grease' },
     { name: 'Loctite SF 7100', type: 'leak detector' },
     { name: 'Loctite', type: 'lubricant' }, { type: 'assembly paste' },
+    { type: 'adhesive remover' }, { type: 'glue residue cleaner' },
+    { type: 'dissolvant pour colles', category: 'adhesive' }, { type: 'décapant mastics' },
   ])('preserves lubricant/release-agent uses: %j', (product) => {
     expect(isAdhesiveOrSealant(product)).toBe(false);
   });
