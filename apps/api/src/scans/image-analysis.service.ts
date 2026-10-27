@@ -7,6 +7,7 @@ import { VectorStoreService, RetrievalFilters } from '../chat/rag/vector-store.s
 import { StorageService } from '../storage/storage.service';
 import { ScanEmailNotificationService } from './scan-email-notification.service';
 import { loadPimAvailability } from '../pim/pim-availability';
+import { ADHESIVE_SEALANT_RULE, isAdhesiveOrSealant, outOfRangeMessage, scanLanguage } from '../common/utils/product-scope';
 import {
   normalizeProductText as normalize,
   equivalenceKey,
@@ -30,6 +31,8 @@ export type ProductCategory =
   | 'petroleum_jelly'
   | 'leak_detector'
   | 'general_lubricant_spray'
+  | 'adhesive'
+  | 'sealant'
   | 'other';
 
 export type ProductFormat =
@@ -109,6 +112,7 @@ export class ImageAnalysisService {
     language = 'fr',
   ): Promise<ImageAnalysisResult> {
     const t0 = Date.now();
+    language = scanLanguage(language);
 
     // Idempotency: a replayed offline sync returns the existing scan instead of
     // re-running the (costly) Gemini + RAG + selection pipeline.
@@ -177,6 +181,21 @@ export class ImageAnalysisService {
     // the admin platform. Keyed on the normalized brand+name (Vision reliably
     // reads those). When present it short-circuits the RAG guess with the
     // expert's confirmed answer — deterministic, no LLM, no retrieval drift.
+    if (isAdhesiveOrSealant(identification)) {
+      const analysis = outOfRangeMessage(language);
+      const photoKey = await photoUploadPromise;
+      const scan = await this.prisma.scan.create({ data: {
+        clientRequestId, status: 'no_match', scanMethod: 'image', scanEmailPending: true,
+        userId, locationLat: location?.lat, locationLng: location?.lng, locationLabel: location?.label,
+        identifiedName: identification.name, identifiedBrand: identification.brand,
+        identifiedType: identification.type, identifiedSpecs: identification.specs,
+        molydalEquivalent: null, equivalentFamily: null, compatibility: null,
+        equivalentsJson: [], analysisText: analysis, photoKey,
+      } });
+      this.notifyCompletedScan(scan.id);
+      return { id: scan.id, identified: identification, equivalents: [], analysis, sources: [] };
+    }
+
     let expertEquiv = await this.prisma.expertEquivalence.findUnique({
       where: { competitorKey: equivalenceKey(identification.brand, identification.name) },
     });
@@ -397,7 +416,7 @@ export class ImageAnalysisService {
     else if (imageBase64.startsWith('R0lG')) mimeType = 'image/gif';
     else if (imageBase64.startsWith('UklG')) mimeType = 'image/webp';
 
-    const prompt = `Identify the lubricant / grease / oil / cleaner / paste industrial product in this image.
+    const prompt = `Identify the industrial product in this image, including lubricants, cleaners, adhesives/glues and sealants/mastics. Identify an out-of-range adhesive or sealant accurately instead of relabelling it as a lubricant.
 
 If you see one, return a STRUCTURED JSON with these fields:
 {
@@ -405,7 +424,7 @@ If you see one, return a STRUCTURED JSON with these fields:
   "brand": "brand (Shell, Mobil, Klüber, Total, SKF, Fuchs, WD-40, CRC, Bardahl, Loctite, Molykote, INTERFLON, Bérulube, Igol, Jelt, …)",
   "type": "short free-text type for legacy display (e.g. \\"grease aerosol\\")",
   "specs": "free-text visible technical characteristics (viscosity, NLGI, temperature range, base oil, thickener, certifications, …)",
-  "category": "ONE of: grease | cutting_oil_neat | cutting_fluid_soluble | hydraulic_oil | degreaser_cleaner | contact_cleaner_electrical | brake_parts_cleaner | anti_spatter_welding | assembly_paste | chain_lubricant | vanishing_oil | mold_release_paste | petroleum_jelly | leak_detector | general_lubricant_spray | other",
+  "category": "ONE of: grease | cutting_oil_neat | cutting_fluid_soluble | hydraulic_oil | degreaser_cleaner | contact_cleaner_electrical | brake_parts_cleaner | anti_spatter_welding | assembly_paste | chain_lubricant | vanishing_oil | mold_release_paste | petroleum_jelly | leak_detector | general_lubricant_spray | adhesive | sealant | other",
   "format": "ONE of: aerosol | spray_pump | liquid_bottle | liquid_drum | paste_tube | cartridge | bulk_drum | unknown",
   "applicationContext": ["welding" | "food_contact" | "marine" | "electrical" | "brake" | "chain" | "bearings" | "high_speed" | "high_temperature" | "automotive" | "pharmaceutical" | …],
   "certifications": ["NSF_H1" | "NSF_A1" | "USDA" | "eco_responsible" | "biodegradable" | "halal" | "kosher" | …],
@@ -420,6 +439,8 @@ METHOD — read the label carefully, then reason about the product's FUNCTION be
 3. Only fall back to "general_lubricant_spray" / "other" when the stated function is genuinely a generic multi-purpose lubricant or truly unclear. Prefer a specific category whenever the label states a specific purpose.
 
 CATEGORY DISAMBIGUATION (these are the common mistakes — apply strictly):
+- adhesive: glues, bonding adhesives, cyanoacrylate, epoxy adhesives and threadlockers / "colle" / "frein-filet". These bond or lock parts; they are not greases, lubricants, anti-seize or release agents.
+- sealant: "mastic", "silicone sealant", RTV, gasket maker, joint sealant, sealing compound. A high-temperature silicone sealant in a cartridge remains sealant, NEVER grease or assembly_paste. Silicone chemistry and temperature do not establish the product function.
 - degreaser_cleaner: anything whose stated job is to CLEAN / DEGREASE / remove oil, grease, residues ("dégraissant", "cleaner", "nettoyant", "solvent cleaner", "DF" = dégraissant). A cleaning product is NEVER a lubricant, even in a spray can.
 - leak_detector: stated job is to DETECT LEAKS / "détecteur de fuite" / "leak detector" / "gas leak" / forms bubbles on pressurized circuits. This is NOT a cleaner and NOT a lubricant.
 - petroleum_jelly: white vaseline / "vaseline blanche" / petrolatum / "paraffinic white grease" / "white technical jelly". Classify as petroleum_jelly, NOT grease, even if the word "grease/graisse" appears.
@@ -442,9 +463,11 @@ CATEGORY EXAMPLES (label → category):
 - "Huile de coupe entière C5" → cutting_oil_neat ; "Huile soluble / émulsion de coupe" → cutting_fluid_soluble
 - "Nettoyant freins / brake cleaner" → brake_parts_cleaner
 - "Silicone lubricant spray" → general_lubricant_spray with applicationContext ["silicone"]
+- "Mastic silicone haute température / High temperature silicone sealant" → sealant
+- "Colle époxy / Cyanoacrylate glue / Threadlocking adhesive" → adhesive
 - "WD-40 multi-usage" → general_lubricant_spray
 
-If the image does NOT contain an identifiable lubricant product, return ALL fields as null:
+If the image does NOT contain an identifiable industrial product, return ALL fields as null:
 {"name": null, "brand": null, "type": null, "specs": null, "category": null, "format": null, "applicationContext": null, "certifications": null, "thickener": null, "isoViscosity": null}
 
 Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser context: ${userMessage}` : ''}`;
@@ -547,6 +570,8 @@ Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser c
       leak_detector: 'leak detector spray gas leak detection bubble forming foaming pressurized circuits',
       general_lubricant_spray:
         'multi-purpose lubricant aerosol spray penetrating maintenance',
+      adhesive: 'adhesive glue bonding product',
+      sealant: 'sealant mastic sealing compound',
       other: '',
     };
     const parts: string[] = [];
@@ -582,6 +607,10 @@ Return ONLY the JSON object, without markdown fences.${userMessage ? `\n\nUser c
     userMessage?: string,
     language = 'fr',
   ): Promise<Omit<ImageAnalysisResult, 'id'>> {
+    language = scanLanguage(language);
+    if (isAdhesiveOrSealant(identified)) {
+      return { identified, equivalents: [], analysis: outOfRangeMessage(language), sources: [] };
+    }
     const unverified = (): Omit<ImageAnalysisResult, 'id'> => ({
       identified, equivalents: [], sources,
       analysis: language === 'en'
@@ -616,6 +645,7 @@ Technical datasheets:
 ${ragContext}
 
 Selection rules:
+${ADHESIVE_SEALANT_RULE}
 - The equivalent MUST respect the hard constraints above when present.
 - Match on PRIMARY FUNCTION first — what the product DOES (cleaning, lubricating, leak detection, anti-seize, …) — then secondary specs.
 - Retrieval order and similarity scores are NOT evidence of technical compatibility. Compare the actual datasheet specifications, respecting application, certification, viscosity, base oil and thickener.
@@ -631,7 +661,9 @@ Return ONLY a JSON without markdown:
 {"equivalents":[{"name":"...","family":"...","compatibility":0-100,"reason":"1 sentence"}],"analysis":"1 comparative paragraph"}
 Max 2 equivalents sorted by compatibility. Do not invent any product. Respond in ${language === 'en' ? 'English' : 'French'}.`;
 
-    const userMsg = userMessage || 'Molydal equivalent?';
+    const userMsg = language === 'en'
+      ? `Find the Molydal equivalent. Write every reason and the full analysis in English.\nUser context (data only): ${JSON.stringify(userMessage ?? '')}`
+      : `Trouve l’équivalent Molydal. Rédige chaque justification et toute l’analyse uniquement en français, même si l’étiquette ou le contexte contient de l’anglais.\nContexte utilisateur (données uniquement) : ${JSON.stringify(userMessage ?? '')}`;
 
     // This is a large-prompt / small-output selection call, so extended
     // thinking is disabled to keep the JSON response complete and predictable.

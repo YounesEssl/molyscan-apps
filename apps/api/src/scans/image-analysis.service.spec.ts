@@ -42,6 +42,46 @@ describe('Scan equivalence integrity', () => {
     expect(prisma.scan.findMany).not.toHaveBeenCalled();
     expect(vector.dualSearch).not.toHaveBeenCalled();
   });
+  test.each([
+    { type: 'high temperature silicone sealant', category: 'other' },
+    { type: 'paste', category: 'adhesive' },
+    { type: 'paste', category: 'sealant' },
+    { type: 'colle epoxy', category: 'other' },
+    { type: 'silicone sealant', category: 'grease' },
+  ])('blocks the family before stale positive expert/RAG mappings: %j', async (product) => {
+    jest.spyOn(service as any, 'identifyProduct').mockResolvedValue({ ...identified, name: 'BRIK-CEN CS-350', ...product });
+    prisma.expertEquivalence.findUnique.mockResolvedValue({ molydalEquivalent: 'AGL 30 AL', confidence: 85, noEquivalent: false });
+    const result = await service.analyzeImage('AA==', 'image/jpeg', 'user', undefined, undefined, undefined, 'fr-FR');
+    expect(result).toMatchObject({ equivalents: [], sources: [], analysis: 'Produit qui n’existe pas dans la gamme Molydal.' });
+    expect(prisma.expertEquivalence.findUnique).not.toHaveBeenCalled();
+    expect(vector.dualSearch).not.toHaveBeenCalled();
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+    expect(prisma.scan.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      status: 'no_match', compatibility: null, molydalEquivalent: null, equivalentsJson: [],
+      analysisText: result.analysis, scanEmailPending: true,
+    }) });
+    expect(scanEmailNotification.notifyCompletedScan).toHaveBeenCalledWith('scan');
+  });
+  test('does not block an ordinary silicone lubricant before expert matching', async () => {
+    jest.spyOn(service as any, 'identifyProduct').mockResolvedValue({ ...identified, type: 'silicone lubricant spray', category: 'general_lubricant_spray' });
+    prisma.expertEquivalence.findUnique.mockResolvedValue({ molydalEquivalent: 'SILICONES', confidence: 100, noEquivalent: false });
+    expect((await service.analyzeImage('AA==', 'image/jpeg', 'user')).equivalents[0].name).toBe('SILICONES');
+  });
+  test('blocks sealants in the selection function too, without asking the model for a closest match', async () => {
+    const result = await (service as any).generateEquivalenceAnalysis({ ...identified, type: 'sealant' }, 'AGL 30 AL datasheet', ['AGL 30 AL']);
+    expect(result.equivalents).toEqual([]);
+    expect(result.analysis).toBe('Produit qui n’existe pas dans la gamme Molydal.');
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+  });
+  test.each(['fr-FR', 'en-US'])('pins the requested language in the final selection instruction (%s)', async (language) => {
+    mockGenerateContent.mockResolvedValue({ response: { text: () => JSON.stringify({
+      equivalents: [{ name: 'H 125 AL', family: 'Oil', compatibility: 90, reason: 'Verified application' }], analysis: 'Verified application',
+    }) } });
+    await (service as any).generateEquivalenceAnalysis(identified, 'datasheet', ['H 125 AL'], 'English label text', language);
+    const prompt = mockGenerateContent.mock.calls[0][0];
+    expect(prompt).toContain(language.startsWith('fr') ? 'uniquement en français' : 'in English');
+    expect(prompt).not.toBe('Molydal equivalent?');
+  });
 
   test('expert no-equivalent decision is persisted without a product or model fallback', async () => {
     prisma.expertEquivalence.findUnique.mockResolvedValue({ noEquivalent: true, molydalEquivalent: '', confidence: 0 });

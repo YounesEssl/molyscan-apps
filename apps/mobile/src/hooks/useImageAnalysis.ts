@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import axios from 'axios';
-import i18n from '@/i18n';
+import i18n, { loadStoredLanguage } from '@/i18n';
+import { scanRequestLanguage } from '@/lib/appLanguage';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '@/lib/axios';
@@ -77,6 +78,7 @@ export function useImageAnalysis(): UseImageAnalysis {
   const analyzeBase64 = useCallback(
     async (base64: string, mimeType = 'image/jpeg'): Promise<void> => {
       if (!(await requestConsent())) return;
+      await loadStoredLanguage();
 
       const sizeKb = Math.round((base64.length * 0.75) / 1024);
       logger.debug(`[analyze] start — ${sizeKb} Ko, mime=${mimeType}`);
@@ -101,7 +103,7 @@ export function useImageAnalysis(): UseImageAnalysis {
             locationLat: location?.lat,
             locationLng: location?.lng,
             locationLabel: location?.label,
-            language: i18n.language ?? 'fr',
+            language: scanRequestLanguage(i18n.resolvedLanguage ?? i18n.language),
           },
           { timeout: 90000 },
         );

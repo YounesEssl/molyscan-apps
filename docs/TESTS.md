@@ -86,6 +86,33 @@ Les suites `sellbase.documents.spec.ts` et `products.documents.spec.ts` passent 
 
 ## Comparatifs techniques après un scan
 
+### Colles, mastics et langue des scans
+
+Les colles, adhésifs de collage, freins-filets et mastics d'étanchéité sont
+exclus des équivalences Molydal. Le contrôle s'effectue après identification,
+avant toute décision experte ou recherche RAG, et s'applique aussi aux suivis
+dans l'assistant. La réponse française est « Produit qui n’existe pas dans la
+gamme Molydal. », sans proposition ni pourcentage. Une graisse silicone, un
+lubrifiant silicone ou un agent antiadhésif de démoulage reste éligible : la
+fonction principale du produit décide, pas la présence du mot silicone.
+
+L'app utilise la langue compatible du téléphone au premier lancement et
+respecte ensuite le choix enregistré par l'utilisateur. Les scans hors ligne
+conservent la langue du moment de leur capture ; les anciens scans en attente
+sans langue utilisent la préférence courante. La génération d'analyse impose
+la langue demandée aussi dans son message final.
+
+Les tests `product-scope.spec.ts`, `image-analysis.service.spec.ts`, les tests
+de contexte RAG et les tests mobiles de langue couvrent ces règles. La recette
+`SCAN_SCOPE_FIXTURE_ID=<scan> node -r dotenv/config scripts/check-scan-scope.cjs`
+depuis `apps/api` rejoue la photo d'un scan existant en lecture seule : upload,
+création de scan et notifications sont interceptés. Elle vérifie aussi la
+sélection d'un nettoyant classique en français et en anglais.
+`SCAN_SCOPE_EVAL_DIST` permet d'utiliser un build isolé et
+`SCAN_SCOPE_EVAL_REPORT` conserve le rapport JSON. Aucun email n'est envoyé.
+
+### Conservation du périmètre des comparatifs
+
 Les tests `comparison-policy.spec.ts` et `rag.expert-decisions.spec.ts` couvrent
 le retour Bardahl HP DRY / PERF 80 : dans cette conversation, la désignation
 abrégée est résolue vers **PERF 80 NF**, présent sur le scan et dans la décision

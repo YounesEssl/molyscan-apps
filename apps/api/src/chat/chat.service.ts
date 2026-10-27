@@ -223,6 +223,11 @@ export class ChatService {
       data: { conversationId, role: 'user', text, sources: [] },
     });
 
+    // Keep the identified primary function in non-streaming follow-ups too.
+    const scanContext = conversation.type === 'product' && conversation.scanId
+      ? await this.prisma.scan.findUnique({ where: { id: conversation.scanId }, select: { identifiedType: true, analysisText: true } })
+      : null;
+
     // Generate AI response
     const aiResult = await this.documents.answer(text, history, conversation.molydalName, { name: conversation.scannedName, brand: conversation.scannedBrand }, preferredDocumentLanguage) ?? await this.ragService.generateResponse({
       question: text,
@@ -231,6 +236,7 @@ export class ChatService {
         scannedBrand: conversation.scannedBrand ?? '',
         molydalName: conversation.molydalName ?? '',
         molydalReference: conversation.molydalReference ?? '',
+        ...(scanContext ?? {}),
       } : undefined,
       conversationHistory: history.map((m) => ({
         role: m.role as 'user' | 'assistant',

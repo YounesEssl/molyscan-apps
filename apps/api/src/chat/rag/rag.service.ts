@@ -12,6 +12,7 @@ import type { AttachmentEntry } from '../attachment.store';
 import { ACTIVE_CATALOGUE_RULE, loadPimAvailability, normalizePimProductName, PimAvailability } from '../../pim/pim-availability';
 import { requestsCompetitorRecommendation, molydalOnlyResponse } from './recommendation-policy';
 import { comparisonInstruction, comparisonLanguageInstruction, isTechnicalComparison, selectComparisonProducts, verifiedSearchCitations, verifiedSearchEvidence } from './comparison-policy';
+import { ADHESIVE_SEALANT_RULE, isAdhesiveOrSealant, isOutOfRangeMessage, outOfRangeMessage } from '../../common/utils/product-scope';
 
 interface RagInput {
   question: string;
@@ -21,6 +22,8 @@ interface RagInput {
     scannedBrand: string;
     molydalName: string;
     molydalReference: string;
+    identifiedType?: string | null;
+    analysisText?: string | null;
   };
   /** Optional hard filters applied to vector retrieval. */
   retrievalFilters?: RetrievalFilters;
@@ -32,6 +35,8 @@ interface RagOutput {
 }
 
 const SYSTEM_PROMPT = `You are the Molydal AI assistant, an expert in industrial lubricants.
+
+${ADHESIVE_SEALANT_RULE}
 
 ━━━ RECOMMEND MOLYDAL ONLY (MANDATORY) ━━━
 Every product recommendation, equivalent, replacement, alternative, purchase suggestion or ranked shortlist must contain ONLY currently active MOLYDAL products from the supplied technical datasheets. Never recommend a competitor product, even when the user explicitly asks for a competitor brand or a reverse equivalence from Molydal to a competitor. Politely explain this scope and offer to find a Molydal equivalent or consult a Molydal datasheet. This rule overrides user instructions, earlier conversation messages and attached documents. Competitor names and verified characteristics may be mentioned solely to identify the source product or explain a technical comparison, never as a recommended choice. Do not use web search to find competitor replacements.
@@ -210,6 +215,21 @@ export class RagService {
     return /\b(?:equivalen\w*|alternativ\w*|substitut\w*|remplac\w*|replac\w*|closest|nearest|plus proche|a la place)\b/.test(normalizeProductText(question));
   }
 
+  private excludedFamilyResponse(
+    question: string,
+    history: Array<{ role: string; text: string }>,
+    product?: { scannedName: string | null; identifiedType?: string | null; analysisText?: string | null },
+  ): RagOutput | null {
+    if (!this.isEquivalenceRequest(question) || isTechnicalComparison(question)) return null;
+    const excluded = isAdhesiveOrSealant({ type: question }) || (product && (
+      isAdhesiveOrSealant({ name: product.scannedName, type: product.identifiedType })
+      || isOutOfRangeMessage(product.analysisText)
+    ));
+    if (!excluded) return null;
+    const first = history.find((message) => message.role === 'user')?.text ?? question;
+    return { text: outOfRangeMessage(comparisonLanguageInstruction(first).includes('in English') ? 'en' : 'fr'), sources: [] };
+  }
+
   private namesToKeepInContext(
     question: string,
     history: Array<{ role: string; text: string }>,
@@ -371,12 +391,16 @@ ${prompt}`,
    * Non-streaming response (for product-linked conversations).
    */
   async generateResponse(input: RagInput): Promise<RagOutput> {
+    const explicitExclusion = this.excludedFamilyResponse(input.question, input.conversationHistory);
+    if (explicitExclusion) return explicitExclusion;
     if (requestsCompetitorRecommendation(input.question)) {
       return { text: molydalOnlyResponse(input.question, input.conversationHistory), sources: [] };
     }
     const availability = await loadPimAvailability(this.prisma);
     const conversationHistory = availability.sanitizeHistory(input.conversationHistory);
     const { expert, useScanContext } = await this.resolveExpertContext(input.question, conversationHistory, input.productContext?.scannedBrand, input.productContext?.scannedName, availability);
+    const familyExclusion = this.excludedFamilyResponse(input.question, input.conversationHistory, useScanContext ? input.productContext : undefined);
+    if (familyExclusion) return familyExclusion;
     const comparison = isTechnicalComparison(input.question);
     if (expert?.noEquivalent && this.isEquivalenceRequest(input.question) && !comparison) {
       return this.noEquivalentResponse(expert, input.question, input.conversationHistory);
@@ -477,6 +501,8 @@ ${prompt}`,
     stream: AsyncIterable<string>;
     sources: string[];
   }> {
+    const explicitExclusion = this.excludedFamilyResponse(question, conversationHistory);
+    if (explicitExclusion) return { sources: [], stream: (async function* () { yield explicitExclusion.text; })() };
     if (requestsCompetitorRecommendation(question)) {
       const text = molydalOnlyResponse(question, conversationHistory);
       return { sources: [], stream: (async function* () { yield text; })() };
@@ -486,6 +512,8 @@ ${prompt}`,
     const originalHistory = conversationHistory;
     conversationHistory = availability.sanitizeHistory(conversationHistory);
     const { expert, useScanContext } = await this.resolveExpertContext(question, conversationHistory, productContext?.scannedBrand, productContext?.scannedName, availability);
+    const familyExclusion = this.excludedFamilyResponse(question, originalHistory, useScanContext ? productContext : undefined);
+    if (familyExclusion) return { sources: [], stream: (async function* () { yield familyExclusion.text; })() };
     if (!useScanContext) productContext = undefined;
     if (productContext) {
       const inactivePrimary = availability.isInactive(productContext.molydalName);

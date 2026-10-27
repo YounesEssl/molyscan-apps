@@ -1,6 +1,8 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getLocales } from 'expo-localization';
+import { defaultAppLanguage } from '@/lib/appLanguage';
 import fr from './locales/fr';
 import en from './locales/en';
 
@@ -14,7 +16,7 @@ i18n.use(initReactI18next).init({
     fr: { translation: fr },
     en: { translation: en },
   },
-  lng: 'en',
+  lng: defaultAppLanguage(getLocales()),
   fallbackLng: 'en',
   interpolation: {
     escapeValue: false,

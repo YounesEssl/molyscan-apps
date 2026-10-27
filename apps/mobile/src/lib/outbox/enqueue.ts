@@ -5,6 +5,8 @@ import { triggerSync } from './connectivity';
 import { createOutboxId, type WorkflowCreatePayload } from './types';
 import { removeByKind } from './repository';
 import { deleteImage } from './imageStore';
+import i18n from '@/i18n';
+import { scanRequestLanguage } from '@/lib/appLanguage';
 
 export interface ScanLocation {
   lat?: number;
@@ -30,6 +32,7 @@ export async function enqueueScanAnalysis(args: {
     kind: 'scan_analysis',
     payload: {
       aiConsentRecorded: true,
+      language: scanRequestLanguage(i18n.resolvedLanguage ?? i18n.language),
       message: args.message,
       locationLat: args.location?.lat,
       locationLng: args.location?.lng,

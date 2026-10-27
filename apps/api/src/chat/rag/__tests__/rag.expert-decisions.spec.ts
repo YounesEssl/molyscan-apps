@@ -56,6 +56,26 @@ describe('Expert decisions in assistant conversations', () => {
     await service.generateStreamingResponse('Un remplacement chez AnotherBrand ?', []);
     expect(mockGetModel.mock.calls[0][0].systemInstruction).toContain('Never recommend a competitor product');
   });
+  test.each(['Quel équivalent pour ce mastic silicone ?', 'Une colle époxy équivalente ?', 'Quel produit le plus proche pour un silicone sealant ?'])('returns no range match for an explicitly excluded family: %s', async (question) => {
+    const response = await service.generateResponse({ question, conversationHistory: [] });
+    expect(response).toEqual({ text: 'Produit qui n’existe pas dans la gamme Molydal.', sources: [] });
+    expect(mockGetModel).not.toHaveBeenCalled();
+    expect(vector.dualSearch).not.toHaveBeenCalled();
+  });
+  test('does not reintroduce a grease in an excluded scan follow-up', async () => {
+    const result = await service.generateStreamingResponse('Propose le plus proche', [], {
+      scannedName: 'BRIK-CEN CS-350', scannedBrand: 'QUIADSA', molydalName: 'AGL 30 AL', molydalReference: '',
+      identifiedType: 'high temperature silicone sealant',
+    });
+    let text = '';
+    for await (const delta of result.stream) text += delta;
+    expect(text).toBe('Produit qui n’existe pas dans la gamme Molydal.');
+    expect(mockGetModel).not.toHaveBeenCalled();
+  });
+  test('preserves the requested English language for the same deterministic exclusion', async () => {
+    const response = await service.generateResponse({ question: 'What equivalent for this silicone sealant?', conversationHistory: [] });
+    expect(response.text).toBe('This product is not available in the Molydal range.');
+  });
   test('pins the exact active product for the reported SOLESTER follow-up', async () => {
     prisma.pimProduct.findMany.mockResolvedValue([{ name: 'SOLESTER 550', active: true }]);
     await service.generateStreamingResponse('And solester550?', [

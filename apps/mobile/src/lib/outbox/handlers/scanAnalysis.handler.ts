@@ -3,6 +3,8 @@ import { ENDPOINTS } from '@/constants/api';
 import { readImageBase64 } from '../imageStore';
 import type { OutboxHandler } from './types';
 import type { OutboxRow, ScanAnalysisPayload } from '../types';
+import i18n, { loadStoredLanguage } from '@/i18n';
+import { scanRequestLanguage } from '@/lib/appLanguage';
 
 /**
  * analyze-image is throttled to 5 requests / minute server-side. Space replays
@@ -23,6 +25,7 @@ export const scanAnalysisHandler: OutboxHandler = {
     }
     const base64 = await readImageBase64(row.imagePath);
     const payload = JSON.parse(row.payload) as ScanAnalysisPayload;
+    if (!payload.language) await loadStoredLanguage();
     if (payload.aiConsentRecorded !== true) {
       throw new Error('AI data sharing consent was not recorded for this scan');
     }
@@ -31,6 +34,7 @@ export const scanAnalysisHandler: OutboxHandler = {
       ENDPOINTS.scans.analyzeImage,
       {
         clientRequestId: row.id,
+        language: payload.language ?? scanRequestLanguage(i18n.resolvedLanguage ?? i18n.language),
         image: base64,
         mimeType: row.mimeType ?? 'image/jpeg',
         message: payload.message,

@@ -13,6 +13,7 @@ export type OutboxStatus = 'pending' | 'in_flight' | 'failed';
 
 /** Body for POST /scans/analyze-image (the image itself lives on disk). */
 export interface ScanAnalysisPayload {
+  language?: 'fr' | 'en';
   /** Proof that the user accepted AI data sharing before this image was queued. */
   aiConsentRecorded?: boolean;
   message?: string;
