@@ -59,6 +59,27 @@ export class PimAvailability {
     return selected.map((match) => match.name);
   }
 
+  /**
+   * Map a hand-typed product name (expert rules: "SOLESTER 530M", "PW30AL",
+   * "3790") to the single active catalogue name it designates, or null when
+   * it is unknown, inactive or ambiguous.
+   */
+  resolveActiveName(value?: string | null): string | null {
+    if (!value || this.isInactive(value)) return null;
+    const normalized = normalizePimProductName(value);
+    const exact = this.activeProductNames.find((name) => normalizePimProductName(name) === normalized);
+    if (exact) return exact;
+    const compact = (name: string) => normalizePimProductName(name).replace(/[^a-z0-9+]/g, '');
+    const target = compact(value);
+    if (target.length < 4) return null;
+    const sameCompact = this.activeProductNames.filter((name) => compact(name) === target);
+    if (sameCompact.length) return sameCompact.length === 1 ? sameCompact[0] : null;
+    // A bare grade number ("3790") designates "GRAISSE 3790" only when unique.
+    if (!/^\d+$/.test(target)) return null;
+    const suffixed = this.activeProductNames.filter((name) => new RegExp(`(^|\\s)${target}$`).test(normalizePimProductName(name)));
+    return suffixed.length === 1 ? suffixed[0] : null;
+  }
+
   sanitizeExpertNote<T extends { note?: string | null }>(expert: T): T {
     return expert.note && this.mentionsInactive(expert.note) ? { ...expert, note: null } : expert;
   }

@@ -102,6 +102,20 @@ function chunkMatchesFilters(
   return true;
 }
 
+const RERANK_CANDIDATES = 40;
+const RERANKED_PRODUCTS = 15;
+/** PIM products carry one catalogue chunk and one FT chunk; legacy rows may have more. */
+const MAX_CHUNKS_PER_PRODUCT = 3;
+
+function isTechnicalSheet(chunk: ChunkResult): boolean {
+  return chunk.metadata?.source_kind === 'sellbase_technical_sheet';
+}
+
+/** Original FT first: it carries the application and performance evidence. */
+function orderProductChunks(chunks: ChunkResult[]): ChunkResult[] {
+  return [...chunks].sort((a, b) => Number(isTechnicalSheet(b)) - Number(isTechnicalSheet(a)));
+}
+
 @Injectable()
 export class VectorStoreService implements OnModuleInit {
   private readonly logger = new Logger(VectorStoreService.name);
@@ -290,35 +304,48 @@ export class VectorStoreService implements OnModuleInit {
       allChunks = filtered;
     }
 
-    // Diversity pass: keep one chunk per product so the reranker sees N
-    // distinct products and not 4 chunks of the same one. The reranker will
-    // then re-score these representative chunks against the actual query.
-    const bestPerProduct = new Map<string, ChunkResult>();
-    const extras: ChunkResult[] = [];
-
+    // Group by product. Previously only the best chunk of a product reached
+    // the LLM unless its second chunk happened to rank in the window too, so
+    // many candidates were judged without their technical sheet.
+    const retrievedByProduct = new Map<string, ChunkResult[]>();
     for (const chunk of allChunks) {
-      if (!bestPerProduct.has(chunk.product_name)) {
-        bestPerProduct.set(chunk.product_name, chunk);
-      } else {
-        extras.push(chunk);
-      }
+      const list = retrievedByProduct.get(chunk.product_name) ?? [];
+      list.push(chunk);
+      retrievedByProduct.set(chunk.product_name, list);
     }
+    const candidateNames = [...retrievedByProduct.keys()].slice(0, RERANK_CANDIDATES);
 
-    const candidatesForRerank = Array.from(bestPerProduct.values()).slice(0, 40);
+    // A candidate's FT may rank below the retrieval window even though its
+    // catalogue record matched. Load every indexed chunk of the candidates so
+    // the LLM judges each product on its catalogue fields AND its original FT.
+    const indexed = await this.loadProductChunks(candidateNames);
+    const candidates = candidateNames.flatMap((name) => {
+      const retrieved = retrievedByProduct.get(name)!;
+      const chunks = (indexed.get(name) ?? retrieved)
+        .map((chunk) => ({ ...chunk, similarity: retrieved[0].similarity }))
+        .filter((chunk) => chunkMatchesFilters(chunk, filters));
+      return chunks.length ? [{ name, chunks: orderProductChunks(chunks).slice(0, MAX_CHUNKS_PER_PRODUCT) }] : [];
+    });
 
     // The PIM intentionally contains Molydal facts, not competitor aliases.
     // Rerank against the normalized technical intent so a competitor name does
     // not erase otherwise relevant candidates retrieved by their properties.
-    const reranked = await this.rerank(reformulatedQuery, candidatesForRerank, 15);
+    // Rank each product on its best retrieved chunk. Reranking a combined
+    // catalogue+FT document was measured on the prod feedback cases and lost
+    // correct equivalents (SOLESTER 530 M dropped from 4th to 8th), so the FT
+    // is added to the context below without changing the proven ranking.
+    const reranked = await this.rerank(
+      reformulatedQuery,
+      candidates.map(({ name }) => retrievedByProduct.get(name)!
+        .find((chunk) => chunkMatchesFilters(chunk, filters))!),
+      RERANKED_PRODUCTS,
+    );
+    const byName = new Map(candidates.map((candidate) => [candidate.name, candidate.chunks]));
 
     const combined = [
       ...pinnedResults,
-      ...reranked,
-      ...extras
-        .filter((c) =>
-          reranked.some((p) => p.product_name === c.product_name),
-        )
-        .slice(0, 15),
+      ...reranked.flatMap((product) => (byName.get(product.product_name) ?? [])
+        .map((chunk) => ({ ...chunk, similarity: product.similarity }))),
     ];
     const seen = new Set<string>();
     return combined.filter((chunk) => {
@@ -326,47 +353,55 @@ export class VectorStoreService implements OnModuleInit {
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
-    }).slice(0, 30);
+    });
   }
 
-  private async findPinnedChunks(names: string[], filters?: RetrievalFilters): Promise<ChunkResult[]> {
-    if (!this.prisma || names.length === 0) return [];
+  private async activeIndexId(): Promise<string | null> {
+    if (!this.prisma) return null;
     const active = await this.prisma.ragIndexVersion.findFirst({
       where: { status: 'active' }, orderBy: { activatedAt: 'desc' }, select: { id: true },
     });
-    if (!active) return [];
-    const selectedNames = [...new Set(names)].slice(0, 6);
-    const rows = await this.prisma.ragChunk.findMany({
+    return active?.id ?? null;
+  }
+
+  private async loadProductChunks(names: string[]): Promise<Map<string, ChunkResult[]>> {
+    const result = new Map<string, ChunkResult[]>();
+    if (names.length === 0) return result;
+    const indexId = await this.activeIndexId();
+    if (!indexId) return result;
+    const rows = await this.prisma!.ragChunk.findMany({
       where: {
-        indexId: active.id,
-        product: { active: true, productType: 'lubricant', name: { in: selectedNames } },
+        indexId,
+        product: { active: true, productType: 'lubricant', name: { in: names } },
       },
       select: {
         content: true, metadata: true,
         product: { select: { name: true, family: true } },
       },
     });
-    const ordered = rows
-      .filter((row) => selectedNames.includes(row.product.name) && !/^MLS/i.test(row.product.family ?? ''))
-      .sort((a, b) => selectedNames.indexOf(a.product.name) - selectedNames.indexOf(b.product.name)
-        || Number(b.metadata && typeof b.metadata === 'object' && !Array.isArray(b.metadata) && b.metadata.source_kind === 'sellbase_technical_sheet')
-        - Number(a.metadata && typeof a.metadata === 'object' && !Array.isArray(a.metadata) && a.metadata.source_kind === 'sellbase_technical_sheet'));
-    const counts = new Map<string, number>();
-    return ordered.flatMap((row) => {
-      const count = counts.get(row.product.name) ?? 0;
-      if (count >= 2) return [];
+    for (const row of rows) {
+      if (!names.includes(row.product.name) || /^MLS/i.test(row.product.family ?? '')) continue;
       const metadata = row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
         ? row.metadata as Record<string, unknown> : {};
-      const chunk: ChunkResult = {
+      const list = result.get(row.product.name) ?? [];
+      list.push({
         product_name: row.product.name,
         product_family: row.product.family ?? '',
         chunk_text: row.content,
-        similarity: 1,
-        metadata: { ...metadata, exact_catalogue_match: true },
-      };
-      if (!chunkMatchesFilters(chunk, filters)) return [];
-      counts.set(row.product.name, count + 1);
-      return [chunk];
-    });
+        similarity: 0,
+        metadata,
+      });
+      result.set(row.product.name, list);
+    }
+    return result;
+  }
+
+  private async findPinnedChunks(names: string[], filters?: RetrievalFilters): Promise<ChunkResult[]> {
+    const selectedNames = [...new Set(names)].slice(0, 6);
+    const indexed = await this.loadProductChunks(selectedNames);
+    return selectedNames.flatMap((name) => orderProductChunks(indexed.get(name) ?? [])
+      .map((chunk) => ({ ...chunk, similarity: 1, metadata: { ...chunk.metadata, exact_catalogue_match: true } }))
+      .filter((chunk) => chunkMatchesFilters(chunk, filters))
+      .slice(0, MAX_CHUNKS_PER_PRODUCT));
   }
 }

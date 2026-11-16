@@ -117,6 +117,24 @@ describe('Scan equivalence integrity', () => {
     expect(vector.dualSearch).not.toHaveBeenCalled();
   });
 
+  test('sends every chunk, including the original FT, of the top 15 products', async () => {
+    const chunk = (name: string, ft: boolean) => ({
+      product_name: name, product_family: 'HUILES', similarity: 0.5,
+      chunk_text: `${name} ${ft ? 'FT' : 'catalogue'}`,
+      metadata: ft ? { source_kind: 'sellbase_technical_sheet' } : {},
+    });
+    vector.dualSearch.mockResolvedValue(Array.from({ length: 16 }, (_, i) => [chunk(`P${i}`, true), chunk(`P${i}`, false)]).flat());
+    const analyze = jest.spyOn(service as any, 'generateEquivalenceAnalysis').mockResolvedValue({ equivalents: [], analysis: 'none' });
+
+    await service.analyzeImage('AA==', 'image/jpeg', 'user');
+
+    const [, context, sources] = analyze.mock.calls[0] as [unknown, string, string[]];
+    expect(sources).toEqual(Array.from({ length: 15 }, (_, i) => `P${i}`));
+    expect(context).toContain('P14 FT');
+    expect(context).toContain('P14 catalogue');
+    expect(context).not.toContain('P15');
+  });
+
   test('saves the answer and notifies after an unrecognized scan', async () => {
     jest.spyOn(service as any, 'identifyProduct').mockResolvedValue({ ...identified, name: '' });
     const result = await service.analyzeImage('AA==', 'image/jpeg', 'user');
