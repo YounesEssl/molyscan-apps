@@ -10,6 +10,10 @@ import { filterCatalogScope } from './pim-scope';
 import { ERP_SLEEP_CHARACTERISTIC_ID, planErpAvailability } from './pim-erp-status';
 import { technicalSheetText } from './technical-sheet-text';
 
+// French is the reference FT. Other languages are indexed only when no French
+// FT can be read, so products documented solely in EN/DE still get evidence.
+const FT_LANGUAGE_PRIORITY = ['fr', 'en', 'de', 'es', 'it'];
+
 @Injectable()
 export class PimSyncService {
   private readonly logger = new Logger(PimSyncService.name);
@@ -197,7 +201,7 @@ export class PimSyncService {
       where: { active: true, productType: 'lubricant' },
       include: {
         references: { where: { active: true } },
-        documents: { where: { kind: 'technical_sheet', language: 'fr' } },
+        documents: { where: { kind: 'technical_sheet', language: { in: FT_LANGUAGE_PRIORITY } } },
       },
     });
     const previous = await this.prisma.ragIndexVersion.findFirst({ where: { status: RagIndexStatus.active } });
@@ -234,21 +238,36 @@ export class PimSyncService {
       // Keep the structured PIM chunk for current availability and reference
       // data, then add the actual Sellbase FT as separate technical evidence.
       await addChunk(product.id, content, metadata);
-      const ft = product.documents?.[0];
-      if (!ft || !this.sellbase.canDownloadDocument(ft.kind, product.sellbaseInstanceId)) continue;
+      const candidates = (product.documents ?? [])
+        .filter((doc) => FT_LANGUAGE_PRIORITY.includes(doc.language)
+          && this.sellbase.canDownloadDocument(doc.kind, product.sellbaseInstanceId))
+        .sort((a, b) => FT_LANGUAGE_PRIORITY.indexOf(a.language) - FT_LANGUAGE_PRIORITY.indexOf(b.language));
+      if (candidates.length === 0) continue;
       ftAvailable++;
-      try {
-        const response = await this.sellbase.downloadDocument(ft.fileName, {
-          kind: ft.kind, language: ft.language, productInstanceId: product.sellbaseInstanceId,
-        });
-        const extracted = await technicalSheetText(response);
-        await addChunk(product.id, `Product: ${product.name}\nOriginal Sellbase technical sheet:\n${extracted}`, {
-          ...metadata, source_kind: 'sellbase_technical_sheet', source_file: ft.fileName,
-        });
-        ftIndexed++;
-      } catch (error) {
-        this.logger.warn(`FT indexing skipped for ${product.name}: ${(error as Error).message}`);
+      const failures: string[] = [];
+      for (const ft of candidates) {
+        try {
+          const response = await this.sellbase.downloadDocument(ft.fileName, {
+            kind: ft.kind, language: ft.language, productInstanceId: product.sellbaseInstanceId,
+          });
+          const extracted = await technicalSheetText(response);
+          // Keep French chunks byte-identical so existing embeddings are reused.
+          const fallback = ft.language !== 'fr';
+          const heading = fallback
+            ? `Original Sellbase technical sheet (${ft.language.toUpperCase()}, no French FT available):`
+            : 'Original Sellbase technical sheet:';
+          await addChunk(product.id, `Product: ${product.name}\n${heading}\n${extracted}`, {
+            ...metadata, source_kind: 'sellbase_technical_sheet', source_file: ft.fileName,
+            ...(fallback ? { source_language: ft.language } : {}),
+          });
+          ftIndexed++;
+          failures.length = 0;
+          break;
+        } catch (error) {
+          failures.push(`${ft.language}: ${(error as Error).message}`);
+        }
       }
+      if (failures.length) this.logger.warn(`FT indexing skipped for ${product.name}: ${failures.join('; ')}`);
     }
     if (products.length < 100) throw new Error(`Safety stop: only ${products.length} lubricants were indexed`);
     return { chunkCount: count, productCount: products.length, ftAvailable, ftIndexed };

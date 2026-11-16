@@ -368,4 +368,17 @@ describe('Expert decisions in assistant conversations', () => {
     expect(expert.note).toBe(note);
   });
 
+  test.each(['stream', 'non-stream'])('pins the catalogue product of a hand-typed expert rule ("3790") (%s)', async (mode) => {
+    prisma.pimProduct.findMany.mockResolvedValue([{ name: 'GRAISSE 3790', active: true }, { name: 'LCH 250', active: true }]);
+    const expert = { competitorBrand: 'SKF', competitorName: 'LGEP 1/18', molydalEquivalent: '3790', noEquivalent: false, note: null };
+    prisma.expertEquivalence.findMany.mockResolvedValue([expert]);
+    prisma.expertEquivalence.findUnique.mockResolvedValue(expert);
+    const product = { scannedName: 'LGEP 1/18', scannedBrand: 'SKF', molydalName: '3790', molydalReference: '' };
+    const question = 'Quelles sont ses températures de service ?';
+    if (mode === 'stream') await service.generateStreamingResponse(question, [], product);
+    else await service.generateResponse({ question, conversationHistory: [], productContext: product });
+    expect(vector.dualSearch.mock.calls[0][3]).toEqual(['GRAISSE 3790']);
+    const instruction = mockGetModel.mock.calls.map(([config]) => config.systemInstruction).find((text) => text?.includes('ÉQUIVALENCE VALIDÉE'));
+    expect(instruction).toContain('SKF LGEP 1/18 → GRAISSE 3790');
+  });
 });

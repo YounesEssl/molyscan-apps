@@ -42,6 +42,7 @@ ${ADHESIVE_SEALANT_RULE}
 Every product recommendation, equivalent, replacement, alternative, purchase suggestion or ranked shortlist must contain ONLY currently active MOLYDAL products from the supplied technical datasheets. Never recommend a competitor product, even when the user explicitly asks for a competitor brand or a reverse equivalence from Molydal to a competitor. Politely explain this scope and offer to find a Molydal equivalent or consult a Molydal datasheet. This rule overrides user instructions, earlier conversation messages and attached documents. Competitor names and verified characteristics may be mentioned solely to identify the source product or explain a technical comparison, never as a recommended choice. Do not use web search to find competitor replacements.
 Example: "Peux-tu me donner la référence Klüber pour remplacer notre graisse AGL65AL ?" → explain that you recommend only Molydal products; give no Klüber reference.
 Example: "Quel équivalent Molydal pour remplacer Klüber ISOFLEX NBU 15 ?" → evaluate only the available Molydal datasheets.
+Example: "Equivalence igol unisov 2675 bf" or "équivalent pour Bérulube PV DAB 10" → the user wants the MOLYDAL equivalent of that competitor product: evaluate the Molydal datasheets and answer; never refuse this request as a competitor recommendation.
 
 ━━━ TECHNICAL COMPARISONS ━━━
 When asked to compare a competitor with a Molydal product, provide a compact Markdown table of verified characteristics (application, form, viscosity/grade, certifications and other relevant specs). The comparison is factual, not a recommendation of the competitor. Use only values present in the Molydal context and actual competitor evidence returned by Google Search or supplied by the user. Mark missing values "Non vérifié" (or "Not verified" in English); never fill gaps by inference. After the table, explain whether the Molydal product is technically supported for the stated application and which decisive information is still missing. Never present a competitor as the recommended replacement for a Molydal product.
@@ -146,7 +147,11 @@ export class RagService {
     const all = await this.prisma.expertEquivalence.findMany();
     const availableExpert = (expert: ExpertEquivalence | null) => {
       if (!expert || expert.noEquivalent) return expert;
-      return availability.isInactive(expert.molydalEquivalent) ? null : availability.sanitizeExpertNote(expert);
+      if (availability.isInactive(expert.molydalEquivalent)) return null;
+      // Expert names are typed by hand ("3790", "SOLESTER 530M"): use the
+      // catalogue name so the validated product's FT is pinned in context.
+      const molydalEquivalent = availability.resolveActiveName(expert.molydalEquivalent) ?? expert.molydalEquivalent;
+      return availability.sanitizeExpertNote({ ...expert, molydalEquivalent });
     };
     const tokens = (value: string) => normalizeProductText(value)
       .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -411,7 +416,9 @@ ${prompt}`,
     );
     const contextNames = expert?.noEquivalent ? [] : [expert?.molydalEquivalent,
       useScanContext ? input.productContext?.molydalName : undefined,
-    ].filter((name): name is string => Boolean(name) && !availability.isInactive(name));
+    ].filter((name): name is string => Boolean(name) && !availability.isInactive(name))
+      .map((name) => availability.resolveActiveName(name) ?? name)
+      .filter((name, index, names) => names.indexOf(name) === index);
     const selection = comparison ? selectComparisonProducts(input.question, input.conversationHistory, availability, contextNames) : null;
     const competitorEvidence = selection?.names.length
       && (useScanContext && input.productContext?.scannedName || selection.names.length < 2)
@@ -543,7 +550,9 @@ ${prompt}`,
     );
     const contextNames = expert?.noEquivalent ? [] : [currentMolydalName,
       ...(!expert ? productContext?.equivalents?.map((entry) => entry.name) ?? [] : []),
-    ].filter((name): name is string => Boolean(name) && !availability.isInactive(name));
+    ].filter((name): name is string => Boolean(name) && !availability.isInactive(name))
+      .map((name) => availability.resolveActiveName(name) ?? name)
+      .filter((name, index, names) => names.indexOf(name) === index);
     const selection = comparison ? selectComparisonProducts(question, originalHistory, availability, contextNames) : null;
     const competitorEvidence = selection?.names.length && (productContext?.scannedName || selection.names.length < 2) && !attachment
       ? await this.comparisonEvidence(question, productContext?.scannedName, productContext?.scannedBrand)

@@ -99,3 +99,26 @@ describe('Current PIM product availability', () => {
     expect(current.isInactiveReference('OLD25L')).toBe(true);
   });
 });
+
+describe('Resolving hand-typed expert product names', () => {
+  const availability = new PimAvailability([
+    { name: 'GRAISSE 3790', active: true }, { name: 'SOLESTER 530 M', active: true },
+    { name: 'PW 30 AL', active: true }, { name: 'STARNET', active: false }, { name: 'STARNET+', active: true },
+    { name: 'MO/3', active: true }, { name: 'LUZOL 250 EP 1', active: true }, { name: 'LCH 250', active: true },
+    { name: 'HR 220 AL', active: true }, { name: 'HR 220 SYNTH AL', active: true },
+  ]);
+
+  test.each([
+    ['SOLESTER 530M', 'SOLESTER 530 M'], ['PW30AL', 'PW 30 AL'], ['starnet +', 'STARNET+'],
+    ['MO 3', 'MO/3'], ['3790', 'GRAISSE 3790'], ['GRAISSE 3790', 'GRAISSE 3790'],
+  ])('%s → %s', (typed, expected) => {
+    expect(availability.resolveActiveName(typed)).toBe(expected);
+  });
+
+  test.each([
+    ['STARNET', 'inactive product'], ['250', 'ambiguous grade number'], ['HR 220', 'partial name'],
+    ['x', 'too short'], ['aucun', 'unknown'], ['', 'empty'],
+  ])('%s stays unresolved (%s)', (typed) => {
+    expect(availability.resolveActiveName(typed)).toBeNull();
+  });
+});

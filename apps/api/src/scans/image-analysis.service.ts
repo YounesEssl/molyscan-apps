@@ -202,7 +202,12 @@ export class ImageAnalysisService {
     const availability = expertEquiv && !expertEquiv.noEquivalent ? await loadPimAvailability(this.prisma) : null;
     const unavailableExpert = availability?.isInactive(expertEquiv?.molydalEquivalent);
     if (expertEquiv && !unavailableExpert) {
-      if (availability) expertEquiv = availability.sanitizeExpertNote(expertEquiv);
+      if (availability) {
+        // Show and store the catalogue name so the product card and the
+        // follow-up chat find the validated product and its FT.
+        const molydalEquivalent = availability.resolveActiveName(expertEquiv.molydalEquivalent) ?? expertEquiv.molydalEquivalent;
+        expertEquiv = availability.sanitizeExpertNote({ ...expertEquiv, molydalEquivalent });
+      }
       this.logger.log(
         `🎯 Équivalence experte: "${identification.name}" → ${expertEquiv.molydalEquivalent} (confiance ${expertEquiv.confidence}%)`,
       );
@@ -288,12 +293,13 @@ export class ImageAnalysisService {
       reformulated,
       Object.keys(retrievalFilters).length > 0 ? retrievalFilters : undefined,
     );
-    // Keep the top 15 chunks: enough to surface the right spec-specific product
-    // (e.g. a calcium-sulfonate grease that ranks ~13th behind generic calcium
-    // greases) without flooding the model's context. Was 8 — raised after prod
-    // feedback showed correct equivalents getting cut just below the threshold.
-    const chunks = allChunks.slice(0, 15);
-    this.logger.log(`✅ Step 2b — RAG search (Supabase): ${Date.now() - t2b}ms → ${allChunks.length} chunks, kept ${chunks.length}`);
+    // Keep the top 15 products: enough to surface the right spec-specific
+    // product (e.g. a calcium-sulfonate grease that ranks ~13th behind generic
+    // calcium greases). Keep every chunk of those products: cutting by chunk
+    // count dropped the original FT of about a third of the candidates.
+    const keptProducts = [...new Set(allChunks.map((c) => c.product_name))].slice(0, 15);
+    const chunks = allChunks.filter((c) => keptProducts.includes(c.product_name));
+    this.logger.log(`✅ Step 2b — RAG search (Supabase): ${Date.now() - t2b}ms → ${allChunks.length} chunks, kept ${chunks.length} for ${keptProducts.length} products`);
 
     const context = chunks.length > 0
       ? chunks
