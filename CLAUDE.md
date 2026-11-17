@@ -53,7 +53,7 @@ git push origin main
 
 # Sur le VPS (api.molyscan.fr)
 cd ~/molyscan-apps && git pull origin main
-cd apps/api && npm install && npm run build
+cd apps/api && npm install && npx prisma generate && npm run build
 npx prisma migrate deploy
 pm2 restart molyscan-api
 ```

@@ -35,14 +35,18 @@ git pull origin main
 cd apps/api
 npm install
 
-# 5. Compiler
+# 5. Régénérer le client Prisma (obligatoire si schema.prisma a changé :
+#    sinon le build échoue sur les nouveaux modèles)
+npx prisma generate
+
+# 6. Compiler
 npm run build
 
-# 6. Appliquer les migrations de base de données
+# 7. Appliquer les migrations de base de données
 npx prisma migrate deploy
 
-# 7. Redémarrer le processus
-pm2 restart molyscan-api
+# 8. Redémarrer le processus (--update-env si le .env a changé)
+pm2 restart molyscan-api --update-env
 ```
 
 ## Première installation sur un VPS vierge
@@ -286,7 +290,7 @@ sudo certbot --nginx -d admin.molyscan.fr
 1. Développer et tester localement
 2. git commit + git push origin main
 3. SSH sur le VPS
-4. git pull + npm run build + npx prisma migrate deploy + pm2 restart
+4. git pull + npx prisma generate + npm run build + npx prisma migrate deploy + pm2 restart
 5. Vérifier: curl https://api.molyscan.fr/api/health
 6. Rebuild APK si l'API a changé: eas build --platform android --profile preview
 ```
