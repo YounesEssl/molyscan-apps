@@ -137,6 +137,30 @@ sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d api.molyscan.fr
 ```
 
+## Approbation des inscriptions par le commercial du département
+
+Quand un client (email hors `@molydal.com`) s'inscrit, l'API envoie aux
+commerciaux affectés à son département un email avec un bouton vers
+`https://api.molyscan.fr/api/registration-requests/<jeton>` : une page HTML
+servie par l'API où le commercial accepte ou refuse la demande. Repli : admins
+approuvés, puis `REGISTRATION_FALLBACK_EMAIL`. Les inscriptions `@molydal.com`
+restent validées depuis la console admin.
+
+Variables d'environnement (`apps/api/.env`) :
+
+| Variable | Rôle |
+|---|---|
+| `API_PUBLIC_URL` | URL publique de l'API sans `/api` (ex. `https://api.molyscan.fr`) — **obligatoire en prod**, sinon le lien pointe sur localhost |
+| `REGISTRATION_APPROVAL_TTL_HOURS` | Validité du lien (défaut 168 h) |
+| `REGISTRATION_FALLBACK_EMAIL` | Dernier repli si ni commercial ni admin (facultatif) |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Déjà utilisées pour les autres emails |
+
+Affectations département → commerciaux :
+
+- `GET /api/admin/department-assignments` — état actuel ;
+- `PUT /api/admin/departments/:id/commercials` `{ "userIds": [...] }` — remplace les commerciaux d'un département ;
+- ou compléter `apps/api/prisma/data/department-commercials.ts` puis `npm run prisma:seed:department-commercials` (additif).
+
 ## Commandes PM2 utiles
 
 ```bash

@@ -8,7 +8,7 @@ describe('AuthService session renewal', () => {
   } };
   const jwt = { sign: jest.fn() };
   const config = { get: jest.fn() };
-  const service = new AuthService(prisma as any, jwt as any, config as any, {} as any);
+  const service = new AuthService(prisma as any, jwt as any, config as any, {} as any, {} as any);
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(now);
     jest.clearAllMocks();
@@ -57,5 +57,41 @@ describe('AuthService session renewal', () => {
     config.get.mockReturnValue(duration);
     await service.refresh('refresh');
     expect(prisma.refreshToken.updateMany.mock.calls[0][0].data.expiresAt.getTime()).toBe(now.getTime() + milliseconds);
+  });
+});
+
+describe('AuthService registration routing', () => {
+  const prisma = {
+    user: { findUnique: jest.fn(), create: jest.fn(), findMany: jest.fn() },
+    department: { findUnique: jest.fn() },
+  };
+  const config = { get: jest.fn((_k: string, fallback?: string) => fallback) };
+  const email = { sendAccessRequestToAdmins: jest.fn() };
+  const approvals = { requestApproval: jest.fn() };
+  const service = new AuthService(prisma as any, {} as any, config as any, email as any, approvals as any);
+  const base = { password: 'secret1', firstName: 'Claire', lastName: 'Martin' };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.findMany.mockResolvedValue([{ email: 'admin@molydal.com' }]);
+    prisma.user.create.mockImplementation(({ data }) => ({ id: 'new-user', ...data }));
+  });
+
+  it('sends a client registration to the commercial of the chosen department', async () => {
+    prisma.department.findUnique.mockResolvedValue({ id: 'dep-69', emailNotificationsDisabled: false });
+    const result = await service.register({ ...base, email: 'claire@client.fr', departmentId: 'dep-69' });
+    expect(approvals.requestApproval).toHaveBeenCalledWith('new-user');
+    expect(email.sendAccessRequestToAdmins).not.toHaveBeenCalled();
+    expect(prisma.user.create.mock.calls[0][0].data).toMatchObject({
+      status: 'pending', role: 'distributor', departments: { connect: [{ id: 'dep-69' }] },
+    });
+    expect(result.message).toContain('commercial');
+  });
+
+  it('keeps the admin console flow for internal @molydal.com accounts', async () => {
+    await service.register({ ...base, email: 'paul@molydal.com' });
+    expect(email.sendAccessRequestToAdmins).toHaveBeenCalled();
+    expect(approvals.requestApproval).not.toHaveBeenCalled();
   });
 });

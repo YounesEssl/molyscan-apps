@@ -87,6 +87,67 @@ export class AdminService {
     }
   }
 
+  /**
+   * Affectations département → commerciaux (utilisées pour router les
+   * demandes d'inscription, de prix et les mails de scan).
+   */
+  async listDepartmentAssignments() {
+    const departments = await this.prisma.department.findMany({
+      orderBy: { code: 'asc' },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        emailNotificationsDisabled: true,
+        users: {
+          where: { role: UserRole.commercial },
+          select: { id: true, email: true, firstName: true, lastName: true, status: true },
+          orderBy: { lastName: 'asc' },
+        },
+      },
+    });
+    return departments.map(({ users, ...department }) => ({
+      ...department,
+      commercials: users,
+    }));
+  }
+
+  async setDepartmentCommercials(departmentId: string, userIds: string[]) {
+    const department = await this.prisma.department.findUnique({
+      where: { id: departmentId },
+      select: { id: true, users: { where: { role: UserRole.commercial }, select: { id: true } } },
+    });
+    if (!department) throw new NotFoundException('Département introuvable.');
+
+    const wanted = [...new Set(userIds)];
+    const commercials = await this.prisma.user.count({
+      where: { id: { in: wanted }, role: UserRole.commercial },
+    });
+    if (commercials !== wanted.length) {
+      throw new BadRequestException(
+        'Un ou plusieurs utilisateurs sont introuvables ou ne sont pas commerciaux.',
+      );
+    }
+
+    // On ne touche qu'aux commerciaux : les distributeurs rattachés au
+    // département restent connectés.
+    const removed = department.users
+      .map((u) => u.id)
+      .filter((id) => !wanted.includes(id));
+    await this.prisma.department.update({
+      where: { id: departmentId },
+      data: {
+        users: {
+          disconnect: removed.map((id) => ({ id })),
+          connect: wanted.map((id) => ({ id })),
+        },
+      },
+    });
+
+    const all = await this.listDepartmentAssignments();
+    return all.find((d) => d.id === departmentId);
+  }
+
   // ─── Demandes d'accès ──────────────────────────────────────────────────
 
   listAccessRequests() {

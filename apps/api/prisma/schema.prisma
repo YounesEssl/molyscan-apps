@@ -124,6 +124,10 @@ model User {
   equivalentFeedbacks     ScanEquivalentFeedback[]
   departments             Department[]             @relation("UserDepartments")
   crmCredential           CrmCredential?
+  // Liens d'approbation d'inscription : envoyés pour ce compte (demandeur) /
+  // reçus par ce compte (commercial ou admin qui valide).
+  registrationApprovalTokens    RegistrationApprovalToken[] @relation("RegistrationApplicant")
+  registrationApprovalsToHandle RegistrationApprovalToken[] @relation("RegistrationApprover")
 
   @@map("users")
 }
@@ -167,6 +171,32 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// Lien magique envoyé par email au commercial du département (ou au repli)
+// pour accepter / refuser une inscription depuis une page web servie par l'API.
+// Un jeton par destinataire ; seul le hash SHA-256 est stocké. Usage unique :
+// la première décision consomme tous les jetons du même demandeur.
+model RegistrationApprovalToken {
+  id              String    @id @default(uuid())
+  tokenHash       String    @unique
+  userId          String
+  recipientEmail  String
+  // null quand le destinataire est l'adresse de repli (pas un compte).
+  recipientUserId String?
+  isFallback      Boolean   @default(false)
+  expiresAt       DateTime
+  usedAt          DateTime?
+  // "approved" | "rejected" sur le jeton utilisé ; null sur les jetons
+  // invalidés par la décision d'un autre destinataire.
+  decision        String?
+  createdAt       DateTime  @default(now())
+
+  user          User  @relation("RegistrationApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  recipientUser User? @relation("RegistrationApprover", fields: [recipientUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("registration_approval_tokens")
 }
 
 model CompetitorProduct {

@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { EmailModule } from './email/email.module';
 import { AuthModule } from './auth/auth.module';
+import { RegistrationRequestsModule } from './registration-requests/registration-requests.module';
 import { AdminModule } from './admin/admin.module';
 import { EquivalencesModule } from './admin/equivalences/equivalences.module';
 import { DepartmentsModule } from './departments/departments.module';
@@ -32,6 +33,7 @@ import { FeaturesModule } from './features/features.module';
     FeaturesModule,
     EmailModule,
     AuthModule,
+    RegistrationRequestsModule,
     AdminModule,
     EquivalencesModule,
     DepartmentsModule,

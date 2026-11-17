@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { RegistrationApprovalService } from '../registration-requests/registration-approval.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UserRole, UserStatus, User } from '@prisma/client';
@@ -32,6 +33,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
+    private registrationApprovals: RegistrationApprovalService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -88,14 +90,22 @@ export class AuthService {
       },
     });
 
-    // Notification admin (best-effort : ne jamais faire échouer l'inscription
-    // si l'envoi d'email échoue — le compte est créé et reste en attente).
-    await this.notifyAdminsOfAccessRequest(user);
+    // Notifications best-effort : ne jamais faire échouer l'inscription si
+    // l'envoi d'email échoue — le compte est créé et reste en attente.
+    if (isMolydal) {
+      // Commercial interne : l'admin doit lui attribuer ses départements.
+      await this.notifyAdminsOfAccessRequest(user);
+    } else {
+      // Client / distributeur : lien d'approbation au commercial du
+      // département choisi (repli admins, puis REGISTRATION_FALLBACK_EMAIL).
+      await this.registrationApprovals.requestApproval(user.id);
+    }
 
     return {
       status: UserStatus.pending,
-      message:
-        'Votre demande a été enregistrée. Un administrateur doit valider votre compte avant que vous puissiez vous connecter.',
+      message: isMolydal
+        ? 'Votre demande a été enregistrée. Un administrateur doit valider votre compte avant que vous puissiez vous connecter.'
+        : 'Votre demande a été enregistrée. Votre commercial Molydal doit valider votre compte avant que vous puissiez vous connecter.',
     };
   }
 

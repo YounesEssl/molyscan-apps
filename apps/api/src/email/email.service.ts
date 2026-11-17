@@ -17,6 +17,21 @@ export interface AccessRequestPayload {
   recipients: string[];
 }
 
+export interface RegistrationApprovalPayload {
+  to: string;
+  applicant: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    company?: string | null;
+    departments: string[];
+  };
+  reviewUrl: string;
+  expiresAt: Date;
+  // true = aucun commercial sur le département, repli admins / adresse.
+  isFallback: boolean;
+}
+
 export interface AccountDecisionPayload {
   firstName: string;
   email: string;
@@ -115,6 +130,23 @@ export class EmailService {
       subject,
       html,
       context: `access-request:${payload.applicant.email}`,
+    });
+  }
+
+  /**
+   * Envoie au commercial du département (ou au repli) le lien personnel vers
+   * la page web d'acceptation / refus d'une inscription.
+   */
+  async sendRegistrationApprovalRequest(
+    payload: RegistrationApprovalPayload,
+  ): Promise<boolean> {
+    const fullName =
+      `${payload.applicant.firstName} ${payload.applicant.lastName}`.trim();
+    return this.send({
+      to: [payload.to],
+      subject: `Nouvelle inscription Molyscan à valider — ${fullName.replace(/[\r\n]+/g, ' ')}`,
+      html: this.renderRegistrationApprovalEmail(payload, fullName),
+      context: `registration-approval:${payload.applicant.email}`,
     });
   }
 
@@ -304,6 +336,43 @@ export class EmailService {
         Si vous n'attendiez pas cette demande, vous pouvez la refuser depuis la
         console d'administration.
       </p>
+    `);
+  }
+
+  private renderRegistrationApprovalEmail(
+    payload: RegistrationApprovalPayload,
+    fullName: string,
+  ): string {
+    const { applicant } = payload;
+    const expires = new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    }).format(payload.expiresAt);
+    const fallbackNote = payload.isFallback
+      ? `<p style="${MUTED}">Aucun commercial n'est rattaché à ce département : cette demande vous est transmise en repli. Pensez à affecter un commercial au département.</p>`
+      : '';
+
+    return wrapLayout(`
+      <h1 style="${H1}">Nouvelle inscription ${accent('à valider')}</h1>
+      <p style="${P}">
+        Un client de votre secteur vient de créer un compte <strong>Molyscan</strong>.
+        Son compte reste bloqué tant que vous ne l'avez pas accepté.
+      </p>
+      <table role="presentation" style="${TABLE}">
+        ${row('Nom', escapeHtml(fullName))}
+        ${row('Email', escapeHtml(applicant.email))}
+        ${applicant.company ? row('Société', escapeHtml(applicant.company)) : ''}
+        ${applicant.departments.length ? row('Département', escapeHtml(applicant.departments.join(', '))) : ''}
+      </table>
+      <div style="margin:32px 0 8px;">
+        <a href="${escapeHtml(payload.reviewUrl)}" style="${BTN_PRIMARY}">Examiner la demande</a>
+      </div>
+      <p style="${MUTED}">
+        Le bouton ouvre une page où vous pourrez accepter ou refuser
+        l'inscription. Ce lien personnel est valable jusqu'au ${escapeHtml(expires)}
+        et ne peut servir qu'une fois : ne le transférez pas.
+      </p>
+      ${fallbackNote}
     `);
   }
 

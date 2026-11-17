@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Put,
   Body,
   Param,
   Query,
@@ -17,6 +18,7 @@ import { CompetitiveIntelligenceQueryDto } from './dto/competitive-intelligence-
 import { ApproveAccessRequestDto } from './dto/approve-access-request.dto';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { SetDepartmentCommercialsDto } from './dto/set-department-commercials.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -72,6 +74,24 @@ export class AdminController {
   @ApiOperation({ summary: 'Create a department' })
   createDepartment(@Body() dto: CreateDepartmentDto) {
     return this.adminService.createDepartment(dto.name);
+  }
+
+  @Get('department-assignments')
+  @ApiOperation({ summary: 'List departments with their assigned commercials' })
+  listDepartmentAssignments() {
+    return this.adminService.listDepartmentAssignments();
+  }
+
+  @Put('departments/:id/commercials')
+  @ApiOperation({
+    summary:
+      'Replace the commercials assigned to a department (registration, price request and scan routing)',
+  })
+  setDepartmentCommercials(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetDepartmentCommercialsDto,
+  ) {
+    return this.adminService.setDepartmentCommercials(id, dto.userIds);
   }
 
   @Get('access-requests')
