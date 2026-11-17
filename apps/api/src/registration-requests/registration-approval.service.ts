@@ -20,6 +20,8 @@ export interface ApprovalRouting {
   recipients: ApprovalRecipient[];
   // true = aucun commercial sur le(s) département(s) : repli admins / adresse.
   isFallback: boolean;
+  // Admins en copie des emails envoyés aux commerciaux (vide en repli).
+  cc: string[];
 }
 
 export interface RegistrationApplicantView {
@@ -125,15 +127,24 @@ export class RegistrationApprovalService {
         })
       : [];
     const assigned = dedupe(commercials.filter(notMuted));
-    if (assigned.length) return { recipients: assigned, isFallback: false };
 
     const admins = await this.prisma.user.findMany({
       where: { role: UserRole.admin, status: UserStatus.approved },
       select,
     });
-    const fallbackAdmins = dedupe(admins.filter(notMuted));
-    if (fallbackAdmins.length) {
-      return { recipients: fallbackAdmins, isFallback: true };
+    const activeAdmins = dedupe(admins.filter(notMuted));
+
+    if (assigned.length) {
+      // Les admins suivent toutes les inscriptions clients en copie.
+      const assignedEmails = new Set(assigned.map((r) => r.email.toLowerCase()));
+      const cc = activeAdmins
+        .map((a) => a.email)
+        .filter((email) => !assignedEmails.has(email.toLowerCase()));
+      return { recipients: assigned, isFallback: false, cc };
+    }
+
+    if (activeAdmins.length) {
+      return { recipients: activeAdmins, isFallback: true, cc: [] };
     }
 
     const fallbackEmail = this.configService
@@ -142,6 +153,7 @@ export class RegistrationApprovalService {
     return {
       recipients: fallbackEmail ? [{ email: fallbackEmail, userId: null }] : [],
       isFallback: true,
+      cc: [],
     };
   }
 
@@ -184,6 +196,7 @@ export class RegistrationApprovalService {
         });
         const ok = await this.emailService.sendRegistrationApprovalRequest({
           to: recipient.email,
+          cc: routing.cc,
           applicant: {
             firstName: user.firstName,
             lastName: user.lastName,

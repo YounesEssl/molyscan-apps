@@ -92,17 +92,24 @@ describe('RegistrationApprovalService', () => {
   // ─── Aiguillage ──────────────────────────────────────────────────────
 
   describe('resolveApprovers', () => {
-    it('routes to the approved commercials of the applicant department', async () => {
-      prisma.user.findMany.mockResolvedValueOnce([
-        commercial('com-1', 'paul@molydal.com'),
-        commercial('com-2', 'PAUL@molydal.com'), // doublon d'adresse
-      ]);
+    it('routes to the approved commercials of the applicant department, admins in cc', async () => {
+      prisma.user.findMany
+        .mockResolvedValueOnce([
+          commercial('com-1', 'paul@molydal.com'),
+          commercial('com-2', 'PAUL@molydal.com'), // doublon d'adresse
+        ])
+        .mockResolvedValueOnce([
+          commercial('adm-1', 'admin@molydal.com'),
+          commercial('adm-2', 'Paul@molydal.com'), // déjà destinataire
+          commercial('adm-3', 'muet@molydal.com', true),
+        ]);
 
       await expect(service.resolveApprovers(['dep-69'])).resolves.toEqual({
         recipients: [{ email: 'paul@molydal.com', userId: 'com-1' }],
         isFallback: false,
+        cc: ['admin@molydal.com'],
       });
-      expect(prisma.user.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.user.findMany).toHaveBeenCalledTimes(2);
       expect(prisma.user.findMany.mock.calls[0][0].where).toEqual({
         role: UserRole.commercial,
         status: UserStatus.approved,
@@ -118,6 +125,7 @@ describe('RegistrationApprovalService', () => {
       await expect(service.resolveApprovers(['dep-69'])).resolves.toEqual({
         recipients: [{ email: 'admin@molydal.com', userId: 'adm-1' }],
         isFallback: true,
+        cc: [],
       });
       expect(prisma.user.findMany.mock.calls[1][0].where).toEqual({
         role: UserRole.admin,
@@ -132,6 +140,7 @@ describe('RegistrationApprovalService', () => {
       await expect(service.resolveApprovers(['dep-69'])).resolves.toEqual({
         recipients: [{ email: 'contact@molydal.com', userId: null }],
         isFallback: true,
+        cc: [],
       });
     });
 
@@ -140,6 +149,7 @@ describe('RegistrationApprovalService', () => {
       await expect(service.resolveApprovers([])).resolves.toEqual({
         recipients: [],
         isFallback: true,
+        cc: [],
       });
     });
   });
@@ -150,10 +160,12 @@ describe('RegistrationApprovalService', () => {
     it('stores only a hash and emails each recipient a personal link', async () => {
       env.API_PUBLIC_URL = 'https://api.molyscan.fr/';
       prisma.user.findUnique.mockResolvedValue(makeUser());
-      prisma.user.findMany.mockResolvedValueOnce([
-        commercial('com-1', 'paul@molydal.com'),
-        commercial('com-2', 'lea@molydal.com'),
-      ]);
+      prisma.user.findMany
+        .mockResolvedValueOnce([
+          commercial('com-1', 'paul@molydal.com'),
+          commercial('com-2', 'lea@molydal.com'),
+        ])
+        .mockResolvedValueOnce([commercial('adm-1', 'admin@molydal.com')]);
 
       await expect(service.requestApproval('client-1')).resolves.toBe(2);
 
@@ -172,6 +184,7 @@ describe('RegistrationApprovalService', () => {
       });
       expect(email.sendRegistrationApprovalRequest.mock.calls[0][0]).toMatchObject({
         to: 'paul@molydal.com',
+        cc: ['admin@molydal.com'],
         isFallback: false,
         applicant: { email: 'claire@client.fr', company: 'ACME', departments: ['69 — Rhône'] },
       });

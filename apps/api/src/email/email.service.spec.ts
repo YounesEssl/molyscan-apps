@@ -55,3 +55,32 @@ describe('completed scan email', () => {
     expect(mockSend.mock.calls[0][0].text).toContain('Aucun produit identifié.');
   });
 });
+
+describe('registration approval email', () => {
+  let service: EmailService;
+  const payload = {
+    to: 'paul@molydal.com',
+    applicant: { firstName: 'Claire', lastName: 'Martin', email: 'claire@client.fr', departments: ['69 — Rhône'] },
+    reviewUrl: 'https://api.molyscan.fr/api/registration-requests/x',
+    expiresAt: new Date('2026-11-24T10:00:00Z'),
+    isFallback: false,
+  };
+
+  beforeEach(() => {
+    mockSend.mockReset();
+    mockSend.mockResolvedValue({ data: { id: 'email-1' }, error: null });
+    service = new EmailService({
+      get: (key: string, fallback?: string) => key === 'RESEND_API_KEY' ? 'test-key' : fallback,
+    } as any);
+  });
+
+  it('copies the admins on the commercial email', async () => {
+    await service.sendRegistrationApprovalRequest({ ...payload, cc: ['admin@molydal.com'] });
+    expect(mockSend.mock.calls[0][0]).toMatchObject({ to: ['paul@molydal.com'], cc: ['admin@molydal.com'] });
+  });
+
+  it('omits cc when there is nobody to copy', async () => {
+    await service.sendRegistrationApprovalRequest({ ...payload, cc: [] });
+    expect(mockSend.mock.calls[0][0]).not.toHaveProperty('cc');
+  });
+});

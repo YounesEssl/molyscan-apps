@@ -19,6 +19,8 @@ export interface AccessRequestPayload {
 
 export interface RegistrationApprovalPayload {
   to: string;
+  // Admins en copie quand le destinataire est le commercial du département.
+  cc?: string[];
   applicant: {
     firstName: string;
     lastName: string;
@@ -144,6 +146,7 @@ export class EmailService {
       `${payload.applicant.firstName} ${payload.applicant.lastName}`.trim();
     return this.send({
       to: [payload.to],
+      cc: payload.cc,
       subject: `Nouvelle inscription Molyscan à valider — ${fullName.replace(/[\r\n]+/g, ' ')}`,
       html: this.renderRegistrationApprovalEmail(payload, fullName),
       context: `registration-approval:${payload.applicant.email}`,
@@ -270,6 +273,7 @@ export class EmailService {
 
   private async send(params: {
     to: string[];
+    cc?: string[];
     subject: string;
     html: string;
     text?: string;
@@ -287,6 +291,7 @@ export class EmailService {
       const { data, error } = await this.resend.emails.send({
         from: this.fromEmail,
         to: params.to,
+        ...(params.cc?.length ? { cc: params.cc } : {}),
         subject: params.subject,
         html: params.html,
         ...(params.text ? { text: params.text } : {}),
@@ -303,7 +308,7 @@ export class EmailService {
         return false;
       }
 
-      this.logger.log(`Email envoyé (${params.context}) → ${params.to.join(', ')}`);
+      this.logger.log(`Email envoyé (${params.context}) → ${params.to.join(', ')}${params.cc?.length ? ` (cc: ${params.cc.join(', ')})` : ''}`);
       return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur inconnue';
